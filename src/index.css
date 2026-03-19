@@ -1,0 +1,126 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-bg-base: #0c1e14;
+  --color-bg-elevated: #132619;
+  --color-bg-surface: rgba(255 255 255 / 0.05);
+  --color-bg-surface-hover: rgba(255 255 255 / 0.08);
+
+  --color-primary: #00d68f;
+  --color-primary-dark: #00b578;
+  --color-primary-light: #33dfa0;
+  --color-primary-glow: rgba(0 214 143 / 0.22);
+
+  --color-secondary: #06b6d4;
+  --color-secondary-glow: rgba(6 182 212 / 0.18);
+
+  --color-success: #00d68f;
+  --color-success-bg: rgba(0 214 143 / 0.12);
+  --color-danger: #ef4444;
+  --color-danger-bg: rgba(239 68 68 / 0.12);
+  --color-warning: #f59e0b;
+  --color-warning-bg: rgba(245 158 11 / 0.12);
+  --color-info: #06b6d4;
+  --color-info-bg: rgba(6 182 212 / 0.12);
+
+  --color-border: rgba(255 255 255 / 0.07);
+  --color-border-strong: rgba(255 255 255 / 0.13);
+
+  --color-text: #ffffff;
+  --color-text-secondary: rgba(255 255 255 / 0.65);
+  --color-text-muted: rgba(255 255 255 / 0.38);
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { color-scheme: dark; }
+
+body {
+  margin: 0;
+  background-color: var(--color-bg-base);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root { min-height: 100dvh; }
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0 214 143 / 0.18); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0 214 143 / 0.32); }
+
+@layer utilities {
+  .glass {
+    background: rgba(255 255 255 / 0.04);
+    border: 1px solid rgba(255 255 255 / 0.07);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 1px 3px rgba(0 0 0 / 0.3), 0 4px 16px rgba(0 0 0 / 0.2);
+  }
+
+  .glass-strong {
+    background: rgba(255 255 255 / 0.07);
+    border: 1px solid rgba(255 255 255 / 0.1);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 24px rgba(0 0 0 / 0.35), 0 1px 4px rgba(0 0 0 / 0.2);
+  }
+
+  .gradient-primary {
+    background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
+  }
+
+  .glow-primary {
+    box-shadow: 0 0 24px var(--color-primary-glow), 0 4px 12px rgba(0 0 0 / 0.3);
+  }
+
+  .text-gradient {
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+}
+
+.bg-ambient {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.bg-ambient::before {
+  content: '';
+  position: absolute;
+  top: -25%;
+  right: -10%;
+  width: 55%;
+  height: 55%;
+  background: radial-gradient(circle, rgba(0 214 143 / 0.07) 0%, transparent 65%);
+  border-radius: 50%;
+}
+
+.bg-ambient::after {
+  content: '';
+  position: absolute;
+  bottom: -20%;
+  left: -5%;
+  width: 45%;
+  height: 45%;
+  background: radial-gradient(circle, rgba(6 182 212 / 0.05) 0%, transparent 65%);
+  border-radius: 50%;
+}

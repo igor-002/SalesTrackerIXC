@@ -1,0 +1,67 @@
+import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '@/lib/supabase'
+import type { TablesInsert } from '@/types/database.types'
+
+export interface VendaComJoins {
+  id: string
+  cliente_nome: string
+  cliente_cpf_cnpj: string | null
+  cliente_uf: string | null
+  quantidade: number
+  valor_unitario: number
+  valor_total: number | null
+  comissao_pct: number | null
+  comissao_valor: number | null
+  mrr: boolean | null
+  data_venda: string
+  descricao: string | null
+  created_at: string | null
+  vendedor: { id: string; nome: string } | null
+  segmento: { id: string; nome: string } | null
+  produto: { id: string; nome: string } | null
+  status: { id: string; nome: string } | null
+}
+
+type VendaInsert = Omit<TablesInsert<'vendas'>, 'valor_total' | 'comissao_valor'>
+
+export function useVendas() {
+  const [vendas, setVendas] = useState<VendaComJoins[]>([])
+  const [loading, setLoading] = useState(true)
+
+  const fetch = useCallback(async () => {
+    setLoading(true)
+    const { data } = await supabase
+      .from('vendas')
+      .select(`
+        *,
+        vendedor:vendedores(id, nome),
+        segmento:segmentos(id, nome),
+        produto:produtos(id, nome),
+        status:status_venda(id, nome)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(200)
+
+    setVendas((data ?? []) as VendaComJoins[])
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { fetch() }, [fetch])
+
+  async function createVenda(payload: VendaInsert) {
+    const { error } = await supabase.from('vendas').insert(payload)
+    if (error) throw error
+    await fetch()
+  }
+
+  async function updateStatus(vendaId: string, statusId: string) {
+    const { error } = await supabase
+      .from('vendas')
+      .update({ status_id: statusId })
+      .eq('id', vendaId)
+    if (error) throw error
+    await fetch()
+  }
+
+  return { vendas, loading, refetch: fetch, createVenda, updateStatus }
+}

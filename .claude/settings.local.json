@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "mcp__supabase__list_projects",
+      "mcp__supabase__get_project_url",
+      "mcp__supabase__get_publishable_keys",
+      "Bash(npm create:*)",
+      "Bash(printf 'y\\\\n')",
+      "Bash(mkdir -p /tmp/salestraker)",
+      "Read(//tmp/**)",
+      "Bash(cp:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tailwindcss:*)",
+      "mcp__supabase__apply_migration",
+      "mcp__supabase__execute_sql",
+      "mcp__supabase__generate_typescript_types",
+      "Read(//c/Users/igor/.claude/plugins/cache/ui-ux-pro-max-skill/ui-ux-pro-max/2.0.1/.claude/skills/ui-ux-pro-max/**)",
+      "Bash(python3 scripts/search.py \"sales CRM dashboard dark glassmorphism professional\" --design-system -p \"SalesTracker\" -f markdown)",
+      "Bash(python3 scripts/search.py \"glassmorphism dark mode\" --domain style -n 3)",
+      "Bash(npm run:*)",
+      "Bash(ls dist/assets/*.css)",
+      "Bash(curl -s http://localhost:5174/)",
+      "Bash(ls C:/www/salestrakerOPENITATT/src/*.css)",
+      "Bash(curl -s http://localhost:5175/src/index.css)",
+      "Bash(npx tsc:*)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}
