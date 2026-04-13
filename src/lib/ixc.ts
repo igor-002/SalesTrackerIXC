@@ -22,7 +22,7 @@
  */
 
 const IXC_BASE_URL = import.meta.env.VITE_IXC_BASE_URL as string | undefined
-const IXC_TOKEN = import.meta.env.VITE_IXC_TOKEN as string | undefined
+
 const IXC_CAMPO_STATUS = (import.meta.env.VITE_IXC_CAMPO_STATUS_CONTRATO as string | undefined) ?? 'status_internet'
 
 // Mapeamento dos valores brutos retornados pela API para nomes usados no SalesTracker.

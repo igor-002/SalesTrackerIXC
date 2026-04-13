@@ -17,7 +17,7 @@ export default function Vendedores() {
         telefone: data.telefone || null,
         meta_mensal: data.meta_mensal,
         ativo: true,
-      })
+      } as never)
       setModalOpen(false)
       toast('success', 'Vendedor cadastrado com sucesso!')
     } catch (err) {

@@ -17,7 +17,7 @@ export default function Produtos() {
         preco_base: data.preco_base,
         recorrente: data.recorrente,
         ativo: true,
-      })
+      } as never)
       setModalOpen(false)
       toast('success', 'Produto cadastrado com sucesso!')
     } catch {

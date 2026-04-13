@@ -31,7 +31,8 @@ export function useMetas() {
   async function upsertMeta(payload: UpsertMetaPayload) {
     const { error } = await supabase
       .from('metas')
-      .upsert(payload, { onConflict: 'ano,mes' })
+      // empresa_id é setado automaticamente pelo trigger — cast necessário para o TS
+      .upsert(payload as never, { onConflict: 'ano,mes' })
     if (error) throw error
     await fetch()
   }
