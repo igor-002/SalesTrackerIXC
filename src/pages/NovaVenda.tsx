@@ -1,4 +1,5 @@
-import { NovaVendaForm, type NovaVendaFormData } from '@/components/vendas/NovaVendaForm'
+import { NovaVendaForm } from '@/components/vendas/NovaVendaForm'
+import type { VendaFormData as NovaVendaFormData } from '@/components/vendas/vendaFormSchema'
 import { useVendas } from '@/hooks/useVendas'
 import { useAuthStore } from '@/store/authStore'
 import { toast } from '@/components/ui/Toast'
@@ -13,6 +14,8 @@ export default function NovaVenda() {
         cliente_nome: data.cliente_nome,
         cliente_cpf_cnpj: data.cliente_cpf_cnpj || null,
         cliente_uf: data.cliente_uf || null,
+        codigo_cliente_ixc: data.codigo_cliente_ixc || null,
+        codigo_contrato_ixc: data.codigo_contrato_ixc || null,
         vendedor_id: data.vendedor_id,
         segmento_id: data.segmento_id || null,
         status_id: data.status_id,

@@ -1,9 +1,11 @@
 import { useForm, Controller, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
+import { useState } from 'react'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
+import { Spinner } from '@/components/ui/Spinner'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { formatBRL, maskCPFCNPJ } from '@/lib/formatters'
 import { UFS } from '@/constants'
@@ -11,25 +13,13 @@ import { useVendedores } from '@/hooks/useVendedores'
 import { useSegmentos } from '@/hooks/useSegmentos'
 import { useProdutos } from '@/hooks/useProdutos'
 import { useStatusVenda } from '@/hooks/useStatusVenda'
+import { useIxcFieldLookup } from '@/hooks/useIxcFieldLookup'
+import { ixcBuscarStatusContrato, ixcBuscarCliente } from '@/lib/ixc'
+import { vendaFormSchema, type VendaFormData } from './vendaFormSchema'
+import { toast } from '@/components/ui/Toast'
 
-const schema = z.object({
-  cliente_nome: z.string().min(2, 'Nome do cliente é obrigatório'),
-  cliente_cpf_cnpj: z.string().optional(),
-  cliente_uf: z.string().length(2, 'Selecione um estado').optional().or(z.literal('')),
-  vendedor_id: z.string().uuid('Selecione um vendedor'),
-  segmento_id: z.string().uuid('Selecione um segmento').optional().or(z.literal('')),
-  status_id: z.string().uuid('Selecione um status'),
-  produto_id: z.string().uuid('Selecione um produto').optional().or(z.literal('')),
-  data_venda: z.string().min(1, 'Data é obrigatória'),
-  mrr: z.boolean(),
-  quantidade: z.coerce.number().int().min(1, 'Mínimo 1'),
-  valor_unitario: z.coerce.number().min(0.01, 'Valor deve ser positivo'),
-  comissao_pct: z.coerce.number().min(0).max(100),
-  descricao: z.string().optional(),
-})
-
-export type NovaVendaFormData = z.infer<typeof schema>
-interface NovaVendaFormProps { onSubmit: (data: NovaVendaFormData) => Promise<void> }
+export type { NovaVendaFormData } from './vendaFormSchema'
+interface NovaVendaFormProps { onSubmit: (data: VendaFormData) => Promise<void> }
 
 const ufOptions = UFS.map((uf) => ({ value: uf, label: uf }))
 
@@ -39,10 +29,41 @@ export function NovaVendaForm({ onSubmit }: NovaVendaFormProps) {
   const { produtos } = useProdutos()
   const { statuses } = useStatusVenda()
   const today = new Date().toISOString().slice(0, 10)
+  const [statusViaIxc, setStatusViaIxc] = useState(false)
 
-  const { register, handleSubmit, control, watch, reset, formState: { errors, isSubmitting } } = useForm<NovaVendaFormData>({
-    resolver: zodResolver(schema) as Resolver<NovaVendaFormData>,
+  const { register, handleSubmit, control, watch, reset, setValue, getValues, formState: { errors, isSubmitting } } = useForm<VendaFormData>({
+    resolver: zodResolver(vendaFormSchema) as Resolver<VendaFormData>,
     defaultValues: { data_venda: today, mrr: false, quantidade: 1, valor_unitario: 0, comissao_pct: 0 },
+  })
+
+  const contratoLookup = useIxcFieldLookup({
+    fetcher: ixcBuscarStatusContrato,
+    onSuccess: (contrato) => {
+      const matched = statuses.find((s) => s.nome.toLowerCase() === contrato.status.toLowerCase())
+      if (matched) {
+        setValue('status_id', matched.id)
+        setStatusViaIxc(true)
+      } else {
+        toast('warning', `Status "${contrato.status}" não encontrado no sistema`)
+      }
+    },
+    onError: (err) => {
+      const msg = err instanceof Error ? err.message : 'Erro ao buscar contrato no IXC'
+      toast('error', msg)
+    },
+  })
+
+  const clienteLookup = useIxcFieldLookup({
+    fetcher: ixcBuscarCliente,
+    onSuccess: (cliente) => {
+      if (!getValues('cliente_nome'))     setValue('cliente_nome', cliente.razao)
+      if (!getValues('cliente_cpf_cnpj')) setValue('cliente_cpf_cnpj', cliente.cnpj_cpf)
+      if (!getValues('cliente_uf'))       setValue('cliente_uf', cliente.uf)
+    },
+    onError: (err) => {
+      const msg = err instanceof Error ? err.message : 'Erro ao buscar cliente no IXC'
+      toast('error', msg)
+    },
   })
 
   const qtd = watch('quantidade') || 0
@@ -51,7 +72,7 @@ export function NovaVendaForm({ onSubmit }: NovaVendaFormProps) {
   const total = qtd * valUnit
   const comissao = total * comPct / 100
 
-  async function onValid(data: NovaVendaFormData) {
+  async function onValid(data: VendaFormData) {
     await onSubmit(data)
     reset({ data_venda: today, mrr: false, quantidade: 1, valor_unitario: 0, comissao_pct: 0 })
   }
@@ -62,6 +83,34 @@ export function NovaVendaForm({ onSubmit }: NovaVendaFormProps) {
         {/* Coluna 1 — Cliente */}
         <GlassCard className="p-5 flex flex-col gap-4">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-white/40">Cliente</h3>
+
+          {/* Códigos IXC primeiro — disparam o auto-preenchimento */}
+          <div className="relative">
+            <Input
+              label="Cód. Cliente IXC"
+              placeholder="Ex: 1234"
+              hint="Auto-preenche nome, CPF e estado"
+              error={errors.codigo_cliente_ixc?.message}
+              disabled={clienteLookup.loading}
+              {...register('codigo_cliente_ixc', { onBlur: clienteLookup.handleBlur })}
+            />
+            {clienteLookup.loading && <Spinner size="sm" className="absolute right-3 top-[34px]" style={{ color: '#00d68f' }} />}
+          </div>
+          <div className="relative">
+            <Input
+              label="Cód. Contrato IXC"
+              placeholder="Ex: 5678"
+              hint="Auto-preenche o status do contrato"
+              error={errors.codigo_contrato_ixc?.message}
+              disabled={contratoLookup.loading}
+              {...register('codigo_contrato_ixc', { onBlur: contratoLookup.handleBlur })}
+            />
+            {contratoLookup.loading && <Spinner size="sm" className="absolute right-3 top-[34px]" style={{ color: '#00d68f' }} />}
+          </div>
+
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
+
+          {/* Dados pessoais — preenchidos manualmente ou via IXC */}
           <Input label="Nome do Cliente" placeholder="Empresa XYZ" required error={errors.cliente_nome?.message} {...register('cliente_nome')} />
           <Controller
             name="cliente_cpf_cnpj"
@@ -84,7 +133,10 @@ export function NovaVendaForm({ onSubmit }: NovaVendaFormProps) {
           <h3 className="text-xs font-semibold uppercase tracking-wider text-white/40">Venda</h3>
           <Select label="Vendedor" options={vendedores.map((v) => ({ value: v.id, label: v.nome }))} placeholder="Selecione..." required error={errors.vendedor_id?.message} {...register('vendedor_id')} />
           <Select label="Segmento" options={segmentos.map((s) => ({ value: s.id, label: s.nome }))} placeholder="Selecione..." error={errors.segmento_id?.message} {...register('segmento_id')} />
-          <Select label="Status" options={statuses.map((s) => ({ value: s.id, label: s.nome }))} placeholder="Selecione..." required error={errors.status_id?.message} {...register('status_id')} />
+          <div>
+            <Select label="Status" options={statuses.map((s) => ({ value: s.id, label: s.nome }))} placeholder="Selecione..." required error={errors.status_id?.message} disabled={contratoLookup.loading} {...register('status_id', { onChange: () => setStatusViaIxc(false) })} />
+            {statusViaIxc && <Badge variant="info" className="mt-1 text-[10px]">via IXC</Badge>}
+          </div>
           <Select label="Produto" options={produtos.map((p) => ({ value: p.id, label: p.nome }))} placeholder="Selecione..." error={errors.produto_id?.message} {...register('produto_id')} />
           <Input label="Data da Venda" type="date" required error={errors.data_venda?.message} {...register('data_venda')} />
           <label className="flex items-center gap-2.5 cursor-pointer select-none">

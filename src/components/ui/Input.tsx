@@ -38,6 +38,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             background: 'rgba(255,255,255,0.05)',
             borderColor: 'rgba(255,255,255,0.1)',
           }}
+          {...props}
           onFocus={(e) => {
             if (!error) {
               e.currentTarget.style.borderColor = '#00d68f'
@@ -54,7 +55,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             }
             props.onBlur?.(e)
           }}
-          {...props}
         />
         {hint && !error && <p className="text-xs text-white/35">{hint}</p>}
         {error && <p className="text-xs text-red-400 font-medium">{error}</p>}

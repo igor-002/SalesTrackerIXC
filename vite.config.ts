@@ -13,4 +13,13 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    proxy: {
+      '/api/ixc': {
+        target: process.env.VITE_IXC_BASE_URL ?? 'https://central.openitgroup.com.br',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/ixc/, '/webservice/v1'),
+      },
+    },
+  },
 })

@@ -1,5 +1,8 @@
 {
+  "outputDirectory": "dist",
+  "buildCommand": "npm run build",
   "rewrites": [
+    { "source": "/api/ixc/:tabela", "destination": "/api/ixc/[tabela]" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
