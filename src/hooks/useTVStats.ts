@@ -39,6 +39,7 @@ export interface TVStats {
   alertasAA: AlertaAATv[]
   rankingVendedores: VendedorRanking[]
   vendasPorDiaSemana: { dia: string; qtd: number }[]
+  mrr12Meses: { mes: string; valor: number }[]
   loading: boolean
 }
 
@@ -52,6 +53,7 @@ const EMPTY: TVStats = {
   alertasAA: [],
   rankingVendedores: [],
   vendasPorDiaSemana: [],
+  mrr12Meses: [],
   loading: true,
 }
 
@@ -71,7 +73,13 @@ export function useTVStats() {
     inicioSemana.setDate(now.getDate() - dayOfWeek)
     const inicioSemanaStr = inicioSemana.toISOString().slice(0, 10)
 
-    const [mesRes, semanaRes] = await Promise.all([
+    // 12 meses para a linha de MRR no gráfico
+    const inicio12Meses = new Date(now)
+    inicio12Meses.setFullYear(inicio12Meses.getFullYear() - 1)
+    inicio12Meses.setDate(1)
+    const inicio12MesesStr = inicio12Meses.toISOString().slice(0, 10)
+
+    const [mesRes, semanaRes, mrr12Res] = await Promise.all([
       supabase
         .from('vendas')
         .select('id, status_ixc, mrr, valor_total, dias_em_aa, cliente_nome, data_venda, codigo_contrato_ixc, vendedor:vendedores(id, nome)')
@@ -80,10 +88,17 @@ export function useTVStats() {
         .from('vendas')
         .select('data_venda')
         .gte('data_venda', inicioSemanaStr),
+      supabase
+        .from('vendas')
+        .select('data_venda, valor_total')
+        .eq('mrr', true)
+        .eq('status_ixc', 'A')
+        .gte('data_venda', inicio12MesesStr),
     ])
 
     const vendasMes = mesRes.data ?? []
     const vendasSemana = semanaRes.data ?? []
+    const vendasMrr12 = mrr12Res.data ?? []
 
     const faturamentoReal = vendasMes
       .filter((v) => v.status_ixc === 'A')
@@ -146,6 +161,23 @@ export function useTVStats() {
     }
     const vendasPorDiaSemana = DIAS_SEMANA.map((dia, i) => ({ dia, qtd: counts[i] }))
 
+    // Agrupar MRR dos últimos 12 meses por mês
+    const mrrMap = new Map<string, number>()
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      mrrMap.set(key, 0)
+    }
+    for (const v of vendasMrr12) {
+      const key = v.data_venda.slice(0, 7)
+      if (mrrMap.has(key)) mrrMap.set(key, (mrrMap.get(key) ?? 0) + (v.valor_total ?? 0))
+    }
+    const mrr12Meses = Array.from(mrrMap.entries()).map(([key, valor]) => {
+      const [ano, mes] = key.split('-')
+      const label = new Date(Number(ano), Number(mes) - 1, 1).toLocaleString('pt-BR', { month: 'short' })
+      return { mes: label, valor }
+    })
+
     setStats({
       faturamentoReal,
       faturamentoPrometido,
@@ -156,6 +188,7 @@ export function useTVStats() {
       alertasAA,
       rankingVendedores,
       vendasPorDiaSemana,
+      mrr12Meses,
       loading: false,
     })
   }, [])

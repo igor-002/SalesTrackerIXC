@@ -154,6 +154,7 @@ export default function TVDashboard() {
             mrrReal={tvStats.mrrReal}
             mrrProjetado={tvStats.mrrProjetado}
             faturamento12Meses={dashStats.faturamento12Meses}
+            mrr12Meses={tvStats.mrr12Meses}
             t={t}
           />
         </div>

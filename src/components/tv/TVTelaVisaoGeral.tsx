@@ -9,6 +9,7 @@ interface TVTelaVisaoGeralProps {
   mrrReal: number
   mrrProjetado: number
   faturamento12Meses: { mes: string; valor: number }[]
+  mrr12Meses?: { mes: string; valor: number }[]
   t: TVThemeColors
 }
 
@@ -18,6 +19,7 @@ export function TVTelaVisaoGeral({
   mrrReal,
   mrrProjetado,
   faturamento12Meses,
+  mrr12Meses,
   t,
 }: TVTelaVisaoGeralProps) {
   return (
@@ -138,7 +140,7 @@ export function TVTelaVisaoGeral({
             Faturamento — Últimos 12 Meses
           </p>
           <div className="flex-1 min-h-0">
-            <BarChartFaturamento data={faturamento12Meses} accentHex={t.primary} />
+            <BarChartFaturamento data={faturamento12Meses} mrrData={mrr12Meses} accentHex={t.primary} />
           </div>
         </div>
 
