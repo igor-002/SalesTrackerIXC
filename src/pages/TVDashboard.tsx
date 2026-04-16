@@ -7,6 +7,9 @@ import { TVTelaVisaoGeral } from '@/components/tv/TVTelaVisaoGeral'
 import { TVTelaFunil } from '@/components/tv/TVTelaFunil'
 import { TVTelaAlertas } from '@/components/tv/TVTelaAlertas'
 import { TVTelaRanking } from '@/components/tv/TVTelaRanking'
+import { TVTelaPlanos } from '@/components/tv/TVTelaPlanos'
+import { TVTelaChurn } from '@/components/tv/TVTelaChurn'
+import { TVTelaVelocidade } from '@/components/tv/TVTelaVelocidade'
 import { useDashboardStats } from '@/hooks/useDashboardStats'
 import { useTVStats } from '@/hooks/useTVStats'
 import { useRealtime } from '@/hooks/useRealtime'
@@ -39,7 +42,7 @@ const THEMES: Record<TVTheme, TVThemeColors> = {
 
 const THEME_KEY = 'tv_theme'
 const SLIDE_INTERVAL = 15000
-const TELA_LABELS = ['Visão Geral', 'Funil', 'Alertas', 'Ranking']
+const TELA_LABELS = ['Visão Geral', 'Funil', 'Alertas', 'Ranking', 'Planos', 'Cancelamentos', 'Velocidade']
 
 export default function TVDashboard() {
   const { stats: dashStats, loading: dashLoading, refetch: refetchDash } = useDashboardStats()
@@ -63,7 +66,7 @@ export default function TVDashboard() {
       return
     }
     intervalRef.current = setInterval(() => {
-      setTela((s) => (s + 1) % 4)
+      setTela((s) => (s + 1) % 7)
     }, SLIDE_INTERVAL)
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
@@ -188,6 +191,30 @@ export default function TVDashboard() {
           style={{ opacity: tela === 3 ? 1 : 0, transform: tela === 3 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 3 ? 'auto' : 'none' }}
         >
           <TVTelaRanking rankingVendedores={tvStats.rankingVendedores} t={t} />
+        </div>
+
+        {/* Tela 4 — Planos */}
+        <div
+          className="absolute inset-0 transition-all duration-700 ease-in-out"
+          style={{ opacity: tela === 4 ? 1 : 0, transform: tela === 4 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 4 ? 'auto' : 'none' }}
+        >
+          <TVTelaPlanos planosMes={tvStats.planosMes} t={t} />
+        </div>
+
+        {/* Tela 5 — Cancelamentos */}
+        <div
+          className="absolute inset-0 transition-all duration-700 ease-in-out"
+          style={{ opacity: tela === 5 ? 1 : 0, transform: tela === 5 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 5 ? 'auto' : 'none' }}
+        >
+          <TVTelaChurn churn={tvStats.churn} t={t} />
+        </div>
+
+        {/* Tela 6 — Velocidade */}
+        <div
+          className="absolute inset-0 transition-all duration-700 ease-in-out"
+          style={{ opacity: tela === 6 ? 1 : 0, transform: tela === 6 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 6 ? 'auto' : 'none' }}
+        >
+          <TVTelaVelocidade velocidadeVendedores={tvStats.velocidadeVendedores} mediaVelocidadeTime={tvStats.mediaVelocidadeTime} t={t} />
         </div>
 
       </div>

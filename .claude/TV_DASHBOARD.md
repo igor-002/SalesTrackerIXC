@@ -168,9 +168,58 @@ Passa `emptyLabel="Mês iniciando"` ao `ProgressBar` quando `pct < 5` (Task 1.4)
 
 ---
 
+---
+
+## Tela 4 — Planos mais vendidos
+**Arquivo:** `src/components/tv/TVTelaPlanos.tsx`
+
+**Props:**
+```ts
+planosMes: PlanoStat[]   // { nome, qtd, total, ticketMedio } ordenado por qtd desc
+t: TVThemeColors
+```
+
+**Dados de:** `useTVStats.ts` — filtra `status_ixc='A'` do mês, agrupa por `segmento.nome`.
+**Layout:** Header + lista com barra proporcional ao líder em qtd + rodapé com ticket médio geral.
+
+---
+
+## Tela 5 — Cancelamentos e churn
+**Arquivo:** `src/components/tv/TVTelaChurn.tsx`
+
+**Props:**
+```ts
+churn: ChurnStats   // { canceladosMes, canceladosMesAnterior, bloqueadosMes, bloqueadosMesAnterior }
+t: TVThemeColors
+```
+
+**Dados de:** `useTVStats.ts` — duas queries separadas filtradas por `status_atualizado_em` (não `data_venda`).
+Status: `C` = cancelado, `B` = bloqueado.
+**Layout:** 2 cards grandes (vermelho/amarelo) com delta vs. mês anterior + banner de alerta se cancelamentos aumentaram.
+**Nota:** campo `motivo_cancelamento` não existe no schema — seção de motivos omitida.
+
+---
+
+## Tela 6 — Velocidade de ativação
+**Arquivo:** `src/components/tv/TVTelaVelocidade.tsx`
+
+**Props:**
+```ts
+velocidadeVendedores: VelocidadeVendedor[]   // { id, nome, mediaDias, melhorCaso, piorCaso, totalContratos }
+mediaVelocidadeTime: number
+t: TVThemeColors
+```
+
+**Dados de:** `useTVStats.ts` — calcula `daysDiff = status_atualizado_em - created_at` para contratos `A`.
+`status_atualizado_em` é usada como aproximação da data de ativação no IXC (ver comentário no hook).
+**Layout:** Ranking do mais rápido ao mais lento. Badge "verificar operação" quando `mediaDias > 2× mediaVelocidadeTime`.
+Rodapé com média do time.
+
+---
+
 ## Log de Mudanças
 
-### Fase 1 (2026-04-14)
+### Fase 1 (2026-04-15)
 
 | Task | Mudança |
 |------|---------|
@@ -178,3 +227,12 @@ Passa `emptyLabel="Mês iniciando"` ao `ProgressBar` quando `pct < 5` (Task 1.4)
 | 1.2  | Métricas secundárias no ranking: contratos, ticket médio, taxa de conversão individual |
 | 1.3  | Linha de MRR ciano sobreposta no gráfico de 12 meses (ComposedChart) |
 | 1.4  | Estado "Mês iniciando" com barra tracejada no ProgressBar quando < 5% |
+
+### Fase 2 (2026-04-15)
+
+| Task | Mudança |
+|------|---------|
+| 2.1  | Nova tela: Planos mais vendidos (agrupado por segmento, contratos A do mês) |
+| 2.2  | Nova tela: Cancelamentos e churn (status B/C via status_atualizado_em, delta vs. mês anterior) |
+| 2.3  | Nova tela: Velocidade de ativação por vendedor (dias created_at → status_atualizado_em) |
+| 2.4  | Carrossel expandido de 4 para 7 telas; useTVStats extendido com novos selects e queries |
