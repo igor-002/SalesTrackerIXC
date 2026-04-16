@@ -236,3 +236,15 @@ Rodapé com média do time.
 | 2.2  | Nova tela: Cancelamentos e churn (status B/C via status_atualizado_em, delta vs. mês anterior) |
 | 2.3  | Nova tela: Velocidade de ativação por vendedor (dias created_at → status_atualizado_em) |
 | 2.4  | Carrossel expandido de 4 para 7 telas; useTVStats extendido com novos selects e queries |
+
+### Fase 4 (2026-04-16)
+
+| Task | Mudança |
+|------|---------|
+| 4.2  | `TVSyncIndicator` no footer (esquerda) — semáforo verde/amarelo/vermelho por tempo desde último sync IXC |
+
+**Indicador de sync:**
+- Componente: `src/components/tv/TVSyncIndicator.tsx`
+- Hook: `useSyncStatus()` de `src/hooks/useSyncStatus.ts` — polling 60s
+- Verde < 30min · Amarelo 30–60min · Vermelho > 60min ou status=erro
+- Posicionado à esquerda dos dots de navegação no footer
