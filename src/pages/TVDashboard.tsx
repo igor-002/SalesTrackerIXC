@@ -10,6 +10,7 @@ import { TVTelaRanking } from '@/components/tv/TVTelaRanking'
 import { TVTelaPlanos } from '@/components/tv/TVTelaPlanos'
 import { TVTelaChurn } from '@/components/tv/TVTelaChurn'
 import { TVTelaVelocidade } from '@/components/tv/TVTelaVelocidade'
+import { TVSyncIndicator } from '@/components/tv/TVSyncIndicator'
 import { useDashboardStats } from '@/hooks/useDashboardStats'
 import { useTVStats } from '@/hooks/useTVStats'
 import { useRealtime } from '@/hooks/useRealtime'
@@ -219,8 +220,12 @@ export default function TVDashboard() {
 
       </div>
 
-      {/* ── FOOTER: dots + pause ── */}
-      <div className="relative z-10 flex-shrink-0 flex items-center justify-center gap-3 pb-1">
+      {/* ── FOOTER: dots + pause + sync indicator ── */}
+      <div className="relative z-10 flex-shrink-0 flex items-center justify-between pb-1">
+        {/* Esquerda — indicador de sync */}
+        <TVSyncIndicator />
+
+        {/* Centro — dots de navegação */}
         <div className="flex items-center gap-2">
           {TELA_LABELS.map((label, i) => (
             <button
@@ -241,6 +246,7 @@ export default function TVDashboard() {
           ))}
         </div>
 
+        {/* Direita — botão pause */}
         <button
           onClick={() => setPausado((p) => !p)}
           className="flex items-center justify-center w-7 h-7 rounded-full transition-colors cursor-pointer"
