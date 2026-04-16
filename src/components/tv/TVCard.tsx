@@ -1,5 +1,16 @@
 import type { ReactNode } from 'react'
 
+export type TVThemeColors = {
+  bg: string
+  glow: string
+  primary: string
+  secondary: string
+  card1: string
+  card2: string
+  card3: string
+  metaColors: [string, string]
+}
+
 interface TVCardProps {
   title: string
   value: string

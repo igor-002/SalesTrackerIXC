@@ -1,98 +1,49 @@
-import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
-import { ixcBuscarStatusContrato, ixcConfigurado } from '@/lib/ixc'
-import type { VendaComJoins } from '@/hooks/useVendas'
+import { useEffect, useRef } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { sincronizarStatusIxc, type SyncResultado } from '@/services/ixcSync'
+import { ixcConfigurado } from '@/lib/ixc'
 
-export interface IxcSyncResult {
-  vendaId: string
-  clienteNome: string
-  statusAnterior: string
-  statusNovo: string
-  atualizado: boolean
-  erro?: string
+export type { SyncResultado }
+
+const SYNC_QUERY_KEY = ['ixc-sync'] as const
+
+interface UseIxcSyncOptions {
+  /** Chamado sempre que uma sincronização for concluída com sucesso */
+  onSyncComplete?: () => void
 }
 
-export function useIxcSync() {
-  const [syncing, setSyncing] = useState(false)
+export function useIxcSync(options?: UseIxcSyncOptions) {
+  const queryClient = useQueryClient()
+  const prevUpdatedAt = useRef<number>(0)
 
-  /**
-   * Sincroniza o status de uma única venda consultando o contrato no IXC
-   * e atualizando o status_id no Supabase se houver correspondência.
-   */
-  async function syncVenda(venda: VendaComJoins, statusMap: Record<string, string>): Promise<IxcSyncResult> {
-    const base: IxcSyncResult = {
-      vendaId: venda.id,
-      clienteNome: venda.cliente_nome,
-      statusAnterior: venda.status?.nome ?? '',
-      statusNovo: '',
-      atualizado: false,
+  const { data, isFetching, dataUpdatedAt } = useQuery<SyncResultado>({
+    queryKey: SYNC_QUERY_KEY,
+    queryFn: sincronizarStatusIxc,
+    refetchInterval: 30 * 60 * 1000,   // 30 minutos
+    staleTime: 29 * 60 * 1000,          // não re-executa se < 29min
+    enabled: ixcConfigurado(),
+    retry: 1,
+  })
+
+  // Dispara onSyncComplete quando dataUpdatedAt muda (nova sync concluída)
+  useEffect(() => {
+    if (dataUpdatedAt > 0 && dataUpdatedAt !== prevUpdatedAt.current) {
+      prevUpdatedAt.current = dataUpdatedAt
+      options?.onSyncComplete?.()
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataUpdatedAt])
 
-    if (!venda.codigo_contrato_ixc) {
-      return { ...base, erro: 'sem código de contrato IXC' }
-    }
+  const ultimaSincronizacao: Date | null = dataUpdatedAt > 0 ? new Date(dataUpdatedAt) : null
 
-    try {
-      const contrato = await ixcBuscarStatusContrato(venda.codigo_contrato_ixc)
-      base.statusNovo = contrato.status
-
-      // Busca o status_id correspondente ao nome retornado pelo IXC
-      const novoStatusId = statusMap[contrato.status.toLowerCase()]
-      if (!novoStatusId) {
-        return { ...base, erro: `status "${contrato.status}" não mapeado` }
-      }
-
-      // Só atualiza se mudou
-      if (novoStatusId === venda.status?.id) {
-        return { ...base, atualizado: false }
-      }
-
-      const { error } = await supabase
-        .from('vendas')
-        .update({ status_id: novoStatusId })
-        .eq('id', venda.id)
-
-      if (error) throw error
-
-      return { ...base, atualizado: true }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'erro desconhecido'
-      return { ...base, erro: msg }
-    }
+  function sincronizarAgora() {
+    return queryClient.invalidateQueries({ queryKey: SYNC_QUERY_KEY })
   }
 
-  /**
-   * Sincroniza todas as vendas que possuem codigo_contrato_ixc preenchido.
-   * statusOptions: lista de { id, nome } dos status cadastrados no sistema.
-   */
-  async function syncTodos(
-    vendas: VendaComJoins[],
-    statusOptions: { id: string; nome: string }[]
-  ): Promise<IxcSyncResult[]> {
-    if (!ixcConfigurado()) {
-      throw new Error('Integração IXC não configurada. Verifique VITE_IXC_BASE_URL e VITE_IXC_TOKEN.')
-    }
-
-    // Mapa nome_em_minúsculas → id (ex: "ativo" → uuid)
-    const statusMap: Record<string, string> = {}
-    for (const s of statusOptions) {
-      statusMap[s.nome.toLowerCase()] = s.id
-    }
-
-    const comCodigo = vendas.filter((v) => v.codigo_contrato_ixc)
-
-    setSyncing(true)
-    try {
-      const results = await Promise.allSettled(
-        comCodigo.map((v) => syncVenda(v, statusMap))
-      )
-      return results.map((r) =>
-        r.status === 'fulfilled' ? r.value : { vendaId: '', clienteNome: '', statusAnterior: '', statusNovo: '', atualizado: false, erro: String(r.reason) }
-      )
-    } finally {
-      setSyncing(false)
-    }
+  return {
+    ultimaSincronizacao,
+    sincronizando: isFetching,
+    sincronizarAgora,
+    resultado: data ?? null,
   }
-
-  return { syncTodos, syncing }
 }

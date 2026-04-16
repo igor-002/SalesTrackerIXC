@@ -2,30 +2,37 @@ import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
   PlusCircle,
-  Users,
+  UserCog,
   Target,
   Monitor,
   TrendingUp,
   LogOut,
-  Package,
   UserCheck,
+  Users,
+  BarChart2,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { Avatar } from '@/components/ui/Avatar'
+import type { Permissoes } from '@/types/permissoes'
 
 const navItems = [
-  { to: '/', icon: LayoutDashboard, label: 'Dashboard', exact: true },
-  { to: '/nova-venda', icon: PlusCircle, label: 'Nova Venda' },
-  { to: '/clientes', icon: UserCheck, label: 'Clientes' },
-  { to: '/vendedores', icon: Users, label: 'Vendedores' },
-  { to: '/metas', icon: Target, label: 'Metas' },
-  { to: '/produtos', icon: Package, label: 'Produtos' },
-  { to: '/tv', icon: Monitor, label: 'TV Dashboard' },
+  { to: '/',           icon: LayoutDashboard, label: 'Dashboard',    permissao: 'dashboard'    as keyof Permissoes, exact: true },
+  { to: '/nova-venda', icon: PlusCircle,       label: 'Nova Venda',   permissao: 'nova_venda'   as keyof Permissoes },
+  { to: '/clientes',   icon: UserCheck,        label: 'Clientes',     permissao: 'clientes'     as keyof Permissoes },
+  { to: '/vendedores', icon: UserCog,          label: 'Vendedores',   permissao: 'vendedores'   as keyof Permissoes },
+  { to: '/metas',      icon: Target,           label: 'Metas',        permissao: 'metas'        as keyof Permissoes },
+  { to: '/relatorios',  icon: BarChart2,        label: 'Relatórios',   permissao: 'relatorios'   as keyof Permissoes },
+  { to: '/tv',         icon: Monitor,          label: 'TV Dashboard', permissao: 'tv_dashboard' as keyof Permissoes },
+  { to: '/usuarios',   icon: Users,            label: 'Usuários',     permissao: 'admin'        as keyof Permissoes },
 ]
 
 export function Sidebar() {
-  const { user, signOut } = useAuthStore()
-  const userName = user?.email?.split('@')[0] ?? 'Admin'
+  const { user, signOut, permissoes } = useAuthStore()
+  const userName = user?.email?.split('@')[0] ?? 'Usuário'
+
+  const navVisiveis = navItems.filter(({ permissao }) =>
+    !permissoes || permissoes[permissao]
+  )
 
   return (
     <aside
@@ -50,7 +57,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 flex flex-col gap-0.5" aria-label="Navegação principal">
-        {navItems.map(({ to, icon: Icon, label, exact }) => (
+        {navVisiveis.map(({ to, icon: Icon, label, exact }) => (
           <NavLink
             key={to}
             to={to}
@@ -83,7 +90,9 @@ export function Sidebar() {
           <Avatar name={userName} size="sm" />
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-white truncate">{userName}</p>
-            <p className="text-xs text-white/40">Administrador</p>
+            <p className="text-xs text-white/40">
+              {permissoes?.admin ? 'Administrador' : 'Vendedor'}
+            </p>
           </div>
         </div>
         <button

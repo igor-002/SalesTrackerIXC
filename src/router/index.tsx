@@ -5,14 +5,15 @@ import { ProtectedRoute } from '@/components/layout/ProtectedRoute'
 import { AppShell } from '@/components/layout/AppShell'
 import { Spinner } from '@/components/ui/Spinner'
 
-const LoginPage = lazy(() => import('@/pages/auth/LoginPage'))
-const Dashboard = lazy(() => import('@/pages/Dashboard'))
-const NovaVenda = lazy(() => import('@/pages/NovaVenda'))
-const Vendedores = lazy(() => import('@/pages/Vendedores'))
-const Metas = lazy(() => import('@/pages/Metas'))
-const Produtos = lazy(() => import('@/pages/Produtos'))
-const Clientes = lazy(() => import('@/pages/Clientes'))
+const LoginPage   = lazy(() => import('@/pages/auth/LoginPage'))
+const Dashboard   = lazy(() => import('@/pages/Dashboard'))
+const NovaVenda   = lazy(() => import('@/pages/NovaVenda'))
+const Vendedores  = lazy(() => import('@/pages/Vendedores'))
+const Metas       = lazy(() => import('@/pages/Metas'))
+const Clientes    = lazy(() => import('@/pages/Clientes'))
 const TVDashboard = lazy(() => import('@/pages/TVDashboard'))
+const Usuarios    = lazy(() => import('@/pages/Usuarios'))
+const Relatorios  = lazy(() => import('@/pages/Relatorios'))
 
 function PageLoader() {
   return (
@@ -35,77 +36,55 @@ export function Router() {
             element={session ? <Navigate to="/" replace /> : <LoginPage />}
           />
 
-          {/* Admin routes */}
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute role="admin">
-                <AppShell>
-                  <Dashboard />
-                </AppShell>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/nova-venda"
-            element={
-              <ProtectedRoute role="admin">
-                <AppShell>
-                  <NovaVenda />
-                </AppShell>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/vendedores"
-            element={
-              <ProtectedRoute role="admin">
-                <AppShell>
-                  <Vendedores />
-                </AppShell>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/metas"
-            element={
-              <ProtectedRoute role="admin">
-                <AppShell>
-                  <Metas />
-                </AppShell>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/produtos"
-            element={
-              <ProtectedRoute role="admin">
-                <AppShell>
-                  <Produtos />
-                </AppShell>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/clientes"
-            element={
-              <ProtectedRoute role="admin">
-                <AppShell>
-                  <Clientes />
-                </AppShell>
-              </ProtectedRoute>
-            }
-          />
+          {/* Rotas protegidas por permissão granular */}
+          <Route path="/" element={
+            <ProtectedRoute permissao="dashboard">
+              <AppShell><Dashboard /></AppShell>
+            </ProtectedRoute>
+          } />
 
-          {/* TV Dashboard — admin acessa diretamente, sem AppShell */}
-          <Route
-            path="/tv"
-            element={
-              <ProtectedRoute role="admin">
-                <TVDashboard />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/nova-venda" element={
+            <ProtectedRoute permissao="nova_venda">
+              <AppShell><NovaVenda /></AppShell>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/clientes" element={
+            <ProtectedRoute permissao="clientes">
+              <AppShell><Clientes /></AppShell>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/vendedores" element={
+            <ProtectedRoute permissao="vendedores">
+              <AppShell><Vendedores /></AppShell>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/metas" element={
+            <ProtectedRoute permissao="metas">
+              <AppShell><Metas /></AppShell>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/usuarios" element={
+            <ProtectedRoute permissao="admin">
+              <AppShell><Usuarios /></AppShell>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/relatorios" element={
+            <ProtectedRoute permissao="relatorios">
+              <AppShell><Relatorios /></AppShell>
+            </ProtectedRoute>
+          } />
+
+          {/* TV Dashboard — sem AppShell */}
+          <Route path="/tv" element={
+            <ProtectedRoute permissao="tv_dashboard">
+              <TVDashboard />
+            </ProtectedRoute>
+          } />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

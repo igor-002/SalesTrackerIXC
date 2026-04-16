@@ -24,6 +24,16 @@ export function Badge({ children, variant = 'default', className = '' }: BadgePr
 }
 
 export function statusToBadgeVariant(status: string): BadgeVariant {
+  // Códigos IXC
+  switch (status) {
+    case 'A':  return 'success'
+    case 'CM': return 'warning'
+    case 'FA': return 'danger'
+    case 'AA': return 'info'
+    case 'CN': return 'danger'
+    case 'N':  return 'purple'
+  }
+  // Fallback para nomes legíveis (dados antigos)
   switch (status.toLowerCase()) {
     case 'ativo': return 'success'
     case 'cancelado': return 'danger'

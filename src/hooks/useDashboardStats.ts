@@ -28,13 +28,28 @@ export interface DashboardStats {
   faturamentoPorDiaMes: { dia: string; valor: number }[]
   mrrPorDiaMes: { dia: string; valor: number }[]
 
+  // Status IXC
+  countPorStatus: { A: number; AA: number; CM: number; FA: number; CN: number; N: number }
+  faturamentoAtivos: number
+  faturamentoAguardando: number
+  alertasAA: AlertaAA[]
+
   // Últimas vendas
   ultimasVendas: UltimaVenda[]
+}
+
+export interface AlertaAA {
+  id: string
+  cliente_nome: string
+  dias_em_aa: number | null
+  vendedor: { nome: string } | null
+  codigo_contrato_ixc: string | null
 }
 
 export interface UltimaVenda {
   id: string
   cliente_nome: string
+  cliente_uf: string | null
   valor_total: number | null
   data_venda: string
   status: { nome: string } | null
@@ -59,6 +74,10 @@ const EMPTY_STATS: DashboardStats = {
   vendasPorDiaSemana: [],
   faturamentoPorDiaMes: [],
   mrrPorDiaMes: [],
+  countPorStatus: { A: 0, AA: 0, CM: 0, FA: 0, CN: 0, N: 0 },
+  faturamentoAtivos: 0,
+  faturamentoAguardando: 0,
+  alertasAA: [],
   ultimasVendas: [],
 }
 
@@ -81,10 +100,10 @@ export function useDashboardStats() {
     inicioSemana.setDate(now.getDate() - dayOfWeek)
     const inicioSemanaStr = inicioSemana.toISOString().slice(0, 10)
 
-    const [vendasMesRes, vendasSemanaRes, cancelamentosRes, ultimasRes] = await Promise.all([
+    const [vendasMesRes, vendasSemanaRes, cancelamentosRes, ultimasRes, vendasHistoricoRes] = await Promise.all([
       supabase
         .from('vendas')
-        .select('id, valor_total, comissao_valor, mrr, data_venda')
+        .select('id, cliente_nome, valor_total, comissao_valor, mrr, data_venda, status_ixc, dias_em_aa, codigo_contrato_ixc, vendedor:vendedores(nome)')
         .gte('data_venda', inicioMes),
       supabase
         .from('vendas')
@@ -96,9 +115,12 @@ export function useDashboardStats() {
         .gte('data_cancel', inicioMes),
       supabase
         .from('vendas')
-        .select('id, cliente_nome, valor_total, data_venda, status:status_venda(nome), vendedor:vendedores(nome)')
+        .select('id, cliente_nome, cliente_uf, valor_total, data_venda, status:status_venda(nome), vendedor:vendedores(nome)')
         .order('created_at', { ascending: false })
         .limit(5),
+      supabase
+        .from('vendas')
+        .select('data_venda, valor_total'),
     ])
 
     const vendasMes = vendasMesRes.data ?? []
@@ -121,22 +143,29 @@ export function useDashboardStats() {
     const vendasMrrMes = vendasMes.filter((v) => v.mrr).reduce((s, v) => s + (v.valor_total ?? 0), 0)
     const faturamentoSemRecorrencia = faturamentoMes - vendasMrrMes
 
-    // MRR vivo: soma dos valores dos clientes recorrentes ativos
-    const { data: clientesAtivos } = await supabase
-      .from('clientes')
-      .select('valor_pacote')
-      .eq('ativo', true)
-      .eq('mrr', true)
-    const mrrTotal = clientesAtivos?.reduce((s, c) => s + (c.valor_pacote ?? 0), 0) ?? vendasMrrMes
+    // MRR: soma das vendas recorrentes do mês atual
+    const mrrTotal = vendasMrrMes
     const ticketMedio = vendasMes.length > 0 ? faturamentoMes / vendasMes.length : 0
     const turnOverPct = vendasMes.length > 0 ? (cancelamentosMes / vendasMes.length) * 100 : 0
 
-    // Histórico completo (a partir do primeiro mês com dado)
-    const { data: vendasHistorico } = await supabase
-      .from('vendas')
-      .select('data_venda, valor_total')
+    // Status IXC
+    const countPorStatus = { A: 0, AA: 0, CM: 0, FA: 0, CN: 0, N: 0 }
+    let faturamentoAtivos = 0
+    let faturamentoAguardando = 0
+    for (const v of vendasMes) {
+      const code = ((v as { status_ixc?: string | null }).status_ixc ?? '') as keyof typeof countPorStatus
+      if (code in countPorStatus) countPorStatus[code]++
+      if (code === 'A') faturamentoAtivos += v.valor_total ?? 0
+      if (code === 'AA') faturamentoAguardando += v.valor_total ?? 0
+    }
+    const alertasAA = (vendasMes as AlertaAA[])
+      .filter((v) => (v as { status_ixc?: string | null }).status_ixc === 'AA' && ((v as { dias_em_aa?: number | null }).dias_em_aa ?? 0) > 7)
+      .sort((a, b) => (b.dias_em_aa ?? 0) - (a.dias_em_aa ?? 0))
+      .slice(0, 5)
 
-    const faturamento12Meses = buildMonthsArray(vendasHistorico ?? [])
+    const vendasHistorico = vendasHistoricoRes.data ?? []
+
+    const faturamento12Meses = buildMonthsArray(vendasHistorico)
     const vendasPorDiaSemana = buildWeekArray(vendasSemanaData)
     const faturamentoPorDiaMes = buildDailyArray(vendasMes, anoAtual, mesAtual)
     const mrrPorDiaMes = buildDailyArray(vendasMes.filter((v) => v.mrr), anoAtual, mesAtual)
@@ -159,6 +188,10 @@ export function useDashboardStats() {
       vendasPorDiaSemana,
       faturamentoPorDiaMes,
       mrrPorDiaMes,
+      countPorStatus,
+      faturamentoAtivos,
+      faturamentoAguardando,
+      alertasAA,
       ultimasVendas: (ultimasRes.data ?? []) as UltimaVenda[],
     })
     setLoading(false)

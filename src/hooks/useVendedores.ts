@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Tables, TablesInsert } from '@/types/database.types'
+import type { IxcVendedor } from '@/lib/ixc'
 
 type Vendedor = Tables<'vendedores'>
 type VendedorInsert = TablesInsert<'vendedores'>
@@ -41,5 +42,37 @@ export function useVendedores() {
     await fetch()
   }
 
-  return { vendedores, loading, error, refetch: fetch, createVendedor, updateVendedor, deleteVendedor }
+  /** Ativa um vendedor IXC no CRM (insert se novo, update se já existe). */
+  async function syncVendedorIxc(ixcVend: IxcVendedor) {
+    const existing = vendedores.find((v) => v.ixc_id === ixcVend.id)
+    if (existing) {
+      await updateVendedor(existing.id, { ativo: true })
+    } else {
+      const { error } = await supabase.from('vendedores').insert({
+        nome: ixcVend.nome,
+        ixc_id: ixcVend.id,
+        ativo: true,
+      } as never)
+      if (error) throw error
+      await fetch()
+    }
+  }
+
+  /** Desativa um vendedor IXC no CRM pelo ixc_id. */
+  async function disableVendedorIxc(ixcId: string) {
+    const existing = vendedores.find((v) => v.ixc_id === ixcId)
+    if (existing) await updateVendedor(existing.id, { ativo: false })
+  }
+
+  return {
+    vendedores,
+    loading,
+    error,
+    refetch: fetch,
+    createVendedor,
+    updateVendedor,
+    deleteVendedor,
+    syncVendedorIxc,
+    disableVendedorIxc,
+  }
 }

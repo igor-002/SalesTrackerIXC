@@ -27,7 +27,28 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173)",
       "Bash(git init:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(vercel --version)",
+      "Bash(vercel whoami:*)",
+      "Bash(vercel:*)",
+      "Bash(1:*)",
+      "Bash(cd:*)",
+      "Bash(grep -l \"phoikjhbtzqxppvxbzvq\" dist/assets/*.js)",
+      "WebFetch(domain:wikiapiprovedor.ixcsoft.com.br)",
+      "WebSearch",
+      "WebFetch(domain:wiki.ixcsoft.com.br)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:wiki-erp.ixcsoft.com.br)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:docs.doc-api-provedor.com)",
+      "Bash(git push:*)",
+      "Bash(gh repo:*)",
+      "Bash(find C:\\\\www\\\\salestrakerOPENITATT\\\\src:*)",
+      "Bash(git stash:*)",
+      "Bash(node:*)",
+      "Bash(grep -E \"IXC_PROXY|IXC_BASE\" .env.production)",
+      "Bash(grep -E \"IXC_PROXY|IXC_BASE\" .env.local)",
+      "Bash(grep -E \"IXC_PROXY|IXC_BASE\" .env)"
     ]
   }
 }

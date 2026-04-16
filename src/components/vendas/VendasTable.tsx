@@ -1,9 +1,20 @@
 import { Badge, statusToBadgeVariant } from '@/components/ui/Badge'
 import { formatBRL, formatDate } from '@/lib/formatters'
-import type { VendaComJoins } from '@/hooks/useVendas'
+import { ixcStatusLabel } from '@/lib/ixc'
+
+export interface VendaRow {
+  id: string
+  cliente_nome: string
+  cliente_uf?: string | null
+  valor_total: number | null
+  data_venda: string
+  status_ixc?: string | null
+  status: { nome: string } | null
+  vendedor: { nome: string } | null
+}
 
 interface VendasTableProps {
-  vendas: VendaComJoins[]
+  vendas: VendaRow[]
 }
 
 export function VendasTable({ vendas }: VendasTableProps) {
@@ -38,7 +49,10 @@ export function VendasTable({ vendas }: VendasTableProps) {
               <td className="py-3.5 text-white/45">{formatDate(v.data_venda)}</td>
               <td className="py-3.5 text-right font-bold text-white">{formatBRL(v.valor_total)}</td>
               <td className="py-3.5 text-right">
-                <Badge variant={statusToBadgeVariant(v.status?.nome ?? '')}>{v.status?.nome ?? '-'}</Badge>
+                {v.status_ixc
+                  ? <Badge variant={statusToBadgeVariant(v.status_ixc)}>{ixcStatusLabel(v.status_ixc)}</Badge>
+                  : <Badge variant={statusToBadgeVariant(v.status?.nome ?? '')}>{v.status?.nome ?? '-'}</Badge>
+                }
               </td>
             </tr>
           ))}

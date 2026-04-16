@@ -1,21 +1,20 @@
-import { useCallback, useState, useEffect } from 'react'
-import { DollarSign, Repeat2 } from 'lucide-react'
+import { useCallback, useState, useEffect, useRef } from 'react'
+import { Pause, Play } from 'lucide-react'
 import { TVClock } from '@/components/tv/TVClock'
-import { TVCard } from '@/components/tv/TVCard'
 import { TVLogo } from '@/components/tv/TVLogo'
-import { TVVendasCarousel } from '@/components/tv/TVVendasCarousel'
-import { TVMetaCarousel } from '@/components/tv/TVMetaCarousel'
-import { TVMetaAreaChart } from '@/components/tv/TVMetaAreaChart'
-import { BarChartFaturamento } from '@/components/charts/BarChartFaturamento'
 import { Spinner } from '@/components/ui/Spinner'
+import { TVTelaVisaoGeral } from '@/components/tv/TVTelaVisaoGeral'
+import { TVTelaFunil } from '@/components/tv/TVTelaFunil'
+import { TVTelaAlertas } from '@/components/tv/TVTelaAlertas'
+import { TVTelaRanking } from '@/components/tv/TVTelaRanking'
 import { useDashboardStats } from '@/hooks/useDashboardStats'
-import { useMetas } from '@/hooks/useMetas'
+import { useTVStats } from '@/hooks/useTVStats'
 import { useRealtime } from '@/hooks/useRealtime'
-import { formatBRL, formatNumber } from '@/lib/formatters'
+import type { TVThemeColors } from '@/components/tv/TVCard'
 
 type TVTheme = 'blue' | 'green'
 
-const THEMES = {
+const THEMES: Record<TVTheme, TVThemeColors> = {
   blue: {
     bg: '#080f1e',
     glow: 'rgba(59,130,246,0.08)',
@@ -24,7 +23,7 @@ const THEMES = {
     card1: 'text-blue-400',
     card2: 'text-blue-300',
     card3: 'text-cyan-400',
-    metaColors: ['#3b82f6', '#60a5fa'] as [string, string],
+    metaColors: ['#3b82f6', '#60a5fa'],
   },
   green: {
     bg: '#0c1e14',
@@ -34,30 +33,51 @@ const THEMES = {
     card1: 'text-emerald-400',
     card2: 'text-cyan-400',
     card3: 'text-amber-400',
-    metaColors: ['#00d68f', '#06b6d4'] as [string, string],
+    metaColors: ['#00d68f', '#06b6d4'],
   },
 }
 
 const THEME_KEY = 'tv_theme'
+const SLIDE_INTERVAL = 15000
+const TELA_LABELS = ['Visão Geral', 'Funil', 'Alertas', 'Ranking']
 
 export default function TVDashboard() {
-  const { stats, loading, refetch } = useDashboardStats()
-  const { getMetaAtual } = useMetas()
+  const { stats: dashStats, loading: dashLoading, refetch: refetchDash } = useDashboardStats()
+  const tvStats = useTVStats()
 
   const [theme, setTheme] = useState<TVTheme>(() => {
     return (localStorage.getItem(THEME_KEY) as TVTheme) ?? 'blue'
   })
+  const [tela, setTela] = useState(0)
+  const [pausado, setPausado] = useState(false)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
     localStorage.setItem(THEME_KEY, theme)
   }, [theme])
 
-  const handleChange = useCallback(() => { refetch() }, [refetch])
+  // Carrossel automático
+  useEffect(() => {
+    if (pausado) {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+      return
+    }
+    intervalRef.current = setInterval(() => {
+      setTela((s) => (s + 1) % 4)
+    }, SLIDE_INTERVAL)
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current)
+    }
+  }, [pausado])
+
+  const handleChange = useCallback(() => {
+    refetchDash()
+    tvStats.refetch()
+  }, [refetchDash, tvStats])
   useRealtime({ onVenda: handleChange, onCancelamento: handleChange })
 
-  const metaAtual = getMetaAtual()
-  const now = new Date()
   const t = THEMES[theme]
+  const loading = dashLoading || tvStats.loading
 
   if (loading) {
     return (
@@ -69,7 +89,11 @@ export default function TVDashboard() {
 
   return (
     <div className="min-h-dvh flex flex-col p-4 gap-3 relative overflow-hidden" style={{ background: t.bg }}>
-      <div className="absolute inset-0 pointer-events-none" aria-hidden="true" style={{ background: `radial-gradient(ellipse 80% 50% at 50% -10%, ${t.glow} 0%, transparent 70%)` }} />
+      <div
+        className="absolute inset-0 pointer-events-none"
+        aria-hidden="true"
+        style={{ background: `radial-gradient(ellipse 80% 50% at 50% -10%, ${t.glow} 0%, transparent 70%)` }}
+      />
 
       {/* ── HEADER ── */}
       <header className="relative z-10 flex items-center justify-between flex-shrink-0">
@@ -104,72 +128,99 @@ export default function TVDashboard() {
           </button>
         </div>
 
-        <TVClock />
+        <div className="flex items-center gap-4">
+          {/* Label tela atual */}
+          <span
+            className="text-xs font-black uppercase tracking-[0.2em] px-3 py-1.5 rounded-full transition-all duration-500"
+            style={{ background: `${t.primary}15`, color: `${t.primary}99`, border: `1px solid ${t.primary}20` }}
+          >
+            {TELA_LABELS[tela]}
+          </span>
+          <TVClock />
+        </div>
       </header>
 
-      {/* ── GRID PRINCIPAL ── */}
-      <div className="relative z-10 flex-1 grid gap-3" style={{
-        gridTemplateColumns: '2fr 1fr',
-        gridTemplateRows: '1fr auto auto',
-        minHeight: 0,
-      }}>
+      {/* ── TELAS (fade + scale) ── */}
+      <div className="relative z-10 flex-1 min-h-0">
 
-        {/* Gráfico 12 meses */}
-        <div className="glass rounded-2xl p-5 flex flex-col" style={{ gridColumn: '1', gridRow: '1', borderTop: `2px solid ${t.primary}` }}>
-          <p className="text-xs font-semibold text-white/35 uppercase tracking-wider mb-3">
-            Faturamento — Últimos 12 Meses
-          </p>
-          <div className="flex-1" style={{ minHeight: 0 }}>
-            <BarChartFaturamento data={stats.faturamento12Meses} accentHex={t.primary} />
-          </div>
-        </div>
-
-        {/* Vendas carousel */}
-        <div style={{ gridColumn: '2', gridRow: '1' }}>
-          <TVVendasCarousel
-            hoje={{ faturamento: stats.faturamentoHoje, vendas: stats.vendasHoje }}
-            semana={{ faturamento: stats.faturamentoSemana, vendas: stats.vendasSemana }}
-            mes={{ faturamento: stats.faturamentoMes, vendas: stats.vendasMes }}
-            accentHex={t.primary}
+        {/* Tela 0 — Visão Geral */}
+        <div
+          className="absolute inset-0 transition-all duration-700 ease-in-out"
+          style={{ opacity: tela === 0 ? 1 : 0, transform: tela === 0 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 0 ? 'auto' : 'none' }}
+        >
+          <TVTelaVisaoGeral
+            faturamentoReal={tvStats.faturamentoReal}
+            faturamentoPrometido={tvStats.faturamentoPrometido}
+            mrrReal={tvStats.mrrReal}
+            mrrProjetado={tvStats.mrrProjetado}
+            faturamento12Meses={dashStats.faturamento12Meses}
+            t={t}
           />
         </div>
 
-        {/* ── LINHA 2: 2 cards grandes ── */}
-        <div className="grid gap-3" style={{ gridColumn: '1 / -1', gridRow: '2', gridTemplateColumns: '1fr 1fr' }}>
-          <TVCard
-            title="Receita sem Recorrência"
-            value={formatBRL(stats.faturamentoSemRecorrencia)}
-            subtitle={`${formatNumber(stats.vendasUnicasMes)} venda${stats.vendasUnicasMes !== 1 ? 's' : ''} única${stats.vendasUnicasMes !== 1 ? 's' : ''}`}
-            icon={<DollarSign size={20} />}
-            accent={t.card1}
-          />
-          <TVCard
-            title="MRR"
-            value={formatBRL(stats.mrrTotal)}
-            subtitle="Receita Recorrente Mensal"
-            icon={<Repeat2 size={20} />}
-            accent={t.card2}
+        {/* Tela 1 — Funil */}
+        <div
+          className="absolute inset-0 transition-all duration-700 ease-in-out"
+          style={{ opacity: tela === 1 ? 1 : 0, transform: tela === 1 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 1 ? 'auto' : 'none' }}
+        >
+          <TVTelaFunil
+            funilCounts={tvStats.funilCounts}
+            taxaConversao={tvStats.taxaConversao}
+            faturamentoReal={tvStats.faturamentoReal}
+            faturamentoPrometido={tvStats.faturamentoPrometido}
+            vendasPorDiaSemana={tvStats.vendasPorDiaSemana}
+            t={t}
           />
         </div>
 
-        {/* ── LINHA 3: Meta area chart + Meta carousel ── */}
-        <div className="grid gap-3" style={{ gridColumn: '1 / -1', gridRow: '3', gridTemplateColumns: '1fr 2fr' }}>
-          <TVMetaAreaChart
-            data={stats.mrrPorDiaMes}
-            metaMensal={metaAtual?.meta_mensal ?? 0}
-            mrrTotal={stats.mrrTotal}
-            accentHex={t.primary}
-          />
-          <TVMetaCarousel
-            metaMensal={metaAtual?.meta_mensal ?? 0}
-            metaSemanal={metaAtual?.meta_semanal ?? 0}
-            faturamentoMes={stats.mrrTotal}
-            faturamentoSemana={stats.faturamentoSemana}
-            mes={metaAtual?.mes ?? now.getMonth() + 1}
-            ano={metaAtual?.ano ?? now.getFullYear()}
-            accentColors={t.metaColors}
-          />
+        {/* Tela 2 — Alertas */}
+        <div
+          className="absolute inset-0 transition-all duration-700 ease-in-out"
+          style={{ opacity: tela === 2 ? 1 : 0, transform: tela === 2 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 2 ? 'auto' : 'none' }}
+        >
+          <TVTelaAlertas alertasAA={tvStats.alertasAA} t={t} />
         </div>
+
+        {/* Tela 3 — Ranking */}
+        <div
+          className="absolute inset-0 transition-all duration-700 ease-in-out"
+          style={{ opacity: tela === 3 ? 1 : 0, transform: tela === 3 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 3 ? 'auto' : 'none' }}
+        >
+          <TVTelaRanking rankingVendedores={tvStats.rankingVendedores} t={t} />
+        </div>
+
+      </div>
+
+      {/* ── FOOTER: dots + pause ── */}
+      <div className="relative z-10 flex-shrink-0 flex items-center justify-center gap-3 pb-1">
+        <div className="flex items-center gap-2">
+          {TELA_LABELS.map((label, i) => (
+            <button
+              key={i}
+              onClick={() => setTela(i)}
+              className="flex items-center gap-1.5 cursor-pointer transition-all duration-300"
+              title={label}
+            >
+              <span
+                className="rounded-full transition-all duration-300"
+                style={{
+                  width: i === tela ? '1.5rem' : '0.5rem',
+                  height: '0.5rem',
+                  background: i === tela ? t.primary : 'rgba(255,255,255,0.2)',
+                }}
+              />
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={() => setPausado((p) => !p)}
+          className="flex items-center justify-center w-7 h-7 rounded-full transition-colors cursor-pointer"
+          style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.08)' }}
+          title={pausado ? 'Retomar carrossel' : 'Pausar carrossel'}
+        >
+          {pausado ? <Play size={12} /> : <Pause size={12} />}
+        </button>
       </div>
     </div>
   )

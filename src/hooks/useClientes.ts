@@ -17,7 +17,7 @@ export function useClientes() {
       .select('*, produto:produtos(nome), vendedor:vendedores(nome)')
       .eq('ativo', true)
       .order('nome')
-    setClientes((data ?? []) as ClienteComJoins[])
+    setClientes((data ?? []) as unknown as ClienteComJoins[])
     setLoading(false)
   }, [])
 

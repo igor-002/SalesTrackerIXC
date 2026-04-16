@@ -11,10 +11,8 @@ import { formatBRL, maskCPFCNPJ } from '@/lib/formatters'
 import { UFS } from '@/constants'
 import { useVendedores } from '@/hooks/useVendedores'
 import { useSegmentos } from '@/hooks/useSegmentos'
-import { useProdutos } from '@/hooks/useProdutos'
-import { useStatusVenda } from '@/hooks/useStatusVenda'
 import { useIxcFieldLookup } from '@/hooks/useIxcFieldLookup'
-import { ixcBuscarStatusContrato, ixcBuscarCliente } from '@/lib/ixc'
+import { ixcBuscarContrato, ixcBuscarCliente, IXC_STATUSES } from '@/lib/ixc'
 import type { VendaComJoins } from '@/hooks/useVendas'
 import { toast } from '@/components/ui/Toast'
 import { vendaFormSchema, type VendaFormData } from './vendaFormSchema'
@@ -33,8 +31,6 @@ const ufOptions = UFS.map((uf) => ({ value: uf, label: uf }))
 export function EditVendaModal({ venda, open, onClose, onSave }: EditVendaModalProps) {
   const { vendedores } = useVendedores()
   const { segmentos } = useSegmentos()
-  const { produtos } = useProdutos()
-  const { statuses } = useStatusVenda()
   const [statusViaIxc, setStatusViaIxc] = useState(false)
 
   const { register, handleSubmit, control, watch, setValue, getValues, formState: { errors, isSubmitting } } = useForm<FormData>({
@@ -47,26 +43,32 @@ export function EditVendaModal({ venda, open, onClose, onSave }: EditVendaModalP
       codigo_contrato_ixc: venda.codigo_contrato_ixc ?? '',
       vendedor_id: venda.vendedor?.id ?? '',
       segmento_id: venda.segmento?.id ?? '',
-      status_id: venda.status?.id ?? '',
-      produto_id: venda.produto?.id ?? '',
+      status_ixc: venda.status_ixc ?? '',
       data_venda: venda.data_venda,
       mrr: venda.mrr ?? false,
       quantidade: venda.quantidade,
       valor_unitario: venda.valor_unitario,
       comissao_pct: venda.comissao_pct ?? 0,
       descricao: venda.descricao ?? '',
+      produtos: [],
     },
   })
 
   const contratoLookup = useIxcFieldLookup({
-    fetcher: ixcBuscarStatusContrato,
+    fetcher: ixcBuscarContrato,
     onSuccess: (contrato) => {
-      const matched = statuses.find((s) => s.nome.toLowerCase() === contrato.status.toLowerCase())
-      if (matched) {
-        setValue('status_id', matched.id)
+      if (contrato.status_code) {
+        setValue('status_ixc', contrato.status_code)
         setStatusViaIxc(true)
-      } else {
-        toast('warning', `Status "${contrato.status}" não encontrado no sistema`)
+      }
+      if (contrato.id_vendedor) {
+        const vend = vendedores.find((v) => v.ixc_id === contrato.id_vendedor)
+        if (vend) setValue('vendedor_id', vend.id)
+      }
+      if (contrato.produtos.length > 0) {
+        setValue('produtos', contrato.produtos)
+        const totalBruto = contrato.produtos.reduce((acc, p) => acc + p.valor_bruto, 0)
+        if (!getValues('valor_unitario')) setValue('valor_unitario', totalBruto)
       }
     },
     onError: (err) => {
@@ -106,7 +108,6 @@ export function EditVendaModal({ venda, open, onClose, onSave }: EditVendaModalP
         <div className="flex flex-col gap-3">
           <p className="text-xs font-semibold uppercase tracking-wider text-white/35">Cliente</p>
 
-          {/* Códigos IXC — disparam o auto-preenchimento dos campos abaixo */}
           <div className="grid grid-cols-2 gap-3">
             <div className="relative">
               <Input
@@ -123,7 +124,7 @@ export function EditVendaModal({ venda, open, onClose, onSave }: EditVendaModalP
               <Input
                 label="Cód. Contrato IXC"
                 placeholder="Ex: 5678"
-                hint="Auto-preenche o status do contrato"
+                hint="Auto-preenche status, vendedor e produtos"
                 error={errors.codigo_contrato_ixc?.message}
                 disabled={contratoLookup.loading}
                 {...register('codigo_contrato_ixc', { onBlur: contratoLookup.handleBlur })}
@@ -134,7 +135,6 @@ export function EditVendaModal({ venda, open, onClose, onSave }: EditVendaModalP
 
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
 
-          {/* Dados pessoais — preenchidos manualmente ou via IXC */}
           <div className="grid grid-cols-3 gap-3">
             <Input label="Nome do Cliente" required error={errors.cliente_nome?.message} {...register('cliente_nome')} />
             <Controller
@@ -158,15 +158,22 @@ export function EditVendaModal({ venda, open, onClose, onSave }: EditVendaModalP
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-white/35 mb-3">Venda</p>
           <div className="grid grid-cols-3 gap-3">
-            <Select label="Vendedor" options={vendedores.map((v) => ({ value: v.id, label: v.nome }))} placeholder="Selecione..." required error={errors.vendedor_id?.message} {...register('vendedor_id')} />
+            <Select label="Vendedor" options={vendedores.filter((v) => v.ativo).map((v) => ({ value: v.id, label: v.nome }))} placeholder="Selecione..." required error={errors.vendedor_id?.message} {...register('vendedor_id')} />
             <Select label="Segmento" options={segmentos.map((s) => ({ value: s.id, label: s.nome }))} placeholder="Selecione..." error={errors.segmento_id?.message} {...register('segmento_id')} />
             <div>
-              <Select label="Status" options={statuses.map((s) => ({ value: s.id, label: s.nome }))} placeholder="Selecione..." required error={errors.status_id?.message} disabled={contratoLookup.loading} {...register('status_id', { onChange: () => setStatusViaIxc(false) })} />
+              <Select
+                label="Status"
+                options={IXC_STATUSES.map((s) => ({ value: s.code, label: s.label }))}
+                placeholder="Selecione..."
+                required
+                error={errors.status_ixc?.message}
+                disabled={contratoLookup.loading}
+                {...register('status_ixc', { onChange: () => setStatusViaIxc(false) })}
+              />
               {statusViaIxc && <Badge variant="info" className="mt-1 text-[10px]">via IXC</Badge>}
             </div>
-            <Select label="Produto" options={produtos.map((p) => ({ value: p.id, label: p.nome }))} placeholder="Selecione..." error={errors.produto_id?.message} {...register('produto_id')} />
             <Input label="Data da Venda" type="date" required error={errors.data_venda?.message} {...register('data_venda')} />
-            <div className="flex items-end pb-2">
+            <div className="flex items-end pb-2 col-span-2">
               <label className="flex items-center gap-2.5 cursor-pointer select-none">
                 <input type="checkbox" className="w-4 h-4 rounded cursor-pointer accent-emerald-500" {...register('mrr')} />
                 <span className="text-sm text-white/70">MRR (Receita Recorrente)</span>

@@ -1,14 +1,16 @@
 interface SpinnerProps {
   size?: 'sm' | 'md' | 'lg'
   className?: string
+  style?: React.CSSProperties
 }
 
 const sizeMap = { sm: 'w-4 h-4', md: 'w-6 h-6', lg: 'w-8 h-8' }
 
-export function Spinner({ size = 'md', className = '' }: SpinnerProps) {
+export function Spinner({ size = 'md', className = '', style }: SpinnerProps) {
   return (
     <svg
       className={`animate-spin text-current ${sizeMap[size]} ${className}`}
+      style={style}
       fill="none"
       viewBox="0 0 24 24"
       aria-hidden="true"

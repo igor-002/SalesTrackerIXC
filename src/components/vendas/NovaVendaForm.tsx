@@ -11,10 +11,8 @@ import { formatBRL, maskCPFCNPJ } from '@/lib/formatters'
 import { UFS } from '@/constants'
 import { useVendedores } from '@/hooks/useVendedores'
 import { useSegmentos } from '@/hooks/useSegmentos'
-import { useProdutos } from '@/hooks/useProdutos'
-import { useStatusVenda } from '@/hooks/useStatusVenda'
 import { useIxcFieldLookup } from '@/hooks/useIxcFieldLookup'
-import { ixcBuscarStatusContrato, ixcBuscarCliente } from '@/lib/ixc'
+import { ixcBuscarContrato, ixcBuscarCliente, IXC_STATUSES } from '@/lib/ixc'
 import { vendaFormSchema, type VendaFormData } from './vendaFormSchema'
 import { toast } from '@/components/ui/Toast'
 
@@ -26,25 +24,37 @@ const ufOptions = UFS.map((uf) => ({ value: uf, label: uf }))
 export function NovaVendaForm({ onSubmit }: NovaVendaFormProps) {
   const { vendedores } = useVendedores()
   const { segmentos } = useSegmentos()
-  const { produtos } = useProdutos()
-  const { statuses } = useStatusVenda()
   const today = new Date().toISOString().slice(0, 10)
   const [statusViaIxc, setStatusViaIxc] = useState(false)
 
   const { register, handleSubmit, control, watch, reset, setValue, getValues, formState: { errors, isSubmitting } } = useForm<VendaFormData>({
     resolver: zodResolver(vendaFormSchema) as Resolver<VendaFormData>,
-    defaultValues: { data_venda: today, mrr: false, quantidade: 1, valor_unitario: 0, comissao_pct: 0 },
+    defaultValues: { data_venda: today, mrr: false, quantidade: 1, valor_unitario: 0, comissao_pct: 0, produtos: [] },
   })
 
+  const produtosWatch = watch('produtos') ?? []
+
   const contratoLookup = useIxcFieldLookup({
-    fetcher: ixcBuscarStatusContrato,
+    fetcher: ixcBuscarContrato,
     onSuccess: (contrato) => {
-      const matched = statuses.find((s) => s.nome.toLowerCase() === contrato.status.toLowerCase())
-      if (matched) {
-        setValue('status_id', matched.id)
+      // Status — armazena o código IXC bruto (ex: "A", "FA")
+      if (contrato.status_code) {
+        setValue('status_ixc', contrato.status_code)
         setStatusViaIxc(true)
-      } else {
-        toast('warning', `Status "${contrato.status}" não encontrado no sistema`)
+      }
+
+      // Vendedor — match pelo ixc_id salvo no Supabase
+      if (contrato.id_vendedor) {
+        const vend = vendedores.find((v) => v.ixc_id === contrato.id_vendedor)
+        if (vend) setValue('vendedor_id', vend.id)
+      }
+
+      // Produtos do contrato
+      if (contrato.produtos.length > 0) {
+        setValue('produtos', contrato.produtos)
+        // valor_unitario = soma de todos os valor_bruto (MRR total do contrato)
+        const totalBruto = contrato.produtos.reduce((acc, p) => acc + p.valor_bruto, 0)
+        if (!getValues('valor_unitario')) setValue('valor_unitario', totalBruto)
       }
     },
     onError: (err) => {
@@ -74,7 +84,8 @@ export function NovaVendaForm({ onSubmit }: NovaVendaFormProps) {
 
   async function onValid(data: VendaFormData) {
     await onSubmit(data)
-    reset({ data_venda: today, mrr: false, quantidade: 1, valor_unitario: 0, comissao_pct: 0 })
+    reset({ data_venda: today, mrr: false, quantidade: 1, valor_unitario: 0, comissao_pct: 0, produtos: [] })
+    setStatusViaIxc(false)
   }
 
   return (
@@ -100,13 +111,37 @@ export function NovaVendaForm({ onSubmit }: NovaVendaFormProps) {
             <Input
               label="Cód. Contrato IXC"
               placeholder="Ex: 5678"
-              hint="Auto-preenche o status do contrato"
+              hint="Auto-preenche status, vendedor e produtos"
               error={errors.codigo_contrato_ixc?.message}
               disabled={contratoLookup.loading}
               {...register('codigo_contrato_ixc', { onBlur: contratoLookup.handleBlur })}
             />
             {contratoLookup.loading && <Spinner size="sm" className="absolute right-3 top-[34px]" style={{ color: '#00d68f' }} />}
           </div>
+
+          {/* Produtos do contrato IXC */}
+          {produtosWatch.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-white/30">
+                Produtos do contrato
+              </p>
+              <div
+                className="flex flex-col gap-1 rounded-xl p-3 max-h-40 overflow-y-auto"
+                style={{ background: 'rgba(0,214,143,0.04)', border: '1px solid rgba(0,214,143,0.1)' }}
+              >
+                {produtosWatch.map((p, i) => (
+                  <div key={i} className="flex items-start justify-between gap-2">
+                    <span className="text-xs text-white/70 leading-tight flex-1 min-w-0 truncate">
+                      {p.descricao || `Produto ${p.id}`}
+                    </span>
+                    <span className="text-xs font-semibold text-emerald-400 shrink-0">
+                      {formatBRL(p.valor_bruto)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }} />
 
@@ -131,13 +166,20 @@ export function NovaVendaForm({ onSubmit }: NovaVendaFormProps) {
         {/* Coluna 2 — Venda */}
         <GlassCard className="p-5 flex flex-col gap-4">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-white/40">Venda</h3>
-          <Select label="Vendedor" options={vendedores.map((v) => ({ value: v.id, label: v.nome }))} placeholder="Selecione..." required error={errors.vendedor_id?.message} {...register('vendedor_id')} />
+          <Select label="Vendedor" options={vendedores.filter((v) => v.ativo).map((v) => ({ value: v.id, label: v.nome }))} placeholder="Selecione..." required error={errors.vendedor_id?.message} {...register('vendedor_id')} />
           <Select label="Segmento" options={segmentos.map((s) => ({ value: s.id, label: s.nome }))} placeholder="Selecione..." error={errors.segmento_id?.message} {...register('segmento_id')} />
           <div>
-            <Select label="Status" options={statuses.map((s) => ({ value: s.id, label: s.nome }))} placeholder="Selecione..." required error={errors.status_id?.message} disabled={contratoLookup.loading} {...register('status_id', { onChange: () => setStatusViaIxc(false) })} />
+            <Select
+              label="Status"
+              options={IXC_STATUSES.map((s) => ({ value: s.code, label: s.label }))}
+              placeholder="Selecione..."
+              required
+              error={errors.status_ixc?.message}
+              disabled={contratoLookup.loading}
+              {...register('status_ixc', { onChange: () => setStatusViaIxc(false) })}
+            />
             {statusViaIxc && <Badge variant="info" className="mt-1 text-[10px]">via IXC</Badge>}
           </div>
-          <Select label="Produto" options={produtos.map((p) => ({ value: p.id, label: p.nome }))} placeholder="Selecione..." error={errors.produto_id?.message} {...register('produto_id')} />
           <Input label="Data da Venda" type="date" required error={errors.data_venda?.message} {...register('data_venda')} />
           <label className="flex items-center gap-2.5 cursor-pointer select-none">
             <input type="checkbox" className="w-4 h-4 rounded cursor-pointer accent-emerald-500" {...register('mrr')} />

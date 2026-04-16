@@ -1,12 +1,13 @@
 import { useState, useMemo } from 'react'
 import { RefreshCw, ShoppingBag, Users, Search, X, Pencil, Trash2, Zap } from 'lucide-react'
+import { useAuthStore } from '@/store/authStore'
 import { Spinner } from '@/components/ui/Spinner'
 import { Badge, statusToBadgeVariant } from '@/components/ui/Badge'
 import { useVendas, type VendaComJoins } from '@/hooks/useVendas'
 import { useVendedores } from '@/hooks/useVendedores'
 import { useStatusVenda } from '@/hooks/useStatusVenda'
 import { useIxcSync } from '@/hooks/useIxcSync'
-import { ixcConfigurado } from '@/lib/ixc'
+import { ixcConfigurado, ixcStatusLabel } from '@/lib/ixc'
 import { formatBRL, formatDate } from '@/lib/formatters'
 import { EditVendaModal } from '@/components/vendas/EditVendaModal'
 import { toast } from '@/components/ui/Toast'
@@ -18,10 +19,12 @@ const MESES = [
 ]
 
 export default function Clientes() {
-  const { vendas, loading, refetch, updateVenda, deleteVenda } = useVendas()
+  const { permissoes, vendedorDbId } = useAuthStore()
+  const vendaFilter = !permissoes?.admin && vendedorDbId ? { vendedorId: vendedorDbId } : undefined
+  const { vendas, loading, refetch, updateVenda, deleteVenda } = useVendas(vendaFilter)
   const { vendedores } = useVendedores()
   const { statuses } = useStatusVenda()
-  const { syncTodos, syncing } = useIxcSync()
+  const { sincronizando: syncing, sincronizarAgora } = useIxcSync({ onSyncComplete: refetch })
 
   const [editando, setEditando] = useState<VendaComJoins | null>(null)
   const [excluindoId, setExcluindoId] = useState<string | null>(null)
@@ -80,8 +83,7 @@ export default function Clientes() {
         codigo_contrato_ixc: data.codigo_contrato_ixc || null,
         vendedor_id: data.vendedor_id,
         segmento_id: data.segmento_id || null,
-        status_id: data.status_id,
-        produto_id: data.produto_id || null,
+        status_ixc: data.status_ixc || null,
         data_venda: data.data_venda,
         mrr: data.mrr,
         quantidade: data.quantidade,
@@ -96,25 +98,9 @@ export default function Clientes() {
     }
   }
 
-  async function handleSyncIxc() {
-    try {
-      const results = await syncTodos(vendas, statuses)
-      await refetch()
-      const atualizados = results.filter((r) => r.atualizado).length
-      const erros = results.filter((r) => r.erro).length
-      const semCodigo = vendas.filter((v) => !v.codigo_contrato_ixc).length
-      if (atualizados > 0) {
-        toast('success', `${atualizados} contrato(s) atualizado(s) via IXC.`)
-      } else if (erros > 0) {
-        toast('error', `${erros} erro(s) na sincronização IXC.`)
-      } else if (semCodigo === vendas.length) {
-        toast('error', 'Nenhuma venda possui código de contrato IXC.')
-      } else {
-        toast('success', 'Tudo já está atualizado.')
-      }
-    } catch (err) {
-      toast('error', err instanceof Error ? err.message : 'Erro ao sincronizar com IXC.')
-    }
+  function handleSyncIxc() {
+    sincronizarAgora()
+    toast('success', 'Sincronização IXC iniciada...')
   }
 
   async function handleExcluir(id: string) {
@@ -341,7 +327,20 @@ export default function Clientes() {
                     <td className="px-4 py-4 text-white/45">{formatDate(v.data_venda)}</td>
                     <td className="px-4 py-4 text-right font-bold text-white">{formatBRL(v.valor_total)}</td>
                     <td className="px-4 py-4 text-right">
-                      <Badge variant={statusToBadgeVariant(v.status?.nome ?? '')}>{v.status?.nome ?? '—'}</Badge>
+                      <div className="flex flex-col items-end gap-1">
+                        {v.status_ixc
+                          ? <Badge variant={statusToBadgeVariant(v.status_ixc)}>{ixcStatusLabel(v.status_ixc)}</Badge>
+                          : <Badge variant={statusToBadgeVariant(v.status?.nome ?? '')}>{v.status?.nome ?? '—'}</Badge>
+                        }
+                        {v.status_ixc === 'AA' && (v.dias_em_aa ?? 0) > 7 && (
+                          <Badge
+                            variant={(v.dias_em_aa ?? 0) > 15 ? 'danger' : 'warning'}
+                            className="text-[10px]"
+                          >
+                            {(v.dias_em_aa ?? 0) > 15 ? 'Urgente' : 'Atenção'} · {v.dias_em_aa}d
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center justify-end gap-1">

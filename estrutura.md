@@ -32,33 +32,44 @@
 
 ### Usuários
 
-| Email | Senha | Role |
-|-------|-------|------|
-| admin@salestracker.com | (definida no projeto) | admin |
-| tv@salestracker.com | tv123456 | tv |
+| Email | Senha | Role | Empresa |
+|-------|-------|------|---------|
+| admin@salestracker.com | (definida no projeto) | admin | Empresa Principal |
+| tv@salestracker.com | tv123456 | tv | Empresa Principal |
+| user1@gmail.com | user1@2026 | admin | Empresa Principal |
+| user2@gmail.com | user2@2026 | admin | Empresa user2 (zerada) |
 
 ---
 
 ## Schema do Banco
 
+### Multi-tenancy
+Cada cliente do SalesTracker tem sua própria **empresa**. Todos os dados são isolados por `empresa_id`. Um novo usuário criado via SQL deve ter um perfil vinculado a uma empresa; os dados só são visíveis dentro da mesma empresa.
+
 ### Tabelas
 
 ```
-segmentos      (id uuid PK, nome text)
+empresas       (id uuid PK, nome text, created_at)
+               ← tenant root; cada cliente/conta tem uma linha aqui
+
+segmentos      (id uuid PK, nome text, empresa_id → empresas)
 
 clientes       (id uuid PK, nome, cpf_cnpj, uf, produto_id→produtos, valor_pacote numeric,
-                mrr bool DEFAULT true, vendedor_id→vendedores, ativo bool, created_at)
+                mrr bool DEFAULT true, vendedor_id→vendedores, ativo bool, created_at,
+                empresa_id → empresas)
                ← mrrTotal no TV Dashboard = SUM(valor_pacote) WHERE ativo=true AND mrr=true
 
-produtos       (id uuid PK, nome, descricao, preco_base numeric, ativo bool, recorrente bool DEFAULT false)
-               ← recorrente adicionado via migration add_recorrente_to_produtos
+produtos       (id uuid PK, nome, descricao, preco_base numeric, ativo bool,
+                recorrente bool DEFAULT false, empresa_id → empresas)
 
-status_venda   (id uuid PK, nome text)
+status_venda   (id uuid PK, nome text, empresa_id → empresas)
   Seeds: Ativo, Cancelado, Pendente, Em análise, Inativo
 
-vendedores     (id uuid PK, nome, email UNIQUE, telefone, meta_mensal numeric, ativo bool, created_at)
+vendedores     (id uuid PK, nome, email UNIQUE, telefone, meta_mensal numeric,
+                ativo bool, created_at, empresa_id → empresas)
 
-metas          (id uuid PK, ano int, mes int, meta_mensal numeric, meta_semanal numeric, UNIQUE(ano,mes))
+metas          (id uuid PK, ano int, mes int, meta_mensal numeric, meta_semanal numeric,
+                UNIQUE(ano,mes), empresa_id → empresas)
 
 vendas         (id uuid PK,
                 cliente_nome, cliente_cpf_cnpj, cliente_uf char(2),
@@ -75,19 +86,27 @@ vendas         (id uuid PK,
                 data_venda date,
                 descricao text,
                 created_by → auth.users,
-                created_at)
+                created_at,
+                empresa_id → empresas)
 
-cancelamentos  (id uuid PK, venda_id → vendas, motivo, data_cancel, created_by, created_at)
+cancelamentos  (id uuid PK, venda_id → vendas, motivo, data_cancel,
+                created_by, created_at, empresa_id → empresas)
 
-profiles       (id uuid PK → auth.users, role: 'admin'|'tv', nome)
+profiles       (id uuid PK → auth.users, role: 'admin'|'tv', nome,
+                empresa_id → empresas NOT NULL)
 ```
 
 ### RLS
 - Todos com RLS habilitado
-- `get_user_role()` SECURITY DEFINER para evitar recursão
-- Role `tv`: apenas SELECT em todas as tabelas
-- Role `admin`: ALL em todas as tabelas
-- `profiles`: SELECT só do próprio usuário; admin vê tudo
+- `get_user_role()` SECURITY DEFINER → retorna role do usuário logado
+- `get_empresa_id()` SECURITY DEFINER → retorna empresa_id do usuário logado
+- Isolamento por tenant: toda policy inclui `empresa_id = get_empresa_id()`
+- Role `tv`: SELECT nas tabelas da sua empresa
+- Role `admin`: ALL nas tabelas da sua empresa
+- `profiles`: SELECT do próprio usuário OU da mesma empresa; admin da empresa gerencia todos
+
+### Triggers
+- `auto_set_empresa_id()` — BEFORE INSERT em todas as tabelas de dados; auto-seta `empresa_id` via `get_empresa_id()` se nulo → **frontend não precisa enviar empresa_id**
 
 ### Realtime
 - `vendas` e `cancelamentos` adicionadas ao `supabase_realtime` publication
@@ -104,6 +123,7 @@ profiles       (id uuid PK → auth.users, role: 'admin'|'tv', nome)
 | `004_drop_and_recreate` | DROP de tudo + recriação completa + RLS + seeds + realtime |
 | `add_recorrente_to_produtos` | `ALTER TABLE produtos ADD COLUMN recorrente boolean NOT NULL DEFAULT false` |
 | `create_clientes_table` | Tabela `clientes` com RLS (admin: all, tv: select) |
+| `005_multi_tenancy` | Tabela `empresas`; `empresa_id` em todas as tabelas; `get_empresa_id()`; triggers `auto_set_empresa_id`; RLS policies reescritas para isolamento por tenant |
 
 ---
 
@@ -132,8 +152,8 @@ profiles       (id uuid PK → auth.users, role: 'admin'|'tv', nome)
 - `useProdutos.ts` — list (todos), create, deleteProduto (soft: ativo=false)
 - `useStatusVenda.ts` — list only
 - `useMetas.ts` — list, upsert (UNIQUE ano+mes), delete, getMetaAtual
-- `useVendas.ts` — list com joins, create
-- `useDashboardStats.ts` — faturamento mês/semana/hoje, `faturamentoSemRecorrencia` (= faturamentoMes - mrrTotal), MRR, comissões, ticket médio, cancelamentos, turn-over, 12 meses, por dia da semana, diário do mês (`faturamentoPorDiaMes`), diário MRR (`mrrPorDiaMes`), últimas 5 vendas
+- `useVendas.ts` — list com joins, create, updateStatus, updateVenda (todos os campos), deleteVenda
+- `useDashboardStats.ts` — todas as 6 queries em `Promise.all` paralelo; `faturamentoSemRecorrencia` (= faturamentoMes - vendasMrrMes), MRR vivo de `clientes`, comissões, ticket médio, cancelamentos, turn-over, histórico desde o primeiro mês com dado, por dia da semana, diário do mês (`faturamentoPorDiaMes`), diário MRR (`mrrPorDiaMes`), últimas 5 vendas com `cliente_uf`
 - `useRealtime.ts` — canal Supabase Realtime vendas + cancelamentos
 
 ### ✅ Fase 4 — Módulo Vendedores
@@ -146,11 +166,11 @@ profiles       (id uuid PK → auth.users, role: 'admin'|'tv', nome)
 
 ### ✅ Fase 6 — Módulo Nova Venda
 - `src/components/vendas/NovaVendaForm.tsx` — 14 campos, CPF/CNPJ mask, live preview subtotal + comissão
-- `src/components/vendas/VendasTable.tsx`, `VendaStatusBadge.tsx`
+- `src/components/vendas/VendasTable.tsx` — aceita `VendaRow[]` (interface mínima própria, compatível com `VendaComJoins` e `UltimaVenda`)
 - `src/pages/NovaVenda.tsx`
 
 ### ✅ Fase 7 — Dashboard Principal
-- `src/pages/Dashboard.tsx` — 5 KPI cards + tabela últimas vendas + skeleton
+- `src/pages/Dashboard.tsx` — 5 KPI cards + tabela últimas vendas + skeleton; usa `<Link>` do React Router (sem reload)
 
 ### ✅ Fase 8 — TV Dashboard (reformulado)
 Layout fullscreen `#080f1e`, sem AppShell:
@@ -175,10 +195,8 @@ Grid layout TV:
 - Realtime habilitado na migration 004
 
 ### ✅ Módulo Clientes (extra)
-- `src/hooks/useClientes.ts` — list (com joins produto+vendedor), create, update, delete (soft)
-- `src/components/clientes/ClienteForm.tsx` — RHF + Zod, seletor MRR/Único, selects produto/vendedor/UF
-- `src/components/clientes/ClientesTable.tsx` — tabela com editar + excluir, rodapé MRR total
-- `src/pages/Clientes.tsx` — modal único para criar e editar
+- `src/pages/Clientes.tsx` — lista vendas (`useVendas`) com filtros (busca, tipo MRR/Único, vendedor, status, mês, ano); botões **Editar** (lápis) e **Excluir** (lixeira) em cada linha
+- `src/components/vendas/EditVendaModal.tsx` — modal com formulário completo pré-preenchido (RHF + Zod), todos os campos de NovaVendaForm, salva via `updateVenda`
 - `useDashboardStats` — `mrrTotal` agora vem de `SUM(clientes.valor_pacote)` onde ativo+mrr=true; fallback para vendas MRR se nenhum cliente cadastrado
 - Rota `/clientes`, item "Clientes" no Sidebar
 
@@ -189,8 +207,23 @@ Grid layout TV:
 - `src/pages/Produtos.tsx`
 - Rota `/produtos` no router, item "Produtos" no Sidebar
 
+### ✅ Deploy — Vercel
+- `vercel.json` — SPA rewrites + outputDirectory `dist`
+- `.env.production` — variáveis embutidas no build (Vite precisa delas em build-time)
+- `src/lib/supabase.ts` — fallback hardcoded para URL/key (anon key é pública por design)
+- Deploy via `vercel build --prod` + `vercel deploy --prebuilt --prod` (build local → deploy do dist)
+- URL produção: `https://salestracker-crm.vercel.app`
+- Credenciais admin: `admin@salestracker.com` / `Admin@2024`
+
+### ✅ Correções & Qualidade (QA parcial)
+- **`App.tsx`** — `onAuthStateChange` agora chama `setLoading(true/false)` ao redor do `fetchRole`, eliminando loop infinito de redirect após login
+- **`VendasTable.tsx`** — interface `VendaRow` própria (mínima), elimina `as any` no Dashboard
+- **`UltimaVenda`** — adicionado `cliente_uf` na interface e na query
+- **`useDashboardStats.ts`** — 6 queries unificadas em único `Promise.all` (era 4 + 2 sequenciais)
+- **`Dashboard.tsx`** — `<a href>` substituído por `<Link>` do React Router
+
 ### 🔲 Fase 10 — Polish & QA
-Não iniciada.
+Parcialmente feita (correções de bugs e tipos). Pendente: error boundaries, empty states, responsividade.
 
 ---
 
@@ -204,6 +237,7 @@ Não iniciada.
 | `/vendedores` | Vendedores | admin |
 | `/metas` | Metas | admin |
 | `/produtos` | Produtos | admin |
+| `/clientes` | Clientes | admin |
 | `/tv` | TVDashboard | admin |
 
 ---
@@ -224,6 +258,16 @@ npm install
 npm run dev       # http://localhost:5173
 npm run build
 ```
+
+## Deploy (Vercel)
+
+```bash
+vercel pull --yes                        # puxa settings do projeto
+vercel build --prod                      # build local com env vars
+vercel deploy --prebuilt --prod          # envia o dist para produção
+```
+
+> **Importante:** usar `--prebuilt` garante que o build local (com as vars do `.env.production`) seja o que vai para produção, evitando problemas de env vars não embutidas no servidor da Vercel.
 
 ---
 
@@ -250,3 +294,8 @@ npm run build
 5. **TV theming** — todos os componentes TV aceitam `accentHex` / `accentColors` como prop; TVDashboard é o único source of truth das cores
 6. **useProdutos** — busca todos os produtos (não filtra `ativo=true`) para exibir na lista, filtra no componente; `deleteProduto` faz soft delete (`ativo=false`)
 7. **Migration 004** — havia schema pré-existente diferente; migration fez DROP CASCADE e recriou tudo
+8. **Auth redirect loop** — `onAuthStateChange` deve chamar `setLoading(true)` antes e `setLoading(false)` no `.finally()` do `fetchRole`; caso contrário session existe mas role é null → loop infinito entre `/` e `/login`
+9. **Deploy Vercel + Vite** — variáveis `VITE_*` são embutidas em build-time; usar `vercel build --prod` + `vercel deploy --prebuilt --prod` é obrigatório; `vercel --prod` sozinho usa build remoto que não pega `.env.production`
+10. **VendasTable** — usa interface `VendaRow` (mínima) em vez de `VendaComJoins` completo; compatível com `UltimaVenda` do dashboard e `VendaComJoins` da página de vendas
+11. **Multi-tenancy** — ao criar novo usuário via SQL: (1) criar linha em `empresas`, (2) criar auth.users, (3) criar auth.identities, (4) criar `profiles` com `empresa_id` apontando para a empresa criada. O frontend não precisa de nenhuma mudança — triggers e RLS cuidam do isolamento automaticamente
+12. **profiles.empresa_id** — NOT NULL obrigatório; usuário sem empresa_id ficará com role null após `fetchRole` → loop de redirect. Sempre criar o profile junto com o usuário
