@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { ixcBuscarStatusContrato } from '@/lib/ixc'
+import { runReconciliacao } from '@/services/reconciliacao'
 
 const DAY_MS = 1000 * 60 * 60 * 24
 
@@ -123,6 +124,9 @@ export async function sincronizarStatusIxc(): Promise<SyncResultado> {
         registros_erro: resultado.erros,
       }).catch(() => undefined)
     }
+
+    // Reconciliação automática após cada sync — não-fatal
+    await runReconciliacao('').catch(() => undefined)
 
     return resultado
   } catch (err) {

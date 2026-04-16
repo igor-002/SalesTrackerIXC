@@ -9,6 +9,7 @@ import { useDashboardStats } from '@/hooks/useDashboardStats'
 import { useIxcSync } from '@/hooks/useIxcSync'
 import { useHistoricoSync } from '@/hooks/useSyncStatus'
 import type { SyncLogRow } from '@/hooks/useSyncStatus'
+import { runReconciliacao } from '@/services/reconciliacao'
 import { ixcConfigurado } from '@/lib/ixc'
 import { formatBRL, formatNumber } from '@/lib/formatters'
 
@@ -94,14 +95,24 @@ function SyncHistoricoCard({ sincronizarAgora, sincronizando }: {
   sincronizando: boolean
 }) {
   const [aberto, setAberto] = useState(false)
+  const [reconciliando, setReconciliando] = useState(false)
   const { data: historico = [], isFetching, refetchTudo } = useHistoricoSync()
 
   const ultimo = historico[0] ?? null
 
   function handleSync() {
     sincronizarAgora()
-    // Após 3s, refetch do histórico para mostrar o novo registro
     setTimeout(() => refetchTudo(), 3000)
+  }
+
+  async function handleReconciliar() {
+    setReconciliando(true)
+    try {
+      await runReconciliacao('')
+    } finally {
+      setReconciliando(false)
+      refetchTudo()
+    }
   }
 
   return (
@@ -190,7 +201,7 @@ function SyncHistoricoCard({ sincronizarAgora, sincronizando }: {
           </div>
 
           {/* Botões de ação */}
-          <div className="px-5 pb-4 flex gap-2">
+          <div className="px-5 pb-4 flex gap-2 flex-wrap">
             <button
               onClick={handleSync}
               disabled={sincronizando}
@@ -199,6 +210,15 @@ function SyncHistoricoCard({ sincronizarAgora, sincronizando }: {
             >
               {sincronizando ? <Spinner size="sm" /> : <RefreshCw size={12} />}
               Sincronizar agora
+            </button>
+            <button
+              onClick={handleReconciliar}
+              disabled={reconciliando}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}
+            >
+              {reconciliando ? <Spinner size="sm" /> : <RefreshCw size={12} />}
+              Reconciliar agora
             </button>
           </div>
         </div>
