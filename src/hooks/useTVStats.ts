@@ -24,6 +24,9 @@ export interface VendedorRanking {
   nome: string
   total: number
   qtd: number
+  ticketMedio: number
+  totalCadastrados: number
+  taxaConversao: number
 }
 
 export interface TVStats {
@@ -111,18 +114,29 @@ export function useTVStats() {
       .filter((v) => (v as { status_ixc?: string | null }).status_ixc === 'AA')
       .sort((a, b) => (b.dias_em_aa ?? 0) - (a.dias_em_aa ?? 0))
 
-    const rankMap = new Map<string, { nome: string; total: number; qtd: number }>()
+    // Ranking: contratos ativos (A) para faturamento + todos os status para conversão
+    const rankMap = new Map<string, { nome: string; total: number; qtd: number; totalCadastrados: number }>()
     for (const v of vendasMes) {
-      if (v.status_ixc !== 'A') continue
       const vend = v.vendedor as { id: string; nome: string } | null
       if (!vend) continue
-      const entry = rankMap.get(vend.id) ?? { nome: vend.nome, total: 0, qtd: 0 }
-      entry.total += v.valor_total ?? 0
-      entry.qtd++
+      const entry = rankMap.get(vend.id) ?? { nome: vend.nome, total: 0, qtd: 0, totalCadastrados: 0 }
+      entry.totalCadastrados++
+      if (v.status_ixc === 'A') {
+        entry.total += v.valor_total ?? 0
+        entry.qtd++
+      }
       rankMap.set(vend.id, entry)
     }
     const rankingVendedores: VendedorRanking[] = Array.from(rankMap.entries())
-      .map(([id, e]) => ({ id, ...e }))
+      .map(([id, e]) => ({
+        id,
+        nome: e.nome,
+        total: e.total,
+        qtd: e.qtd,
+        ticketMedio: e.qtd > 0 ? e.total / e.qtd : 0,
+        totalCadastrados: e.totalCadastrados,
+        taxaConversao: e.totalCadastrados > 0 ? (e.qtd / e.totalCadastrados) * 100 : 0,
+      }))
       .sort((a, b) => b.total - a.total)
 
     const counts = new Array(7).fill(0)

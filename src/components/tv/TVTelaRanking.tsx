@@ -73,24 +73,25 @@ export function TVTelaRanking({ rankingVendedores, t }: TVTelaRankingProps) {
                     }
                   </span>
 
-                  {/* Nome */}
-                  <span
-                    className="flex-1 truncate font-bold"
-                    style={{
-                      fontSize: isFirst ? '1.5rem' : isTop3 ? '1.25rem' : '1.1rem',
-                      color: isFirst ? 'rgba(255,255,255,0.95)' : isTop3 ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.55)',
-                    }}
-                  >
-                    {v.nome}
-                  </span>
-
-                  {/* Qtd */}
-                  <span
-                    className="text-sm tabular-nums flex-shrink-0"
-                    style={{ color: 'rgba(255,255,255,0.3)' }}
-                  >
-                    {formatNumber(v.qtd)} venda{v.qtd !== 1 ? 's' : ''}
-                  </span>
+                  {/* Nome + métricas secundárias */}
+                  <div className="flex-1 min-w-0">
+                    <span
+                      className="block truncate font-bold"
+                      style={{
+                        fontSize: isFirst ? '1.5rem' : isTop3 ? '1.25rem' : '1.1rem',
+                        color: isFirst ? 'rgba(255,255,255,0.95)' : isTop3 ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.55)',
+                      }}
+                    >
+                      {v.nome}
+                    </span>
+                    <div className="flex items-center gap-2 mt-1" style={{ color: 'rgba(255,255,255,0.28)', fontSize: '0.75rem' }}>
+                      <span>{formatNumber(v.qtd)} contrato{v.qtd !== 1 ? 's' : ''}</span>
+                      <span>·</span>
+                      <span>{formatBRL(v.ticketMedio)} ticket</span>
+                      <span>·</span>
+                      <span>{v.taxaConversao.toFixed(0)}% conversão</span>
+                    </div>
+                  </div>
 
                   {/* Total */}
                   <span
