@@ -127,7 +127,7 @@ function MesAnoSelect({ mes, ano, onChangeMes, onChangeAno }: {
 function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
   vendedorIdFiltro: string | null
   isGestor: boolean
-  vendedores: { id: string; nome: string; ativo: boolean | null }[]
+  vendedores: { id: string; nome: string; ativo: boolean | null; meta_mensal?: number | null }[]
 }) {
   const now = new Date()
   const [mes, setMes] = useState(now.getMonth() + 1)
@@ -481,7 +481,7 @@ function TabRanking({ vendedores }: {
 function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
   vendedorIdFiltro: string | null
   isGestor: boolean
-  vendedores: { id: string; nome: string; ativo: boolean | null }[]
+  vendedores: { id: string; nome: string; ativo: boolean | null; meta_mensal?: number | null }[]
 }) {
   const now = new Date()
   const [mes, setMes] = useState(now.getMonth() + 1)
@@ -496,6 +496,8 @@ function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
   const vendedorEfetivo = isGestor ? vendedorSel : vendedorIdFiltro
 
   const { data: contratos = [], isFetching } = useRelatoriosMes(mes, ano, vendedorEfetivo)
+  // Dados do time completo para badges comparativos (cached pelo React Query)
+  const { data: contratosTime = [] } = useRelatoriosMes(mes, ano, null)
   const { getMetaVendedor } = useMetasVendedor(mes, ano)
 
   // Últimos 4 meses para o gráfico
@@ -511,6 +513,49 @@ function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
   const nomeVendedor = vendedorEfetivo
     ? (vendedores.find(v => v.id === vendedorEfetivo)?.nome ?? 'Vendedor')
     : 'Todos'
+
+  // Métricas expandidas do vendedor selecionado
+  const cancelamentos = contratos.filter(c => c.status_ixc === 'C').length
+  const taxaConversaoInd = contratos.length > 0 ? (kpis.ativos / contratos.length) * 100 : 0
+  const tempoAtivInd = useMemo(() => calcTempoAtivacao(contratos), [contratos])
+  const metaIndividual = vendedores.find(v => v.id === vendedorEfetivo)?.meta_mensal ?? null
+  const pctMetaInd = metaIndividual && metaIndividual > 0
+    ? Math.min((kpis.ativos / metaIndividual) * 100, 200)
+    : null
+
+  // Badges: comparativo com o time
+  const badgeDestaque = useMemo(() => {
+    if (!vendedorEfetivo || contratosTime.length === 0) return false
+    const vendMap = new Map<string, { ativos: number; total: number }>()
+    for (const c of contratosTime) {
+      const vid = c.vendedor?.id
+      if (!vid) continue
+      const e = vendMap.get(vid) ?? { ativos: 0, total: 0 }
+      e.total++
+      if (c.status_ixc === 'A') e.ativos++
+      vendMap.set(vid, e)
+    }
+    let melhorId = ''
+    let melhorTaxa = -1
+    for (const [id, e] of vendMap.entries()) {
+      const taxa = e.total > 0 ? e.ativos / e.total : 0
+      if (taxa > melhorTaxa) { melhorTaxa = taxa; melhorId = id }
+    }
+    return melhorId === vendedorEfetivo
+  }, [contratosTime, vendedorEfetivo])
+
+  const badgeAtencao = useMemo(() => {
+    if (!vendedorEfetivo || contratosTime.length === 0) return false
+    const cancelMap = new Map<string, number>()
+    for (const c of contratosTime) {
+      const vid = c.vendedor?.id
+      if (!vid || c.status_ixc !== 'C') continue
+      cancelMap.set(vid, (cancelMap.get(vid) ?? 0) + 1)
+    }
+    if (cancelMap.size === 0) return false
+    const maxId = Array.from(cancelMap.entries()).sort((a, b) => b[1] - a[1])[0][0]
+    return maxId === vendedorEfetivo && cancelMap.get(vendedorEfetivo)! > 0
+  }, [contratosTime, vendedorEfetivo])
 
   return (
     <div className="flex flex-col gap-5">
@@ -552,7 +597,72 @@ function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
             <KpiCard label="Ticket Médio"          value={formatBRL(kpis.ticketMedio)}     icon={<DollarSign size={18} />} accentHex="#f59e0b" sub="por contrato ativo" />
           </div>
 
-          {/* Barra de meta individual */}
+          {/* Métricas expandidas (Fase 3 — Tarefa 3.4) */}
+          <GlassCard className="p-5">
+            <div className="flex items-center gap-3 mb-4 flex-wrap">
+              <h3 className="text-sm font-semibold text-white">Perfil de desempenho — {nomeVendedor}</h3>
+              {badgeDestaque && (
+                <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(0,214,143,0.15)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.3)' }}>
+                  ★ Melhor conversão do time
+                </span>
+              )}
+              {badgeAtencao && (
+                <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}>
+                  ⚠ Mais cancelamentos do time
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-5">
+              {/* Taxa de conversão individual */}
+              <div>
+                <p className="text-xs text-white/40 mb-1">Taxa de conversão</p>
+                <p className="text-xl font-bold text-white">{formatPercent(taxaConversaoInd)}</p>
+                <p className="text-xs text-white/30 mt-0.5">ativos ÷ total cadastrados</p>
+              </div>
+              {/* Tempo médio de ativação */}
+              <div>
+                <p className="text-xs text-white/40 mb-1">Tempo médio de ativação</p>
+                {tempoAtivInd ? (
+                  <>
+                    <p className="text-xl font-bold text-white">{tempoAtivInd.mediaDias.toFixed(1)}<span className="text-sm font-normal text-white/40 ml-1">dias</span></p>
+                    <p className="text-xs text-white/30 mt-0.5">melhor {tempoAtivInd.melhorCaso}d · pior {tempoAtivInd.piorCaso}d</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-white/30">—</p>
+                )}
+              </div>
+              {/* Cancelamentos */}
+              <div>
+                <p className="text-xs text-white/40 mb-1">Cancelamentos no período</p>
+                <p className="text-xl font-bold" style={{ color: cancelamentos > 0 ? '#ef4444' : 'rgba(255,255,255,0.7)' }}>{cancelamentos}</p>
+                <p className="text-xs text-white/30 mt-0.5">contratos com status C</p>
+              </div>
+              {/* Meta individual (vendedores.meta_mensal) */}
+              <div>
+                <p className="text-xs text-white/40 mb-1">Meta individual</p>
+                {metaIndividual && metaIndividual > 0 ? (
+                  <>
+                    <p className="text-xl font-bold text-white">{pctMetaInd?.toFixed(0)}%</p>
+                    <p className="text-xs text-white/30 mt-0.5">{kpis.ativos} de {metaIndividual} contratos</p>
+                  </>
+                ) : (
+                  <p className="text-sm text-white/30">Não definida</p>
+                )}
+              </div>
+            </div>
+            {/* Barra de progresso vs meta individual */}
+            {metaIndividual && metaIndividual > 0 && pctMetaInd !== null && (
+              <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-white/40">Progresso vs. meta individual</span>
+                  <span className="text-xs font-semibold" style={{ color: (pctMetaInd ?? 0) >= 100 ? '#00d68f' : '#f59e0b' }}>{kpis.ativos} / {metaIndividual}</span>
+                </div>
+                <ProgressBar value={Math.min(pctMetaInd, 100)} color={(pctMetaInd ?? 0) >= 100 ? 'success' : (pctMetaInd ?? 0) >= 60 ? 'primary' : 'warning'} size="md" emptyLabel="Mês iniciando" />
+              </div>
+            )}
+          </GlassCard>
+
+          {/* Barra de meta individual (metas_vendedor) */}
           {meta > 0 && (
             <GlassCard className="p-5">
               <div className="flex items-center justify-between mb-3">
