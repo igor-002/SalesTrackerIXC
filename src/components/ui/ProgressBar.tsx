@@ -5,6 +5,7 @@ interface ProgressBarProps {
   animated?: boolean
   className?: string
   showLabel?: boolean
+  emptyLabel?: string
 }
 
 const colorMap = {
@@ -28,8 +29,25 @@ export function ProgressBar({
   animated = false,
   className = '',
   showLabel = false,
+  emptyLabel,
 }: ProgressBarProps) {
   const clamped = Math.min(100, Math.max(0, value))
+
+  if (clamped < 5 && emptyLabel) {
+    return (
+      <div className={`flex items-center gap-3 ${className}`}>
+        <div
+          className={`flex-1 rounded-full border border-dashed ${sizeMap[size]}`}
+          style={{ borderColor: 'rgba(255,255,255,0.2)', background: 'transparent' }}
+          role="progressbar"
+          aria-valuenow={clamped}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        />
+        <span className="text-xs text-white/40 whitespace-nowrap">{emptyLabel}</span>
+      </div>
+    )
+  }
 
   return (
     <div className={`flex items-center gap-3 ${className}`}>

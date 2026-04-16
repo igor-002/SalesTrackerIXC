@@ -24,7 +24,7 @@ export function TVMetaBar({ label, atual, meta, color = 'primary' }: TVMetaBarPr
           <p className="text-lg font-semibold text-white/70">{formatBRL(meta)}</p>
         </div>
       </div>
-      <ProgressBar value={pct} color={isAtingida ? 'success' : color} size="lg" animated={!isAtingida} />
+      <ProgressBar value={pct} color={isAtingida ? 'success' : color} size="lg" animated={!isAtingida} emptyLabel={pct < 5 ? 'Mês iniciando' : undefined} />
       <p className={`text-sm font-semibold mt-3 ${isAtingida ? 'text-emerald-400' : 'text-white/60'}`}>
         {pct.toFixed(1)}% {isAtingida ? '✓ Atingida!' : 'realizado'}
       </p>

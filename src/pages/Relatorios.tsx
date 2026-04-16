@@ -204,7 +204,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                   {kpis.ativos} / {metaTime} ativos ({pctMeta.toFixed(0)}%)
                 </span>
               </div>
-              <ProgressBar value={pctMeta} color={pctMeta >= 100 ? 'success' : pctMeta >= 60 ? 'primary' : 'warning'} size="lg" />
+              <ProgressBar value={pctMeta} color={pctMeta >= 100 ? 'success' : pctMeta >= 60 ? 'primary' : 'warning'} size="lg" emptyLabel="Mês iniciando" />
             </GlassCard>
           )}
 
@@ -358,6 +358,7 @@ function TabRanking({ vendedores }: {
                             color={r.pct >= 100 ? 'success' : r.pct >= 60 ? 'primary' : 'warning'}
                             size="sm"
                             className="flex-1"
+                            emptyLabel="Mês iniciando"
                           />
                           <span className="text-xs font-semibold text-white/60 w-10 text-right tabular-nums">{r.pct.toFixed(0)}%</span>
                         </div>
@@ -464,7 +465,7 @@ function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
                   {kpis.ativos} / {meta} ativos
                 </span>
               </div>
-              <ProgressBar value={Math.min(pctMeta, 100)} color={pctMeta >= 100 ? 'success' : pctMeta >= 60 ? 'primary' : 'warning'} size="lg" />
+              <ProgressBar value={Math.min(pctMeta, 100)} color={pctMeta >= 100 ? 'success' : pctMeta >= 60 ? 'primary' : 'warning'} size="lg" emptyLabel="Mês iniciando" />
             </GlassCard>
           )}
 
