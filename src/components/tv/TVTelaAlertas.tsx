@@ -69,20 +69,41 @@ export function TVTelaAlertas({ alertasAA, t }: TVTelaAlertasProps) {
         <div className="h-full overflow-y-auto">
           {alertasAA.map((v, idx) => {
             const dias = v.dias_em_aa ?? 0
-            const urgente = dias > 15
-            const atencao = dias > 7
+            const urgente = dias > 7
+            const atencao = dias >= 4 && dias <= 7
+            const verde   = dias >= 1 && dias <= 3
 
             const rowBg = urgente
               ? 'rgba(239,68,68,0.07)'
               : atencao
               ? 'rgba(245,158,11,0.06)'
+              : verde
+              ? 'rgba(0,214,143,0.06)'
               : undefined
 
             const borderColor = urgente
               ? 'rgba(239,68,68,0.3)'
               : atencao
               ? 'rgba(245,158,11,0.25)'
+              : verde
+              ? 'rgba(0,214,143,0.35)'
               : 'rgba(255,255,255,0.04)'
+
+            const leftBorder = urgente
+              ? '3px solid #ef4444'
+              : atencao
+              ? '3px solid #f59e0b'
+              : verde
+              ? '3px solid #00d68f'
+              : '3px solid transparent'
+
+            const diasColor = urgente
+              ? '#ef4444'
+              : atencao
+              ? '#f59e0b'
+              : verde
+              ? '#00d68f'
+              : 'rgba(255,255,255,0.35)'
 
             return (
               <div
@@ -93,7 +114,7 @@ export function TVTelaAlertas({ alertasAA, t }: TVTelaAlertasProps) {
                   gap: '1.5rem',
                   background: rowBg,
                   borderBottomColor: borderColor,
-                  borderLeft: urgente ? '3px solid #ef4444' : atencao ? '3px solid #f59e0b' : '3px solid transparent',
+                  borderLeft: leftBorder,
                   animationDelay: `${idx * 50}ms`,
                 }}
               >
@@ -105,7 +126,7 @@ export function TVTelaAlertas({ alertasAA, t }: TVTelaAlertasProps) {
 
                 <span
                   className="text-2xl font-black text-right tabular-nums"
-                  style={{ color: urgente ? '#ef4444' : atencao ? '#f59e0b' : 'rgba(255,255,255,0.35)' }}
+                  style={{ color: diasColor }}
                 >
                   {dias}d
                 </span>
@@ -124,6 +145,13 @@ export function TVTelaAlertas({ alertasAA, t }: TVTelaAlertasProps) {
                       style={{ background: 'rgba(245,158,11,0.18)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.35)' }}
                     >
                       ATENÇÃO
+                    </span>
+                  ) : verde ? (
+                    <span
+                      className="text-xs font-black px-3 py-1.5 rounded-full whitespace-nowrap"
+                      style={{ background: 'rgba(0,214,143,0.18)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.35)' }}
+                    >
+                      Em dia
                     </span>
                   ) : (
                     <span className="text-xs font-semibold px-3 py-1.5 rounded-full whitespace-nowrap text-white/25 bg-white/5 border border-white/8">
