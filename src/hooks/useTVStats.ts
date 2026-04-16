@@ -29,6 +29,29 @@ export interface VendedorRanking {
   taxaConversao: number
 }
 
+export interface PlanoStat {
+  nome: string
+  qtd: number
+  total: number
+  ticketMedio: number
+}
+
+export interface ChurnStats {
+  canceladosMes: number
+  canceladosMesAnterior: number
+  bloqueadosMes: number
+  bloqueadosMesAnterior: number
+}
+
+export interface VelocidadeVendedor {
+  id: string
+  nome: string
+  mediaDias: number
+  melhorCaso: number
+  piorCaso: number
+  totalContratos: number
+}
+
 export interface TVStats {
   faturamentoReal: number
   faturamentoPrometido: number
@@ -40,6 +63,10 @@ export interface TVStats {
   rankingVendedores: VendedorRanking[]
   vendasPorDiaSemana: { dia: string; qtd: number }[]
   mrr12Meses: { mes: string; valor: number }[]
+  planosMes: PlanoStat[]
+  churn: ChurnStats
+  velocidadeVendedores: VelocidadeVendedor[]
+  mediaVelocidadeTime: number
   loading: boolean
 }
 
@@ -54,6 +81,10 @@ const EMPTY: TVStats = {
   rankingVendedores: [],
   vendasPorDiaSemana: [],
   mrr12Meses: [],
+  planosMes: [],
+  churn: { canceladosMes: 0, canceladosMesAnterior: 0, bloqueadosMes: 0, bloqueadosMesAnterior: 0 },
+  velocidadeVendedores: [],
+  mediaVelocidadeTime: 0,
   loading: true,
 }
 
@@ -79,10 +110,13 @@ export function useTVStats() {
     inicio12Meses.setDate(1)
     const inicio12MesesStr = inicio12Meses.toISOString().slice(0, 10)
 
-    const [mesRes, semanaRes, mrr12Res] = await Promise.all([
+    // Mês anterior para comparativo de churn
+    const inicioMesAnterior = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10)
+
+    const [mesRes, semanaRes, mrr12Res, churnMesRes, churnAnteriorRes] = await Promise.all([
       supabase
         .from('vendas')
-        .select('id, status_ixc, mrr, valor_total, dias_em_aa, cliente_nome, data_venda, codigo_contrato_ixc, vendedor:vendedores(id, nome)')
+        .select('id, status_ixc, mrr, valor_total, dias_em_aa, cliente_nome, data_venda, codigo_contrato_ixc, created_at, status_atualizado_em, vendedor:vendedores(id, nome), segmento:segmentos(id, nome)')
         .gte('data_venda', inicioMes),
       supabase
         .from('vendas')
@@ -94,11 +128,26 @@ export function useTVStats() {
         .eq('mrr', true)
         .eq('status_ixc', 'A')
         .gte('data_venda', inicio12MesesStr),
+      // Churn mês corrente: contratos que tiveram status atualizado para B ou C neste mês
+      supabase
+        .from('vendas')
+        .select('id, status_ixc')
+        .in('status_ixc', ['B', 'C'])
+        .gte('status_atualizado_em', inicioMes),
+      // Churn mês anterior: contratos que tiveram status B ou C no mês passado
+      supabase
+        .from('vendas')
+        .select('id, status_ixc')
+        .in('status_ixc', ['B', 'C'])
+        .gte('status_atualizado_em', inicioMesAnterior)
+        .lt('status_atualizado_em', inicioMes),
     ])
 
     const vendasMes = mesRes.data ?? []
     const vendasSemana = semanaRes.data ?? []
     const vendasMrr12 = mrr12Res.data ?? []
+    const churnMes = churnMesRes.data ?? []
+    const churnAnterior = churnAnteriorRes.data ?? []
 
     const faturamentoReal = vendasMes
       .filter((v) => v.status_ixc === 'A')
@@ -161,6 +210,64 @@ export function useTVStats() {
     }
     const vendasPorDiaSemana = DIAS_SEMANA.map((dia, i) => ({ dia, qtd: counts[i] }))
 
+    // Planos mais vendidos do mês (contratos A, agrupados por segmento)
+    const planosMap = new Map<string, { qtd: number; total: number }>()
+    for (const v of vendasMes) {
+      if (v.status_ixc !== 'A') continue
+      const seg = v.segmento as { id: string; nome: string } | null
+      const nome = seg?.nome ?? 'Sem segmento'
+      const entry = planosMap.get(nome) ?? { qtd: 0, total: 0 }
+      entry.qtd++
+      entry.total += v.valor_total ?? 0
+      planosMap.set(nome, entry)
+    }
+    const planosMes: PlanoStat[] = Array.from(planosMap.entries())
+      .map(([nome, e]) => ({ nome, qtd: e.qtd, total: e.total, ticketMedio: e.qtd > 0 ? e.total / e.qtd : 0 }))
+      .sort((a, b) => b.qtd - a.qtd)
+
+    // Churn: cancelados e bloqueados vs. mês anterior
+    const churn: ChurnStats = {
+      canceladosMes: churnMes.filter((v) => v.status_ixc === 'C').length,
+      bloqueadosMes: churnMes.filter((v) => v.status_ixc === 'B').length,
+      canceladosMesAnterior: churnAnterior.filter((v) => v.status_ixc === 'C').length,
+      bloqueadosMesAnterior: churnAnterior.filter((v) => v.status_ixc === 'B').length,
+    }
+
+    // Velocidade de ativação: dias entre created_at e status_atualizado_em para contratos A
+    // NOTA: status_atualizado_em é o timestamp da última atualização de status.
+    // Quando status_ixc = 'A', é uma aproximação da data de ativação no IXC.
+    // Apenas registros com status_ixc='A', status_atualizado_em não nulo e daysDiff >= 0.
+    const velMap = new Map<string, { nome: string; dias: number[]; id: string }>()
+    let todasDiasVelocidade: number[] = []
+    for (const v of vendasMes) {
+      if (v.status_ixc !== 'A' || !v.status_atualizado_em || !v.created_at) continue
+      const daysDiff = Math.round(
+        (new Date(v.status_atualizado_em).getTime() - new Date(v.created_at).getTime()) / 86400000
+      )
+      if (daysDiff < 0) continue // sanity check — rejeita dados inconsistentes
+      const vend = v.vendedor as { id: string; nome: string } | null
+      if (!vend) continue
+      const entry = velMap.get(vend.id) ?? { nome: vend.nome, dias: [], id: vend.id }
+      entry.dias.push(daysDiff)
+      velMap.set(vend.id, entry)
+      todasDiasVelocidade.push(daysDiff)
+    }
+    const velocidadeVendedores: VelocidadeVendedor[] = Array.from(velMap.values())
+      .filter((e) => e.dias.length > 0)
+      .map((e) => ({
+        id: e.id,
+        nome: e.nome,
+        mediaDias: e.dias.reduce((s, d) => s + d, 0) / e.dias.length,
+        melhorCaso: Math.min(...e.dias),
+        piorCaso: Math.max(...e.dias),
+        totalContratos: e.dias.length,
+      }))
+      .sort((a, b) => a.mediaDias - b.mediaDias)
+
+    const mediaVelocidadeTime = todasDiasVelocidade.length > 0
+      ? todasDiasVelocidade.reduce((s, d) => s + d, 0) / todasDiasVelocidade.length
+      : 0
+
     // Agrupar MRR dos últimos 12 meses por mês
     const mrrMap = new Map<string, number>()
     for (let i = 11; i >= 0; i--) {
@@ -189,6 +296,10 @@ export function useTVStats() {
       rankingVendedores,
       vendasPorDiaSemana,
       mrr12Meses,
+      planosMes,
+      churn,
+      velocidadeVendedores,
+      mediaVelocidadeTime,
       loading: false,
     })
   }, [])
