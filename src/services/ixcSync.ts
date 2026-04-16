@@ -54,30 +54,86 @@ async function sincronizarVenda(venda: VendaParaSync): Promise<{ atualizado: boo
   }
 }
 
+// ── Helpers de log ────────────────────────────────────────────────────────────
+
+async function inserirLogSync(tipo: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('sync_log')
+    .insert({ tipo, status: 'em_andamento', iniciado_em: new Date().toISOString() })
+    .select('id')
+    .single()
+  return data?.id ?? null
+}
+
+async function atualizarLogSync(id: string, fields: Partial<{
+  status: string
+  finalizado_em: string
+  duracao_ms: number
+  registros_processados: number
+  registros_atualizados: number
+  registros_erro: number
+  erro_mensagem: string
+}>): Promise<void> {
+  await supabase.from('sync_log').update(fields).eq('id', id)
+}
+
+// ── Sync principal ────────────────────────────────────────────────────────────
+
 export async function sincronizarStatusIxc(): Promise<SyncResultado> {
-  // Busca apenas vendas com código de contrato IXC
-  const { data, error } = await supabase
-    .from('vendas')
-    .select('id, codigo_contrato_ixc, status_ixc, status_atualizado_em')
-    .not('codigo_contrato_ixc', 'is', null)
+  const iniciadoEm = Date.now()
+  // Log não-fatal: se falhar, o sync continua normalmente
+  const logId = await inserirLogSync('ixc_contratos').catch(() => null)
 
-  if (error) throw new Error(`Erro ao buscar vendas: ${error.message}`)
+  try {
+    const { data, error } = await supabase
+      .from('vendas')
+      .select('id, codigo_contrato_ixc, status_ixc, status_atualizado_em')
+      .not('codigo_contrato_ixc', 'is', null)
 
-  const vendas = (data ?? []) as VendaParaSync[]
-  if (!vendas.length) return { atualizadas: 0, erros: 0, total: 0 }
+    if (error) throw new Error(`Erro ao buscar vendas: ${error.message}`)
 
-  const results = await Promise.allSettled(vendas.map(sincronizarVenda))
+    const vendas = (data ?? []) as VendaParaSync[]
 
-  let atualizadas = 0
-  let erros = 0
-  for (const r of results) {
-    if (r.status === 'fulfilled') {
-      if (r.value.atualizado) atualizadas++
-      if (r.value.erro) erros++
+    let resultado: SyncResultado
+    if (!vendas.length) {
+      resultado = { atualizadas: 0, erros: 0, total: 0 }
     } else {
-      erros++
-    }
-  }
+      const results = await Promise.allSettled(vendas.map(sincronizarVenda))
 
-  return { atualizadas, erros, total: vendas.length }
+      let atualizadas = 0
+      let erros = 0
+      for (const r of results) {
+        if (r.status === 'fulfilled') {
+          if (r.value.atualizado) atualizadas++
+          if (r.value.erro) erros++
+        } else {
+          erros++
+        }
+      }
+      resultado = { atualizadas, erros, total: vendas.length }
+    }
+
+    if (logId) {
+      await atualizarLogSync(logId, {
+        status: 'sucesso',
+        finalizado_em: new Date().toISOString(),
+        duracao_ms: Date.now() - iniciadoEm,
+        registros_processados: resultado.total,
+        registros_atualizados: resultado.atualizadas,
+        registros_erro: resultado.erros,
+      }).catch(() => undefined)
+    }
+
+    return resultado
+  } catch (err) {
+    if (logId) {
+      await atualizarLogSync(logId, {
+        status: 'erro',
+        finalizado_em: new Date().toISOString(),
+        duracao_ms: Date.now() - iniciadoEm,
+        erro_mensagem: err instanceof Error ? err.message : 'erro desconhecido',
+      }).catch(() => undefined)
+    }
+    throw err
+  }
 }

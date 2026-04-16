@@ -340,6 +340,48 @@ export type Database = {
           },
         ]
       }
+      sync_log: {
+        Row: {
+          duracao_ms: number | null
+          empresa_id: string
+          erro_mensagem: string | null
+          finalizado_em: string | null
+          id: string
+          iniciado_em: string
+          registros_atualizados: number | null
+          registros_erro: number | null
+          registros_processados: number | null
+          status: string
+          tipo: string
+        }
+        Insert: {
+          duracao_ms?: number | null
+          empresa_id?: string
+          erro_mensagem?: string | null
+          finalizado_em?: string | null
+          id?: string
+          iniciado_em?: string
+          registros_atualizados?: number | null
+          registros_erro?: number | null
+          registros_processados?: number | null
+          status: string
+          tipo: string
+        }
+        Update: {
+          duracao_ms?: number | null
+          empresa_id?: string
+          erro_mensagem?: string | null
+          finalizado_em?: string | null
+          id?: string
+          iniciado_em?: string
+          registros_atualizados?: number | null
+          registros_erro?: number | null
+          registros_processados?: number | null
+          status?: string
+          tipo?: string
+        }
+        Relationships: []
+      }
       usuarios: {
         Row: {
           ativo: boolean | null
