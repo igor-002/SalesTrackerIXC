@@ -13,7 +13,7 @@ import {
 } from 'recharts'
 import {
   FileText, Users, User, TrendingUp, DollarSign, Percent,
-  Target, ChevronDown, Check, Edit2, X,
+  Target, ChevronDown, Check, Edit2, X, Zap, Clock,
 } from 'lucide-react'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Spinner } from '@/components/ui/Spinner'
@@ -26,6 +26,9 @@ import {
   useRelatoriosMes,
   useRelatoriosRange,
   calcKpis,
+  calcForecast,
+  calcArpuPorSegmento,
+  calcTempoAtivacao,
   agruparPorMes,
   ultimosMeses,
 } from '@/hooks/useRelatoriosIxc'
@@ -150,6 +153,9 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
   const pctMeta = metaTime > 0 ? Math.min((kpis.ativos / metaTime) * 100, 100) : 0
 
   const chartData = useMemo(() => agruparPorMes(contratosRange, meses6), [contratosRange, meses6])
+  const forecast  = useMemo(() => calcForecast(contratos, mes, ano), [contratos, mes, ano])
+  const arpuList  = useMemo(() => calcArpuPorSegmento(contratos), [contratos])
+  const tempoAtiv = useMemo(() => calcTempoAtivacao(contratos), [contratos])
 
   return (
     <div className="flex flex-col gap-5">
@@ -192,21 +198,114 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
             <KpiCard label="Taxa de Conversão"     value={formatPercent(kpis.taxaConversao)} icon={<Percent size={18} />}  accentHex="#8b5cf6" sub="ativos ÷ total" />
           </div>
 
-          {/* Meta do time */}
+          {/* Meta + Forecast */}
           {isGestor && metaTime > 0 && (
-            <GlassCard className="p-5">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <Target size={15} className="text-emerald-400" />
-                  <span className="text-sm font-semibold text-white">Meta do Time — {MESES_LABELS[mes - 1]}</span>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              {/* Meta do time */}
+              <GlassCard className="p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Target size={15} className="text-emerald-400" />
+                    <span className="text-sm font-semibold text-white">Meta do Time — {MESES_LABELS[mes - 1]}</span>
+                  </div>
+                  <span className="text-sm font-bold" style={{ color: '#00d68f' }}>
+                    {kpis.ativos} / {metaTime} ativos ({pctMeta.toFixed(0)}%)
+                  </span>
                 </div>
-                <span className="text-sm font-bold" style={{ color: '#00d68f' }}>
-                  {kpis.ativos} / {metaTime} ativos ({pctMeta.toFixed(0)}%)
-                </span>
-              </div>
-              <ProgressBar value={pctMeta} color={pctMeta >= 100 ? 'success' : pctMeta >= 60 ? 'primary' : 'warning'} size="lg" emptyLabel="Mês iniciando" />
-            </GlassCard>
+                <ProgressBar value={pctMeta} color={pctMeta >= 100 ? 'success' : pctMeta >= 60 ? 'primary' : 'warning'} size="lg" emptyLabel="Mês iniciando" />
+              </GlassCard>
+
+              {/* Forecast */}
+              {forecast ? (() => {
+                const pctForecast = metaTime > 0 ? (forecast.forecast / metaTime) * 100 : 0
+                const accentHex = pctForecast >= 100 ? '#00d68f' : pctForecast >= 50 ? '#f59e0b' : '#ef4444'
+                const label = pctForecast >= 100 ? 'Meta atingível' : pctForecast >= 50 ? 'Abaixo do ritmo' : 'Ritmo crítico'
+                return (
+                  <GlassCard className="p-5 relative overflow-hidden">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Zap size={15} style={{ color: accentHex }} />
+                      <span className="text-sm font-semibold text-white">Projeção de fechamento</span>
+                      <span
+                        className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full"
+                        style={{ background: `${accentHex}18`, color: accentHex, border: `1px solid ${accentHex}30` }}
+                      >
+                        {label}
+                      </span>
+                    </div>
+                    <p className="text-2xl font-bold text-white tracking-tight">{formatBRL(forecast.forecast)}</p>
+                    <p className="text-xs text-white/40 mt-1">
+                      {pctForecast.toFixed(0)}% da meta · baseado em {forecast.passadosDU}/{forecast.totalDU} dias úteis
+                    </p>
+                    <div className="absolute -right-4 -bottom-4 w-20 h-20 rounded-full opacity-[0.07]" style={{ background: accentHex }} />
+                  </GlassCard>
+                )
+              })() : (
+                <GlassCard className="p-5 flex items-center gap-3">
+                  <Zap size={15} className="text-white/20" />
+                  <span className="text-sm text-white/30">Projeção disponível a partir do 1º dia útil</span>
+                </GlassCard>
+              )}
+            </div>
           )}
+
+          {/* Tempo médio de ativação + ARPU por segmento */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {/* Tempo de ativação */}
+            <GlassCard className="p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Clock size={15} className="text-cyan-400" />
+                <span className="text-sm font-semibold text-white">Tempo médio de ativação</span>
+                <span className="ml-auto text-xs text-white/30">cadastro → ativação no IXC</span>
+              </div>
+              {tempoAtiv ? (
+                <div className="flex items-end gap-6">
+                  <div>
+                    <p className="text-3xl font-bold text-white tracking-tight">{tempoAtiv.mediaDias.toFixed(1)}<span className="text-base font-normal text-white/40 ml-1">dias</span></p>
+                    <p className="text-xs text-white/40 mt-1">média do time · {tempoAtiv.amostra} contrato{tempoAtiv.amostra !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div className="flex gap-4 text-xs text-white/40 mb-1">
+                    <div>
+                      <p className="font-semibold text-emerald-400">{tempoAtiv.melhorCaso}d</p>
+                      <p>melhor</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-amber-400">{tempoAtiv.piorCaso}d</p>
+                      <p>pior</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-white/30">Sem dados de ativação no período.</p>
+              )}
+            </GlassCard>
+
+            {/* ARPU por segmento */}
+            <GlassCard className="p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <DollarSign size={15} className="text-amber-400" />
+                <span className="text-sm font-semibold text-white">ARPU por segmento</span>
+                <span className="ml-auto text-xs text-white/30">contratos ativos</span>
+              </div>
+              {arpuList.length === 0 ? (
+                <p className="text-sm text-white/30">Sem contratos ativos no período.</p>
+              ) : (
+                <div className="flex flex-col gap-2.5">
+                  {arpuList.map((s, i) => (
+                    <div key={s.nome} className="flex items-center gap-3">
+                      <span className="flex-1 text-sm text-white/70 truncate">{s.nome}</span>
+                      {i === 0 && (
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
+                          mais rentável
+                        </span>
+                      )}
+                      <span className="text-xs text-white/40 w-14 text-right tabular-nums">{s.contratos} contr.</span>
+                      <span className="text-sm font-semibold text-white tabular-nums w-28 text-right">{formatBRL(s.arpu)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </GlassCard>
+          </div>
 
           {/* Gráfico 6 meses */}
           <GlassCard className="p-5">
