@@ -1,4 +1,5 @@
-import { TrendingUp, DollarSign, Users, Repeat2, Award, RefreshCw, AlertTriangle } from 'lucide-react'
+import { useState } from 'react'
+import { TrendingUp, DollarSign, Users, Repeat2, Award, RefreshCw, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Spinner } from '@/components/ui/Spinner'
@@ -6,6 +7,8 @@ import { Badge } from '@/components/ui/Badge'
 import { VendasTable } from '@/components/vendas/VendasTable'
 import { useDashboardStats } from '@/hooks/useDashboardStats'
 import { useIxcSync } from '@/hooks/useIxcSync'
+import { useHistoricoSync } from '@/hooks/useSyncStatus'
+import type { SyncLogRow } from '@/hooks/useSyncStatus'
 import { ixcConfigurado } from '@/lib/ixc'
 import { formatBRL, formatNumber } from '@/lib/formatters'
 
@@ -59,9 +62,155 @@ function formatSyncTime(date: Date | null): string {
   return hrs === 1 ? 'há 1 hora' : `há ${hrs} horas`
 }
 
+function formatIsoHora(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
+function SyncStatusBadge({ status }: { status: string }) {
+  if (status === 'sucesso') {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,214,143,0.12)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.25)' }}>
+        <CheckCircle2 size={10} /> sucesso
+      </span>
+    )
+  }
+  if (status === 'erro') {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}>
+        <XCircle size={10} /> erro
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
+      <Loader2 size={10} className="animate-spin" /> em andamento
+    </span>
+  )
+}
+
+function SyncHistoricoCard({ sincronizarAgora, sincronizando }: {
+  sincronizarAgora: () => void
+  sincronizando: boolean
+}) {
+  const [aberto, setAberto] = useState(false)
+  const { data: historico = [], isFetching, refetchTudo } = useHistoricoSync()
+
+  const ultimo = historico[0] ?? null
+
+  function handleSync() {
+    sincronizarAgora()
+    // Após 3s, refetch do histórico para mostrar o novo registro
+    setTimeout(() => refetchTudo(), 3000)
+  }
+
+  return (
+    <GlassCard className="overflow-hidden">
+      {/* Header — sempre visível */}
+      <button
+        onClick={() => setAberto((v) => !v)}
+        className="w-full flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-white/[0.02] transition-colors"
+      >
+        <div className="flex items-center gap-2.5">
+          <RefreshCw size={14} className="text-emerald-400" />
+          <span className="text-sm font-semibold text-white">Sincronização IXC</span>
+          {ultimo && <SyncStatusBadge status={ultimo.status} />}
+        </div>
+        <div className="flex items-center gap-3">
+          {ultimo && (
+            <span className="text-xs text-white/30">
+              {formatIsoHora(ultimo.finalizado_em ?? ultimo.iniciado_em)}
+              {ultimo.registros_processados != null && ` · ${ultimo.registros_processados} contratos`}
+            </span>
+          )}
+          {aberto ? <ChevronUp size={14} className="text-white/30" /> : <ChevronDown size={14} className="text-white/30" />}
+        </div>
+      </button>
+
+      {/* Painel expandido */}
+      {aberto && (
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+          {/* Último sync em destaque */}
+          {ultimo && (
+            <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/30 mb-2">Última sincronização</p>
+              <div className="flex flex-wrap items-center gap-4">
+                <SyncStatusBadge status={ultimo.status} />
+                <span className="text-sm text-white">{formatIsoHora(ultimo.iniciado_em)}</span>
+                {ultimo.registros_processados != null && (
+                  <span className="text-xs text-white/50">{ultimo.registros_processados} contratos processados</span>
+                )}
+                {ultimo.registros_atualizados != null && (
+                  <span className="text-xs text-white/50">{ultimo.registros_atualizados} atualizados</span>
+                )}
+                {ultimo.duracao_ms != null && (
+                  <span className="text-xs text-white/30">{ultimo.duracao_ms}ms</span>
+                )}
+                {ultimo.erro_mensagem && (
+                  <span className="text-xs text-red-400 font-medium">Erro: {ultimo.erro_mensagem}</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Lista compacta dos últimos 10 */}
+          <div className="px-5 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-white/30 mb-2">Histórico recente</p>
+            {isFetching && historico.length === 0 ? (
+              <div className="flex justify-center py-4"><Spinner size="sm" style={{ color: '#00d68f' }} /></div>
+            ) : historico.length === 0 ? (
+              <p className="text-xs text-white/30 py-2">Nenhum registro de sincronização.</p>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {historico.map((row: SyncLogRow) => (
+                  <div
+                    key={row.id}
+                    className="flex items-center gap-3 py-1.5 rounded-lg px-2 text-xs"
+                    style={{ background: 'rgba(255,255,255,0.02)' }}
+                  >
+                    <span className="text-white/30 w-28 flex-shrink-0 tabular-nums">{formatIsoHora(row.iniciado_em)}</span>
+                    <SyncStatusBadge status={row.status} />
+                    <span className="text-white/40 flex-shrink-0 capitalize">{row.tipo.replace('_', ' ')}</span>
+                    {row.registros_processados != null && (
+                      <span className="text-white/30 tabular-nums">{row.registros_processados} proc.</span>
+                    )}
+                    {row.registros_atualizados != null && row.registros_atualizados > 0 && (
+                      <span className="text-emerald-400/70 tabular-nums">{row.registros_atualizados} atualiz.</span>
+                    )}
+                    {row.duracao_ms != null && (
+                      <span className="text-white/20 tabular-nums ml-auto">{row.duracao_ms}ms</span>
+                    )}
+                    {row.erro_mensagem && (
+                      <span className="text-red-400/70 ml-auto truncate max-w-[200px]">{row.erro_mensagem}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Botões de ação */}
+          <div className="px-5 pb-4 flex gap-2">
+            <button
+              onClick={handleSync}
+              disabled={sincronizando}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: 'rgba(0,214,143,0.12)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.2)' }}
+            >
+              {sincronizando ? <Spinner size="sm" /> : <RefreshCw size={12} />}
+              Sincronizar agora
+            </button>
+          </div>
+        </div>
+      )}
+    </GlassCard>
+  )
+}
+
 export default function Dashboard() {
   const { stats, loading } = useDashboardStats()
   const { ultimaSincronizacao, sincronizando, sincronizarAgora } = useIxcSync()
+  const ixcAtivo = ixcConfigurado()
   const now = new Date()
   const monthLabel = now.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
 
@@ -72,7 +221,7 @@ export default function Dashboard() {
           <h2 className="text-xl font-bold text-white">Visão Geral</h2>
           <p className="text-sm text-white/40 font-medium">{monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}</p>
         </div>
-        {ixcConfigurado() && (
+        {ixcAtivo && (
           <div className="flex items-center gap-2">
             <span className="text-xs text-white/30">
               {sincronizando ? 'Sincronizando...' : `IXC: ${formatSyncTime(ultimaSincronizacao)}`}
@@ -188,6 +337,10 @@ export default function Dashboard() {
             })}
           </div>
         </GlassCard>
+      )}
+
+      {ixcAtivo && (
+        <SyncHistoricoCard sincronizarAgora={sincronizarAgora} sincronizando={sincronizando} />
       )}
 
       <GlassCard className="p-6">
