@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase'
 import { ixcBuscarStatusContrato } from '@/lib/ixc'
 import { runReconciliacao } from '@/services/reconciliacao'
+import { syncAllVendasUnicas } from '@/hooks/useVendasUnicas'
 
 const DAY_MS = 1000 * 60 * 60 * 24
 
@@ -127,6 +128,9 @@ export async function sincronizarStatusIxc(): Promise<SyncResultado> {
 
     // Reconciliação automática após cada sync — não-fatal
     await runReconciliacao('').catch(() => undefined)
+
+    // Sync de vendas únicas (parcelas) — não-fatal
+    await syncAllVendasUnicas().catch(() => undefined)
 
     return resultado
   } catch (err) {
