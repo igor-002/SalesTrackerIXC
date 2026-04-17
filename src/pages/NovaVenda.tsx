@@ -1,10 +1,16 @@
+import { useState } from 'react'
+import { RefreshCw, FolderKanban } from 'lucide-react'
 import { NovaVendaForm } from '@/components/vendas/NovaVendaForm'
+import { NovaVendaUnicaForm } from '@/components/vendas/NovaVendaUnicaForm'
 import type { VendaFormData as NovaVendaFormData } from '@/components/vendas/vendaFormSchema'
 import { useVendas } from '@/hooks/useVendas'
 import { useAuthStore } from '@/store/authStore'
 import { toast } from '@/components/ui/Toast'
 
+type TipoVenda = 'recorrente' | 'unica'
+
 export default function NovaVenda() {
+  const [tipoVenda, setTipoVenda] = useState<TipoVenda>('recorrente')
   const { createVenda } = useVendas()
   const { user } = useAuthStore()
 
@@ -34,9 +40,45 @@ export default function NovaVenda() {
     }
   }
 
+  function handleVendaUnicaSuccess() {
+    toast('success', 'Venda única registrada com sucesso!')
+    setTipoVenda('recorrente')
+  }
+
   return (
     <div>
-      <NovaVendaForm onSubmit={handleSubmit} />
+      {/* Toggle tipo de venda */}
+      <div className="flex gap-2 mb-6">
+        <button
+          onClick={() => setTipoVenda('recorrente')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all cursor-pointer ${
+            tipoVenda === 'recorrente'
+              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+              : 'bg-white/5 text-white/60 hover:bg-white/10 border border-transparent'
+          }`}
+        >
+          <RefreshCw size={18} />
+          Venda Recorrente
+        </button>
+        <button
+          onClick={() => setTipoVenda('unica')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all cursor-pointer ${
+            tipoVenda === 'unica'
+              ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
+              : 'bg-white/5 text-white/60 hover:bg-white/10 border border-transparent'
+          }`}
+        >
+          <FolderKanban size={18} />
+          Venda Única (Projeto)
+        </button>
+      </div>
+
+      {/* Formulário correspondente */}
+      {tipoVenda === 'recorrente' ? (
+        <NovaVendaForm onSubmit={handleSubmit} />
+      ) : (
+        <NovaVendaUnicaForm onSuccess={handleVendaUnicaSuccess} onCancel={() => setTipoVenda('recorrente')} />
+      )}
     </div>
   )
 }
