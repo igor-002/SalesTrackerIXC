@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { TrendingUp, DollarSign, Users, Repeat2, Award, RefreshCw, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
+import { TrendingUp, DollarSign, Users, Repeat2, Award, RefreshCw, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Loader2, FolderKanban, Clock, CircleDollarSign, AlertCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Spinner } from '@/components/ui/Spinner'
@@ -12,6 +12,7 @@ import type { SyncLogRow } from '@/hooks/useSyncStatus'
 import { runReconciliacao } from '@/services/reconciliacao'
 import { ixcConfigurado } from '@/lib/ixc'
 import { formatBRL, formatNumber } from '@/lib/formatters'
+import { useVendasUnicasMes } from '@/hooks/useVendasUnicas'
 
 interface StatCardProps {
   label: string
@@ -230,6 +231,7 @@ function SyncHistoricoCard({ sincronizarAgora, sincronizando }: {
 export default function Dashboard() {
   const { stats, loading } = useDashboardStats()
   const { ultimaSincronizacao, sincronizando, sincronizarAgora } = useIxcSync()
+  const { data: projetosData, isLoading: loadingProjetos } = useVendasUnicasMes()
   const ixcAtivo = ixcConfigurado()
   const now = new Date()
   const monthLabel = now.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
@@ -381,6 +383,107 @@ export default function Dashboard() {
           <div className="flex justify-center py-8"><Spinner style={{ color: '#00d68f' }} /></div>
         ) : (
           <VendasTable vendas={stats.ultimasVendas} />
+        )}
+      </GlassCard>
+
+      {/* Projetos & Serviços (Vendas Únicas) */}
+      <GlassCard className="p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <FolderKanban size={16} className="text-violet-400" />
+            <div>
+              <h3 className="text-sm font-semibold text-white">Projetos & Serviços</h3>
+              <p className="text-xs text-white/40 mt-0.5">Vendas únicas do mês (não contam na meta)</p>
+            </div>
+          </div>
+          <Link
+            to="/nova-venda"
+            className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+            style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}
+          >
+            + Novo projeto
+          </Link>
+        </div>
+
+        {loadingProjetos ? (
+          <div className="flex justify-center py-8"><Spinner style={{ color: '#a78bfa' }} /></div>
+        ) : !projetosData?.stats.total_projetos ? (
+          <div className="text-center py-8">
+            <FolderKanban size={32} className="text-white/20 mx-auto mb-2" />
+            <p className="text-sm text-white/40">Nenhum projeto registrado este mês</p>
+          </div>
+        ) : (
+          <>
+            {/* Stats cards */}
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-5">
+              <div className="rounded-xl p-4 relative overflow-hidden" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-violet-400/70 mb-1">Projetos</p>
+                <p className="text-2xl font-bold text-white mb-0.5">{projetosData.stats.total_projetos}</p>
+                <p className="text-xs text-white/30">{formatBRL(projetosData.stats.valor_vendido)} vendido</p>
+                <div className="absolute -right-3 -bottom-3 w-14 h-14 rounded-full opacity-10 bg-violet-400" />
+              </div>
+
+              <div className="rounded-xl p-4 relative overflow-hidden" style={{ background: 'rgba(0,214,143,0.06)', border: '1px solid rgba(0,214,143,0.15)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70 mb-1">Recebido</p>
+                <p className="text-2xl font-bold text-white mb-0.5">{formatBRL(projetosData.stats.valor_recebido)}</p>
+                <p className="text-xs text-white/30">
+                  {projetosData.stats.valor_vendido > 0
+                    ? `${Math.round((projetosData.stats.valor_recebido / projetosData.stats.valor_vendido) * 100)}%`
+                    : '0%'} do total
+                </p>
+                <div className="absolute -right-3 -bottom-3 w-14 h-14 rounded-full opacity-10 bg-emerald-400" />
+              </div>
+
+              <div className="rounded-xl p-4 relative overflow-hidden" style={{ background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.15)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-cyan-400/70 mb-1">Pendente</p>
+                <p className="text-2xl font-bold text-white mb-0.5">{formatBRL(projetosData.stats.valor_pendente)}</p>
+                <p className="text-xs text-white/30">A receber</p>
+                <div className="absolute -right-3 -bottom-3 w-14 h-14 rounded-full opacity-10 bg-cyan-400" />
+              </div>
+
+              <div className="rounded-xl p-4 relative overflow-hidden" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-red-400/70 mb-1">Em Atraso</p>
+                <p className="text-2xl font-bold text-white mb-0.5">{formatBRL(projetosData.stats.valor_em_atraso)}</p>
+                <p className="text-xs text-white/30">Vencidas</p>
+                <div className="absolute -right-3 -bottom-3 w-14 h-14 rounded-full opacity-10 bg-red-400" />
+              </div>
+            </div>
+
+            {/* Lista de projetos recentes */}
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/30 mb-1">Projetos recentes</p>
+              {projetosData.vendas.slice(0, 5).map((projeto) => (
+                <div
+                  key={projeto.id}
+                  className="flex items-center justify-between rounded-xl px-4 py-3"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-white truncate">{projeto.cliente_nome}</p>
+                    <p className="text-xs text-white/35 mt-0.5 truncate">{projeto.descricao || '—'}</p>
+                  </div>
+                  <div className="flex items-center gap-3 ml-4 flex-shrink-0">
+                    <div className="text-right">
+                      <p className="text-sm font-semibold text-white tabular-nums">{formatBRL(projeto.valor_total)}</p>
+                      <p className="text-xs text-white/35 tabular-nums">{projeto.parcelas} parcela{projeto.parcelas > 1 ? 's' : ''}</p>
+                    </div>
+                    <Badge
+                      variant={
+                        projeto.status_geral === 'pago' ? 'success' :
+                        projeto.status_geral === 'em_atraso' ? 'danger' :
+                        projeto.status_geral === 'cancelado' ? 'neutral' : 'warning'
+                      }
+                    >
+                      {projeto.status_geral === 'pago' ? 'Pago' :
+                       projeto.status_geral === 'em_atraso' ? 'Atraso' :
+                       projeto.status_geral === 'cancelado' ? 'Cancelado' :
+                       `${projeto.progresso_pct}%`}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </GlassCard>
     </div>
