@@ -415,6 +415,112 @@ export type Database = {
         }
         Relationships: []
       }
+      vendas_unicas: {
+        Row: {
+          id: string
+          empresa_id: string
+          vendedor_id: string | null
+          cliente_nome: string
+          codigo_cliente_ixc: string | null
+          id_venda_ixc: string | null
+          descricao: string | null
+          valor_total: number
+          data_venda: string
+          status: string
+          parcelas: number | null
+          ids_areceber: string | null
+          created_by: string | null
+          created_at: string | null
+        }
+        Insert: {
+          id?: string
+          empresa_id?: string
+          vendedor_id?: string | null
+          cliente_nome: string
+          codigo_cliente_ixc?: string | null
+          id_venda_ixc?: string | null
+          descricao?: string | null
+          valor_total: number
+          data_venda: string
+          status?: string
+          parcelas?: number | null
+          ids_areceber?: string | null
+          created_by?: string | null
+          created_at?: string | null
+        }
+        Update: {
+          id?: string
+          empresa_id?: string
+          vendedor_id?: string | null
+          cliente_nome?: string
+          codigo_cliente_ixc?: string | null
+          id_venda_ixc?: string | null
+          descricao?: string | null
+          valor_total?: number
+          data_venda?: string
+          status?: string
+          parcelas?: number | null
+          ids_areceber?: string | null
+          created_by?: string | null
+          created_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendas_unicas_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendas_unicas_parcelas: {
+        Row: {
+          id: string
+          venda_unica_id: string
+          id_areceber_ixc: string | null
+          numero_parcela: number
+          valor: number
+          data_vencimento: string
+          status_pagamento: string
+          valor_pago: number | null
+          data_pagamento: string | null
+          ultima_atualizacao: string | null
+        }
+        Insert: {
+          id?: string
+          venda_unica_id: string
+          id_areceber_ixc?: string | null
+          numero_parcela: number
+          valor: number
+          data_vencimento: string
+          status_pagamento?: string
+          valor_pago?: number | null
+          data_pagamento?: string | null
+          ultima_atualizacao?: string | null
+        }
+        Update: {
+          id?: string
+          venda_unica_id?: string
+          id_areceber_ixc?: string | null
+          numero_parcela?: number
+          valor?: number
+          data_vencimento?: string
+          status_pagamento?: string
+          valor_pago?: number | null
+          data_pagamento?: string | null
+          ultima_atualizacao?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendas_unicas_parcelas_venda_unica_id_fkey"
+            columns: ["venda_unica_id"]
+            isOneToOne: false
+            referencedRelation: "vendas_unicas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendas: {
         Row: {
           cliente_cpf_cnpj: string | null

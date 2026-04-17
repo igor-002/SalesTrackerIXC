@@ -283,3 +283,133 @@ export async function ixcListarVendedores(): Promise<IxcVendedor[]> {
       raw: r,
     }))
 }
+
+// ── Vendas Únicas (vd_saida) ────────────────────────────────────────────────
+
+export interface IxcVendaSaida {
+  id: string
+  id_cliente: string
+  valor_total: number
+  status: string // F=Finalizado, A=Aberto, C=Cancelado
+  ids_areceber: string | null
+  data_emissao: string | null
+  data_saida: string | null
+  id_contrato: string
+  id_comissionado: string | null
+  raw: Record<string, unknown>
+}
+
+/**
+ * Busca vendas avulsas de um cliente no IXC (vd_saida com id_contrato = "0").
+ */
+export async function ixcBuscarVendasCliente(idCliente: string): Promise<IxcVendaSaida[]> {
+  const resp = await fetch(ixcUrl('vd_saida'), {
+    method: 'POST',
+    headers: { ...ixcHeaders(), ixcsoft: 'listar' },
+    body: JSON.stringify({
+      qtype: 'vd_saida.id_cliente',
+      query: idCliente,
+      oper: '=',
+      page: '1',
+      rp: '100',
+      sortname: 'vd_saida.id',
+      sortorder: 'desc',
+    }),
+  })
+  if (!resp.ok) throw new Error(`IXC API erro ${resp.status}: ${resp.statusText}`)
+  const data = (await resp.json()) as { registros?: Record<string, unknown>[] | Record<string, unknown> }
+  const registros = normalizeRegistros(data)
+  return registros
+    .filter((r) => String(r.id_contrato ?? '') === '0' || String(r.id_contrato ?? '') === '')
+    .map((r) => ({
+      id: String(r.id ?? ''),
+      id_cliente: String(r.id_cliente ?? ''),
+      valor_total: parseFloat(String(r.valor ?? '0')),
+      status: String(r.status ?? ''),
+      ids_areceber: (r.ids_areceber as string | undefined) ?? null,
+      data_emissao: (r.data_emissao as string | undefined) ?? null,
+      data_saida: (r.data_saida as string | undefined) ?? null,
+      id_contrato: String(r.id_contrato ?? ''),
+      id_comissionado: (r.id_comissionado as string | undefined) ?? null,
+      raw: r,
+    }))
+}
+
+// ── Financeiro (fn_areceber) ────────────────────────────────────────────────
+
+export interface IxcAreceber {
+  id: string
+  id_venda: string
+  valor: number
+  valor_baixado: number
+  data_vencimento: string
+  data_pagamento: string | null
+  status: string // "A receber", "Recebimento em dia", "Recebimento em atraso"
+  raw: Record<string, unknown>
+}
+
+/**
+ * Busca boletos/parcelas de uma venda no IXC (fn_areceber).
+ */
+export async function ixcBuscarAreceberPorVenda(idVenda: string): Promise<IxcAreceber[]> {
+  const resp = await fetch(ixcUrl('fn_areceber'), {
+    method: 'POST',
+    headers: { ...ixcHeaders(), ixcsoft: 'listar' },
+    body: JSON.stringify({
+      qtype: 'fn_areceber.id_venda',
+      query: idVenda,
+      oper: '=',
+      page: '1',
+      rp: '50',
+      sortname: 'fn_areceber.data_vencimento',
+      sortorder: 'asc',
+    }),
+  })
+  if (!resp.ok) throw new Error(`IXC API erro ${resp.status}: ${resp.statusText}`)
+  const data = (await resp.json()) as { registros?: Record<string, unknown>[] | Record<string, unknown> }
+  const registros = normalizeRegistros(data)
+  return registros.map((r) => ({
+    id: String(r.id ?? ''),
+    id_venda: String(r.id_venda ?? ''),
+    valor: parseFloat(String(r.valor ?? '0')),
+    valor_baixado: parseFloat(String(r.valor_baixado ?? '0')),
+    data_vencimento: String(r.data_vencimento ?? ''),
+    data_pagamento: (r.data_pagamento as string | undefined) || null,
+    status: String(r.status ?? ''),
+    raw: r,
+  }))
+}
+
+/**
+ * Busca um boleto específico pelo ID no IXC.
+ */
+export async function ixcBuscarAreceberPorId(idAreceber: string): Promise<IxcAreceber | null> {
+  const resp = await fetch(ixcUrl('fn_areceber'), {
+    method: 'POST',
+    headers: { ...ixcHeaders(), ixcsoft: 'listar' },
+    body: JSON.stringify({
+      qtype: 'fn_areceber.id',
+      query: idAreceber,
+      oper: '=',
+      page: '1',
+      rp: '1',
+      sortname: 'fn_areceber.id',
+      sortorder: 'asc',
+    }),
+  })
+  if (!resp.ok) throw new Error(`IXC API erro ${resp.status}: ${resp.statusText}`)
+  const data = (await resp.json()) as { registros?: Record<string, unknown>[] | Record<string, unknown> }
+  const registros = normalizeRegistros(data)
+  if (!registros.length) return null
+  const r = registros[0]
+  return {
+    id: String(r.id ?? ''),
+    id_venda: String(r.id_venda ?? ''),
+    valor: parseFloat(String(r.valor ?? '0')),
+    valor_baixado: parseFloat(String(r.valor_baixado ?? '0')),
+    data_vencimento: String(r.data_vencimento ?? ''),
+    data_pagamento: (r.data_pagamento as string | undefined) || null,
+    status: String(r.status ?? ''),
+    raw: r,
+  }
+}
