@@ -300,7 +300,8 @@ export interface IxcVendaSaida {
 }
 
 /**
- * Busca vendas avulsas de um cliente no IXC (vd_saida com id_contrato = "0").
+ * Busca vendas avulsas de um cliente no IXC (vd_saida sem contrato vinculado).
+ * Considera avulsa quando id_contrato é "0", "", null ou ausente.
  */
 export async function ixcBuscarVendasCliente(idCliente: string): Promise<IxcVendaSaida[]> {
   const resp = await fetch(ixcUrl('vd_saida'), {
@@ -319,12 +320,22 @@ export async function ixcBuscarVendasCliente(idCliente: string): Promise<IxcVend
   if (!resp.ok) throw new Error(`IXC API erro ${resp.status}: ${resp.statusText}`)
   const data = (await resp.json()) as { registros?: Record<string, unknown>[] | Record<string, unknown> }
   const registros = normalizeRegistros(data)
+
+  // Filtro mais permissivo para vendas avulsas:
+  // id_contrato = "0", "", null, undefined ou ausente
+  const isAvulsa = (r: Record<string, unknown>): boolean => {
+    const idContrato = r.id_contrato
+    if (idContrato === null || idContrato === undefined) return true
+    const str = String(idContrato).trim()
+    return str === '' || str === '0'
+  }
+
   return registros
-    .filter((r) => String(r.id_contrato ?? '') === '0' || String(r.id_contrato ?? '') === '')
+    .filter(isAvulsa)
     .map((r) => ({
       id: String(r.id ?? ''),
       id_cliente: String(r.id_cliente ?? ''),
-      valor_total: parseFloat(String(r.valor ?? '0')),
+      valor_total: parseFloat(String(r.valor_total ?? '0')),
       status: String(r.status ?? ''),
       ids_areceber: (r.ids_areceber as string | undefined) ?? null,
       data_emissao: (r.data_emissao as string | undefined) ?? null,
