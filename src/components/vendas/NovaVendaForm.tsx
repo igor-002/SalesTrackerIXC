@@ -11,6 +11,7 @@ import { formatBRL, maskCPFCNPJ } from '@/lib/formatters'
 import { UFS } from '@/constants'
 import { useVendedores } from '@/hooks/useVendedores'
 import { useSegmentos } from '@/hooks/useSegmentos'
+import { useProdutos } from '@/hooks/useProdutos'
 import { useIxcFieldLookup } from '@/hooks/useIxcFieldLookup'
 import { ixcBuscarContrato, ixcBuscarCliente, IXC_STATUSES } from '@/lib/ixc'
 import { vendaFormSchema, type VendaFormData } from './vendaFormSchema'
@@ -55,6 +56,7 @@ function clearRecorrenteData() {
 export function NovaVendaForm({ onSubmit }: NovaVendaFormProps) {
   const { vendedores } = useVendedores()
   const { segmentos } = useSegmentos()
+  const { produtos: produtosCatalogo } = useProdutos()
   const today = new Date().toISOString().slice(0, 10)
   const [statusViaIxc, setStatusViaIxc] = useState(false)
   const isRestoring = useRef(true)
@@ -63,7 +65,7 @@ export function NovaVendaForm({ onSubmit }: NovaVendaFormProps) {
   const savedData = getSavedRecorrenteData()
   const defaultValues: Partial<VendaFormData> = {
     data_venda: today,
-    mrr: false,
+    mrr: savedData ? savedData.mrr : true, // MRR true por padrão em vendas recorrentes
     quantidade: 1,
     valor_unitario: 0,
     comissao_pct: 0,
@@ -110,6 +112,15 @@ export function NovaVendaForm({ onSubmit }: NovaVendaFormProps) {
         // valor_unitario = soma de todos os valor_bruto (MRR total do contrato)
         const totalBruto = contrato.produtos.reduce((acc, p) => acc + p.valor_bruto, 0)
         if (!getValues('valor_unitario')) setValue('valor_unitario', totalBruto)
+
+        // MRR automático: verificar se algum produto IXC corresponde a um produto recorrente no catálogo
+        const algumRecorrente = contrato.produtos.some((prodIxc) => {
+          const descLower = prodIxc.descricao.toLowerCase().trim()
+          return produtosCatalogo.some(
+            (prodCat) => prodCat.recorrente && prodCat.nome.toLowerCase().trim().includes(descLower)
+          )
+        })
+        setValue('mrr', algumRecorrente)
       }
     },
     onError: (err) => {
@@ -140,7 +151,7 @@ export function NovaVendaForm({ onSubmit }: NovaVendaFormProps) {
   async function onValid(data: VendaFormData) {
     await onSubmit(data)
     clearRecorrenteData()
-    reset({ data_venda: today, mrr: false, quantidade: 1, valor_unitario: 0, comissao_pct: 0, produtos: [] })
+    reset({ data_venda: today, mrr: true, quantidade: 1, valor_unitario: 0, comissao_pct: 0, produtos: [] })
     setStatusViaIxc(false)
   }
 

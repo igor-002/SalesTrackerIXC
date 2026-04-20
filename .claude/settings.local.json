@@ -50,7 +50,8 @@
       "Bash(grep -E \"IXC_PROXY|IXC_BASE\" .env.local)",
       "Bash(grep -E \"IXC_PROXY|IXC_BASE\" .env)",
       "Bash(git checkout *)",
-      "Bash(git reset *)"
+      "Bash(git reset *)",
+      "Bash(grep -r \"ixc_id\" C:/www/salestrakerOPENITATT/src/hooks/useProdutos.ts C:/www/salestrakerOPENITATT/src/components/produtos/*.tsx)"
     ]
   }
 }
