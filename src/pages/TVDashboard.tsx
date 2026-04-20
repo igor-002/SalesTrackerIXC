@@ -4,13 +4,10 @@ import { TVClock } from '@/components/tv/TVClock'
 import { TVLogo } from '@/components/tv/TVLogo'
 import { Spinner } from '@/components/ui/Spinner'
 import { TVTelaVisaoGeral } from '@/components/tv/TVTelaVisaoGeral'
-import { TVTelaFunil } from '@/components/tv/TVTelaFunil'
+import { TVTelaPipeline } from '@/components/tv/TVTelaPipeline'
+import { TVTelaVendedores } from '@/components/tv/TVTelaVendedores'
 import { TVTelaAlertas } from '@/components/tv/TVTelaAlertas'
-import { TVTelaRanking } from '@/components/tv/TVTelaRanking'
-import { TVTelaPlanos } from '@/components/tv/TVTelaPlanos'
-import { TVTelaChurn } from '@/components/tv/TVTelaChurn'
-import { TVTelaVelocidade } from '@/components/tv/TVTelaVelocidade'
-import { TVTelaProjetoServico } from '@/components/tv/TVTelaProjetoServico'
+import { TVTelaProdutos } from '@/components/tv/TVTelaProdutos'
 import { TVSyncIndicator } from '@/components/tv/TVSyncIndicator'
 import { useDashboardStats } from '@/hooks/useDashboardStats'
 import { useTVStats } from '@/hooks/useTVStats'
@@ -45,7 +42,7 @@ const THEMES: Record<TVTheme, TVThemeColors> = {
 
 const THEME_KEY = 'tv_theme'
 const SLIDE_INTERVAL = 15000
-const TELA_LABELS = ['Visão Geral', 'Funil', 'Alertas', 'Ranking', 'Planos', 'Cancelamentos', 'Velocidade', 'Projetos']
+const TELA_LABELS = ['Visão Geral', 'Pipeline', 'Vendedores', 'Alertas', 'Produtos']
 
 export default function TVDashboard() {
   const { stats: dashStats, loading: dashLoading, refetch: refetchDash } = useDashboardStats()
@@ -70,7 +67,7 @@ export default function TVDashboard() {
       return
     }
     intervalRef.current = setInterval(() => {
-      setTela((s) => (s + 1) % 8)
+      setTela((s) => (s + 1) % 5)
     }, SLIDE_INTERVAL)
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
@@ -167,79 +164,61 @@ export default function TVDashboard() {
           />
         </div>
 
-        {/* Tela 1 — Funil */}
+        {/* Tela 1 — Pipeline (Funil + Churn) */}
         <div
           className="absolute inset-0 transition-all duration-700 ease-in-out"
           style={{ opacity: tela === 1 ? 1 : 0, transform: tela === 1 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 1 ? 'auto' : 'none' }}
         >
-          <TVTelaFunil
+          <TVTelaPipeline
             funilCounts={tvStats.funilCounts}
+            churn={tvStats.churn}
             taxaConversao={tvStats.taxaConversao}
             faturamentoReal={tvStats.faturamentoReal}
             faturamentoPrometido={tvStats.faturamentoPrometido}
-            vendasPorDiaSemana={tvStats.vendasPorDiaSemana}
             t={t}
           />
         </div>
 
-        {/* Tela 2 — Alertas */}
+        {/* Tela 2 — Vendedores (Ranking + Velocidade) */}
         <div
           className="absolute inset-0 transition-all duration-700 ease-in-out"
           style={{ opacity: tela === 2 ? 1 : 0, transform: tela === 2 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 2 ? 'auto' : 'none' }}
         >
-          <TVTelaAlertas alertasAA={tvStats.alertasAA} t={t} />
+          <TVTelaVendedores
+            rankingVendedores={tvStats.rankingVendedores}
+            velocidadeVendedores={tvStats.velocidadeVendedores}
+            mediaVelocidadeTime={tvStats.mediaVelocidadeTime}
+            t={t}
+          />
         </div>
 
-        {/* Tela 3 — Ranking */}
+        {/* Tela 3 — Alertas */}
         <div
           className="absolute inset-0 transition-all duration-700 ease-in-out"
           style={{ opacity: tela === 3 ? 1 : 0, transform: tela === 3 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 3 ? 'auto' : 'none' }}
         >
-          <TVTelaRanking rankingVendedores={tvStats.rankingVendedores} t={t} />
+          <TVTelaAlertas alertasAA={tvStats.alertasAA} t={t} />
         </div>
 
-        {/* Tela 4 — Planos */}
+        {/* Tela 4 — Produtos (Planos + Projetos) */}
         <div
           className="absolute inset-0 transition-all duration-700 ease-in-out"
           style={{ opacity: tela === 4 ? 1 : 0, transform: tela === 4 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 4 ? 'auto' : 'none' }}
         >
-          <TVTelaPlanos planosMes={tvStats.planosMes} t={t} />
-        </div>
-
-        {/* Tela 5 — Cancelamentos */}
-        <div
-          className="absolute inset-0 transition-all duration-700 ease-in-out"
-          style={{ opacity: tela === 5 ? 1 : 0, transform: tela === 5 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 5 ? 'auto' : 'none' }}
-        >
-          <TVTelaChurn churn={tvStats.churn} t={t} />
-        </div>
-
-        {/* Tela 6 — Velocidade */}
-        <div
-          className="absolute inset-0 transition-all duration-700 ease-in-out"
-          style={{ opacity: tela === 6 ? 1 : 0, transform: tela === 6 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 6 ? 'auto' : 'none' }}
-        >
-          <TVTelaVelocidade velocidadeVendedores={tvStats.velocidadeVendedores} mediaVelocidadeTime={tvStats.mediaVelocidadeTime} t={t} />
-        </div>
-
-        {/* Tela 7 — Projetos & Serviços */}
-        <div
-          className="absolute inset-0 transition-all duration-700 ease-in-out"
-          style={{ opacity: tela === 7 ? 1 : 0, transform: tela === 7 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 7 ? 'auto' : 'none' }}
-        >
-          <TVTelaProjetoServico
+          <TVTelaProdutos
+            planosMes={tvStats.planosMes}
             projetos={(projetosData?.vendas ?? []).map(v => ({
               id: v.id,
               cliente_nome: v.cliente_nome,
-              descricao: v.descricao,
               valor_total: v.valor_total,
-              parcelas: v.parcelas,
-              status_geral: v.status_geral,
               progresso_pct: v.progresso_pct,
-              valor_recebido: v.valor_recebido,
-              valor_pendente: v.valor_pendente,
+              status_geral: v.status_geral,
             }))}
-            stats={projetosData?.stats ?? { total_projetos: 0, valor_vendido: 0, valor_recebido: 0, valor_pendente: 0, valor_em_atraso: 0 }}
+            projetosStats={{
+              total_projetos: projetosData?.stats.total_projetos ?? 0,
+              valor_vendido: projetosData?.stats.valor_vendido ?? 0,
+              valor_recebido: projetosData?.stats.valor_recebido ?? 0,
+            }}
             t={t}
           />
         </div>
