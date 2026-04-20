@@ -13,7 +13,8 @@ import {
 } from 'recharts'
 import {
   FileText, Users, User, TrendingUp, DollarSign, Percent,
-  Target, ChevronDown, Check, Edit2, X, Zap, Clock,
+  Target, ChevronDown, Check, Edit2, X, Zap, Clock, FolderKanban,
+  CheckCircle2, AlertCircle,
 } from 'lucide-react'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Spinner } from '@/components/ui/Spinner'
@@ -33,6 +34,7 @@ import {
   ultimosMeses,
 } from '@/hooks/useRelatoriosIxc'
 import { formatBRL, formatPercent } from '@/lib/formatters'
+import { useVendasUnicas } from '@/hooks/useVendasUnicas'
 
 // ── Constantes ───────────────────────────────────────────────────────────────
 
@@ -41,7 +43,7 @@ const MESES_LABELS = [
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
 ]
 
-type Aba = 'visao_geral' | 'ranking' | 'por_vendedor'
+type Aba = 'visao_geral' | 'ranking' | 'por_vendedor' | 'projetos'
 
 // ── KPI Card ──────────────────────────────────────────────────────────────────
 
@@ -703,6 +705,205 @@ function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
   )
 }
 
+// ── Aba 4: Projetos & Serviços ────────────────────────────────────────────────
+
+type StatusFiltroProjeto = 'todos' | 'a_receber' | 'pago' | 'em_atraso' | 'cancelado'
+
+function TabProjetos() {
+  const now = new Date()
+  const [mes, setMes] = useState(now.getMonth() + 1)
+  const [ano, setAno] = useState(now.getFullYear())
+  const [statusFiltro, setStatusFiltro] = useState<StatusFiltroProjeto>('todos')
+
+  const { vendas, isLoading } = useVendasUnicas()
+
+  // Filtrar por mês/ano
+  const projetosMes = useMemo(() => {
+    const inicio = `${ano}-${String(mes).padStart(2, '0')}-01`
+    const fimMes = new Date(ano, mes, 0)
+    const fim = `${ano}-${String(mes).padStart(2, '0')}-${String(fimMes.getDate()).padStart(2, '0')}`
+
+    return vendas.filter(v => v.data_venda >= inicio && v.data_venda <= fim)
+  }, [vendas, mes, ano])
+
+  // Filtrar por status
+  const projetosFiltrados = useMemo(() => {
+    if (statusFiltro === 'todos') return projetosMes
+    return projetosMes.filter(v => v.status_geral === statusFiltro)
+  }, [projetosMes, statusFiltro])
+
+  // Métricas agregadas
+  const metricas = useMemo(() => {
+    const ativos = projetosMes.filter(v => v.status !== 'cancelado')
+    return {
+      total: ativos.length,
+      valor_vendido: ativos.reduce((acc, v) => acc + v.valor_total, 0),
+      valor_recebido: ativos.reduce((acc, v) => acc + v.valor_recebido, 0),
+      valor_pendente: ativos.reduce((acc, v) => acc + v.valor_pendente, 0),
+      valor_em_atraso: ativos.reduce((acc, v) => acc + v.valor_em_atraso, 0),
+    }
+  }, [projetosMes])
+
+  const statusOptions: { key: StatusFiltroProjeto; label: string; color: string }[] = [
+    { key: 'todos', label: 'Todos', color: '#a78bfa' },
+    { key: 'a_receber', label: 'A Receber', color: '#f59e0b' },
+    { key: 'pago', label: 'Pagos', color: '#00d68f' },
+    { key: 'em_atraso', label: 'Em Atraso', color: '#ef4444' },
+    { key: 'cancelado', label: 'Cancelados', color: '#666' },
+  ]
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner style={{ color: '#a78bfa' }} />
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Filtros */}
+      <GlassCard className="p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <FolderKanban size={18} className="text-violet-400" />
+            <span className="text-sm font-semibold text-white">Projetos & Serviços</span>
+            <span className="text-xs text-white/40">(Vendas únicas - não contam na meta)</span>
+          </div>
+          <MesAnoSelect mes={mes} ano={ano} onChangeMes={setMes} onChangeAno={setAno} />
+        </div>
+
+        {/* Filtro de status */}
+        <div className="flex gap-2 mt-4 flex-wrap">
+          {statusOptions.map(opt => (
+            <button
+              key={opt.key}
+              onClick={() => setStatusFiltro(opt.key)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+              style={statusFiltro === opt.key
+                ? { background: `${opt.color}20`, color: opt.color, border: `1px solid ${opt.color}40` }
+                : { background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.08)' }
+              }
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </GlassCard>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
+        <KpiCard
+          label="Total Projetos"
+          value={String(metricas.total)}
+          icon={<FolderKanban size={18} />}
+          accentHex="#a78bfa"
+        />
+        <KpiCard
+          label="Valor Vendido"
+          value={formatBRL(metricas.valor_vendido)}
+          icon={<DollarSign size={18} />}
+          accentHex="#a78bfa"
+        />
+        <KpiCard
+          label="Valor Recebido"
+          value={formatBRL(metricas.valor_recebido)}
+          icon={<CheckCircle2 size={18} />}
+          accentHex="#00d68f"
+          sub={metricas.valor_vendido > 0 ? `${Math.round((metricas.valor_recebido / metricas.valor_vendido) * 100)}%` : '0%'}
+        />
+        <KpiCard
+          label="Valor Pendente"
+          value={formatBRL(metricas.valor_pendente)}
+          icon={<Clock size={18} />}
+          accentHex="#06b6d4"
+        />
+        <KpiCard
+          label="Em Atraso"
+          value={formatBRL(metricas.valor_em_atraso)}
+          icon={<AlertCircle size={18} />}
+          accentHex="#ef4444"
+        />
+      </div>
+
+      {/* Tabela de projetos */}
+      <GlassCard className="p-5">
+        <h3 className="text-sm font-semibold text-white mb-4">
+          Projetos do Mês ({projetosFiltrados.length})
+        </h3>
+
+        {projetosFiltrados.length === 0 ? (
+          <div className="text-center py-8">
+            <FolderKanban size={32} className="text-white/20 mx-auto mb-2" />
+            <p className="text-sm text-white/40">Nenhum projeto encontrado</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-white/40 text-xs uppercase tracking-wider">
+                  <th className="pb-3 font-semibold">Cliente</th>
+                  <th className="pb-3 font-semibold">Descrição</th>
+                  <th className="pb-3 font-semibold">Vendedor</th>
+                  <th className="pb-3 font-semibold text-right">Valor</th>
+                  <th className="pb-3 font-semibold text-right">Recebido</th>
+                  <th className="pb-3 font-semibold text-center">Progresso</th>
+                  <th className="pb-3 font-semibold text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {projetosFiltrados.map(projeto => {
+                  const statusColor = projeto.status_geral === 'pago' ? '#00d68f' :
+                                     projeto.status_geral === 'em_atraso' ? '#ef4444' :
+                                     projeto.status_geral === 'cancelado' ? '#666' : '#f59e0b'
+                  const StatusIcon = projeto.status_geral === 'pago' ? CheckCircle2 :
+                                    projeto.status_geral === 'em_atraso' ? AlertCircle : Clock
+
+                  return (
+                    <tr key={projeto.id} className="border-t border-white/5">
+                      <td className="py-3 text-white font-medium">{projeto.cliente_nome}</td>
+                      <td className="py-3 text-white/60 truncate max-w-[200px]">{projeto.descricao || '—'}</td>
+                      <td className="py-3 text-white/60">{projeto.vendedor?.nome || '—'}</td>
+                      <td className="py-3 text-right text-white tabular-nums">{formatBRL(projeto.valor_total)}</td>
+                      <td className="py-3 text-right tabular-nums" style={{ color: '#00d68f99' }}>
+                        {formatBRL(projeto.valor_recebido)}
+                      </td>
+                      <td className="py-3">
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
+                            <div
+                              className="h-full rounded-full"
+                              style={{ width: `${projeto.progresso_pct}%`, background: statusColor }}
+                            />
+                          </div>
+                          <span className="text-xs tabular-nums" style={{ color: statusColor }}>
+                            {projeto.progresso_pct}%
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3 text-center">
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-semibold"
+                          style={{ background: `${statusColor}18`, color: statusColor, border: `1px solid ${statusColor}30` }}
+                        >
+                          <StatusIcon size={12} />
+                          {projeto.status_geral === 'pago' ? 'Pago' :
+                           projeto.status_geral === 'em_atraso' ? 'Atraso' :
+                           projeto.status_geral === 'cancelado' ? 'Cancelado' : 'A receber'}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </GlassCard>
+    </div>
+  )
+}
+
 // ── Componente principal ───────────────────────────────────────────────────────
 
 export default function Relatorios() {
@@ -719,6 +920,7 @@ export default function Relatorios() {
     { key: 'visao_geral',   label: 'Visão Geral',          icon: <TrendingUp size={15} /> },
     { key: 'ranking',       label: 'Ranking de Vendedores', icon: <Users size={15} />,      somenteGestor: true },
     { key: 'por_vendedor',  label: 'Por Vendedor',          icon: <User size={15} /> },
+    { key: 'projetos',      label: 'Projetos & Serviços',   icon: <FolderKanban size={15} /> },
   ]
 
   const abasVisiveis = abas.filter(a => !a.somenteGestor || isGestor)
@@ -768,6 +970,9 @@ export default function Relatorios() {
           isGestor={isGestor}
           vendedores={vendedores}
         />
+      )}
+      {aba === 'projetos' && (
+        <TabProjetos />
       )}
     </div>
   )
