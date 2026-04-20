@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { RefreshCw, FolderKanban } from 'lucide-react'
 import { NovaVendaForm } from '@/components/vendas/NovaVendaForm'
 import { NovaVendaUnicaForm } from '@/components/vendas/NovaVendaUnicaForm'
@@ -9,10 +9,34 @@ import { toast } from '@/components/ui/Toast'
 
 type TipoVenda = 'recorrente' | 'unica'
 
+const STORAGE_KEY = 'salestracker_nova_venda_draft'
+
+function getSavedTipoVenda(): TipoVenda {
+  try {
+    const saved = sessionStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      if (parsed.tipoVenda === 'recorrente' || parsed.tipoVenda === 'unica') {
+        return parsed.tipoVenda
+      }
+    }
+  } catch { /* ignore */ }
+  return 'recorrente'
+}
+
 export default function NovaVenda() {
-  const [tipoVenda, setTipoVenda] = useState<TipoVenda>('recorrente')
+  const [tipoVenda, setTipoVenda] = useState<TipoVenda>(getSavedTipoVenda)
   const { createVenda } = useVendas()
   const { user } = useAuthStore()
+
+  // Persistir tipoVenda no sessionStorage
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(STORAGE_KEY)
+      const parsed = saved ? JSON.parse(saved) : {}
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...parsed, tipoVenda }))
+    } catch { /* ignore */ }
+  }, [tipoVenda])
 
   async function handleSubmit(data: NovaVendaFormData) {
     try {
@@ -73,12 +97,13 @@ export default function NovaVenda() {
         </button>
       </div>
 
-      {/* Formulário correspondente */}
-      {tipoVenda === 'recorrente' ? (
+      {/* Formulários — ambos montados, visibilidade controlada por CSS para evitar re-mount */}
+      <div className={tipoVenda === 'recorrente' ? '' : 'hidden'}>
         <NovaVendaForm onSubmit={handleSubmit} />
-      ) : (
+      </div>
+      <div className={tipoVenda === 'unica' ? '' : 'hidden'}>
         <NovaVendaUnicaForm onSuccess={handleVendaUnicaSuccess} onCancel={() => setTipoVenda('recorrente')} />
-      )}
+      </div>
     </div>
   )
 }

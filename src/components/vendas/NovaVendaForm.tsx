@@ -1,6 +1,6 @@
 import { useForm, Controller, type Resolver } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
@@ -20,17 +20,72 @@ export type { NovaVendaFormData } from './vendaFormSchema'
 interface NovaVendaFormProps { onSubmit: (data: VendaFormData) => Promise<void> }
 
 const ufOptions = UFS.map((uf) => ({ value: uf, label: uf }))
+const STORAGE_KEY = 'salestracker_nova_venda_draft'
+
+function getSavedRecorrenteData(): Partial<VendaFormData> | null {
+  try {
+    const saved = sessionStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      return parsed.recorrente ?? null
+    }
+  } catch { /* ignore */ }
+  return null
+}
+
+function saveRecorrenteData(data: Partial<VendaFormData>) {
+  try {
+    const saved = sessionStorage.getItem(STORAGE_KEY)
+    const parsed = saved ? JSON.parse(saved) : {}
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...parsed, recorrente: data }))
+  } catch { /* ignore */ }
+}
+
+function clearRecorrenteData() {
+  try {
+    const saved = sessionStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      delete parsed.recorrente
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
+    }
+  } catch { /* ignore */ }
+}
 
 export function NovaVendaForm({ onSubmit }: NovaVendaFormProps) {
   const { vendedores } = useVendedores()
   const { segmentos } = useSegmentos()
   const today = new Date().toISOString().slice(0, 10)
   const [statusViaIxc, setStatusViaIxc] = useState(false)
+  const isRestoring = useRef(true)
+
+  // Restaurar dados salvos ou usar defaults
+  const savedData = getSavedRecorrenteData()
+  const defaultValues: Partial<VendaFormData> = {
+    data_venda: today,
+    mrr: false,
+    quantidade: 1,
+    valor_unitario: 0,
+    comissao_pct: 0,
+    produtos: [],
+    ...savedData,
+  }
 
   const { register, handleSubmit, control, watch, reset, setValue, getValues, formState: { errors, isSubmitting } } = useForm<VendaFormData>({
     resolver: zodResolver(vendaFormSchema) as Resolver<VendaFormData>,
-    defaultValues: { data_venda: today, mrr: false, quantidade: 1, valor_unitario: 0, comissao_pct: 0, produtos: [] },
+    defaultValues,
   })
+
+  // Auto-salvar mudanças no sessionStorage
+  const formValues = watch()
+  useEffect(() => {
+    // Não salvar durante a restauração inicial
+    if (isRestoring.current) {
+      isRestoring.current = false
+      return
+    }
+    saveRecorrenteData(formValues)
+  }, [formValues])
 
   const produtosWatch = watch('produtos') ?? []
 
@@ -84,6 +139,7 @@ export function NovaVendaForm({ onSubmit }: NovaVendaFormProps) {
 
   async function onValid(data: VendaFormData) {
     await onSubmit(data)
+    clearRecorrenteData()
     reset({ data_venda: today, mrr: false, quantidade: 1, valor_unitario: 0, comissao_pct: 0, produtos: [] })
     setStatusViaIxc(false)
   }

@@ -5,7 +5,7 @@
  * MODO 1 — Buscar do IXC: busca vendas avulsas do cliente
  * MODO 2 — Cadastro manual: preenche os campos manualmente
  */
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { Search, Package, FileText, DollarSign, Check, AlertTriangle, X } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
@@ -46,31 +46,93 @@ interface FormData {
   vendedor_id: string
 }
 
+const STORAGE_KEY = 'salestracker_nova_venda_draft'
+
+interface SavedUnicaState {
+  mode: FormMode
+  formData: Partial<FormData>
+  codigoClienteBusca: string
+  clienteNomeIxc: string
+}
+
+function getSavedUnicaState(): SavedUnicaState | null {
+  try {
+    const saved = sessionStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      return parsed.unica ?? null
+    }
+  } catch { /* ignore */ }
+  return null
+}
+
+function saveUnicaState(state: SavedUnicaState) {
+  try {
+    const saved = sessionStorage.getItem(STORAGE_KEY)
+    const parsed = saved ? JSON.parse(saved) : {}
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ ...parsed, unica: state }))
+  } catch { /* ignore */ }
+}
+
+function clearUnicaState() {
+  try {
+    const saved = sessionStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      delete parsed.unica
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
+    }
+  } catch { /* ignore */ }
+}
+
 export function NovaVendaUnicaForm({ onSuccess, onCancel }: NovaVendaUnicaFormProps) {
   const { vendedores } = useVendedores()
   const { createVendaUnica } = useVendasUnicas()
   const { user } = useAuthStore()
   const today = new Date().toISOString().slice(0, 10)
+  const isRestoring = useRef(true)
 
-  const [mode, setMode] = useState<FormMode>('select')
+  // Restaurar estado salvo
+  const savedState = getSavedUnicaState()
+
+  const [mode, setMode] = useState<FormMode>(savedState?.mode ?? 'select')
   const [buscando, setBuscando] = useState(false)
   const [salvando, setSalvando] = useState(false)
 
   // Dados do IXC
-  const [codigoClienteBusca, setCodigoClienteBusca] = useState('')
+  const [codigoClienteBusca, setCodigoClienteBusca] = useState(savedState?.codigoClienteBusca ?? '')
   const [vendasIxc, setVendasIxc] = useState<IxcVendaSaida[]>([])
   const [vendaSelecionada, setVendaSelecionada] = useState<IxcVendaSaida | null>(null)
   const [parcelasLocal, setParcelasLocal] = useState<ParcelaLocal[]>([])
   const [semBoletos, setSemBoletos] = useState(false)
-  const [clienteNomeIxc, setClienteNomeIxc] = useState('')
+  const [clienteNomeIxc, setClienteNomeIxc] = useState(savedState?.clienteNomeIxc ?? '')
+
+  const defaultValues: Partial<FormData> = {
+    data_venda: today,
+    parcelas: 1,
+    valor_total: 0,
+    ...savedState?.formData,
+  }
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<FormData>({
-    defaultValues: {
-      data_venda: today,
-      parcelas: 1,
-      valor_total: 0,
-    },
+    defaultValues,
   })
+
+  // Auto-salvar mudanças no sessionStorage
+  const formValues = watch()
+  useEffect(() => {
+    // Não salvar durante a restauração inicial
+    if (isRestoring.current) {
+      isRestoring.current = false
+      return
+    }
+    saveUnicaState({
+      mode,
+      formData: formValues,
+      codigoClienteBusca,
+      clienteNomeIxc,
+    })
+  }, [mode, formValues, codigoClienteBusca, clienteNomeIxc])
 
   const valorTotal = watch('valor_total') || 0
 
@@ -203,12 +265,15 @@ export function NovaVendaUnicaForm({ onSuccess, onCancel }: NovaVendaUnicaFormPr
       }
 
       toast('success', 'Projeto/Serviço cadastrado com sucesso!')
+      clearUnicaState()
       reset()
       setMode('select')
       setVendasIxc([])
       setVendaSelecionada(null)
       setParcelasLocal([])
       setSemBoletos(false)
+      setCodigoClienteBusca('')
+      setClienteNomeIxc('')
       onSuccess?.()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro ao salvar'
@@ -230,7 +295,7 @@ export function NovaVendaUnicaForm({ onSuccess, onCancel }: NovaVendaUnicaFormPr
           </div>
           {onCancel && (
             <button
-              onClick={onCancel}
+              onClick={() => { clearUnicaState(); onCancel() }}
               className="p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
             >
               <X size={18} />
