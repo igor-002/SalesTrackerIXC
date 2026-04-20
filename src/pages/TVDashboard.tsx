@@ -10,9 +10,11 @@ import { TVTelaRanking } from '@/components/tv/TVTelaRanking'
 import { TVTelaPlanos } from '@/components/tv/TVTelaPlanos'
 import { TVTelaChurn } from '@/components/tv/TVTelaChurn'
 import { TVTelaVelocidade } from '@/components/tv/TVTelaVelocidade'
+import { TVTelaProjetoServico } from '@/components/tv/TVTelaProjetoServico'
 import { TVSyncIndicator } from '@/components/tv/TVSyncIndicator'
 import { useDashboardStats } from '@/hooks/useDashboardStats'
 import { useTVStats } from '@/hooks/useTVStats'
+import { useVendasUnicasMes } from '@/hooks/useVendasUnicas'
 import { useRealtime } from '@/hooks/useRealtime'
 import type { TVThemeColors } from '@/components/tv/TVCard'
 
@@ -43,11 +45,12 @@ const THEMES: Record<TVTheme, TVThemeColors> = {
 
 const THEME_KEY = 'tv_theme'
 const SLIDE_INTERVAL = 15000
-const TELA_LABELS = ['Visão Geral', 'Funil', 'Alertas', 'Ranking', 'Planos', 'Cancelamentos', 'Velocidade']
+const TELA_LABELS = ['Visão Geral', 'Funil', 'Alertas', 'Ranking', 'Planos', 'Cancelamentos', 'Velocidade', 'Projetos']
 
 export default function TVDashboard() {
   const { stats: dashStats, loading: dashLoading, refetch: refetchDash } = useDashboardStats()
   const tvStats = useTVStats()
+  const { data: projetosData, isLoading: loadingProjetos, refetch: refetchProjetos } = useVendasUnicasMes()
 
   const [theme, setTheme] = useState<TVTheme>(() => {
     return (localStorage.getItem(THEME_KEY) as TVTheme) ?? 'blue'
@@ -67,7 +70,7 @@ export default function TVDashboard() {
       return
     }
     intervalRef.current = setInterval(() => {
-      setTela((s) => (s + 1) % 7)
+      setTela((s) => (s + 1) % 8)
     }, SLIDE_INTERVAL)
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
@@ -77,11 +80,12 @@ export default function TVDashboard() {
   const handleChange = useCallback(() => {
     refetchDash()
     tvStats.refetch()
-  }, [refetchDash, tvStats])
+    refetchProjetos()
+  }, [refetchDash, tvStats, refetchProjetos])
   useRealtime({ onVenda: handleChange, onCancelamento: handleChange })
 
   const t = THEMES[theme]
-  const loading = dashLoading || tvStats.loading
+  const loading = dashLoading || tvStats.loading || loadingProjetos
 
   if (loading) {
     return (
@@ -216,6 +220,28 @@ export default function TVDashboard() {
           style={{ opacity: tela === 6 ? 1 : 0, transform: tela === 6 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 6 ? 'auto' : 'none' }}
         >
           <TVTelaVelocidade velocidadeVendedores={tvStats.velocidadeVendedores} mediaVelocidadeTime={tvStats.mediaVelocidadeTime} t={t} />
+        </div>
+
+        {/* Tela 7 — Projetos & Serviços */}
+        <div
+          className="absolute inset-0 transition-all duration-700 ease-in-out"
+          style={{ opacity: tela === 7 ? 1 : 0, transform: tela === 7 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 7 ? 'auto' : 'none' }}
+        >
+          <TVTelaProjetoServico
+            projetos={(projetosData?.vendas ?? []).map(v => ({
+              id: v.id,
+              cliente_nome: v.cliente_nome,
+              descricao: v.descricao,
+              valor_total: v.valor_total,
+              parcelas: v.parcelas,
+              status_geral: v.status_geral,
+              progresso_pct: v.progresso_pct,
+              valor_recebido: v.valor_recebido,
+              valor_pendente: v.valor_pendente,
+            }))}
+            stats={projetosData?.stats ?? { total_projetos: 0, valor_vendido: 0, valor_recebido: 0, valor_pendente: 0, valor_em_atraso: 0 }}
+            t={t}
+          />
         </div>
 
       </div>
