@@ -18,7 +18,7 @@ import { formatBRL } from '@/lib/formatters'
 import { useVendedores } from '@/hooks/useVendedores'
 import { useVendasUnicas, syncParcelasFromIxc, type VendaUnicaInsert } from '@/hooks/useVendasUnicas'
 import { useAuthStore } from '@/store/authStore'
-import { ixcBuscarVendasCliente, ixcBuscarAreceberPorVenda, ixcBuscarCliente, type IxcVendaSaida, type IxcAreceber } from '@/lib/ixc'
+import { ixcBuscarVendasCliente, ixcBuscarCliente, type IxcVendaSaida } from '@/lib/ixc'
 
 interface NovaVendaUnicaFormProps {
   onSuccess?: () => void
@@ -26,6 +26,13 @@ interface NovaVendaUnicaFormProps {
 }
 
 type FormMode = 'select' | 'ixc' | 'manual'
+
+/** Parcela parseada do ids_areceber da vd_saida */
+interface ParcelaLocal {
+  id: string
+  valor: number
+  data_vencimento: string
+}
 
 interface FormData {
   cliente_nome: string
@@ -47,14 +54,14 @@ export function NovaVendaUnicaForm({ onSuccess, onCancel }: NovaVendaUnicaFormPr
 
   const [mode, setMode] = useState<FormMode>('select')
   const [buscando, setBuscando] = useState(false)
-  const [buscandoParcelas, setBuscandoParcelas] = useState(false)
   const [salvando, setSalvando] = useState(false)
 
   // Dados do IXC
   const [codigoClienteBusca, setCodigoClienteBusca] = useState('')
   const [vendasIxc, setVendasIxc] = useState<IxcVendaSaida[]>([])
   const [vendaSelecionada, setVendaSelecionada] = useState<IxcVendaSaida | null>(null)
-  const [parcelasIxc, setParcelasIxc] = useState<IxcAreceber[]>([])
+  const [parcelasLocal, setParcelasLocal] = useState<ParcelaLocal[]>([])
+  const [semBoletos, setSemBoletos] = useState(false)
   const [clienteNomeIxc, setClienteNomeIxc] = useState('')
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<FormData>({
@@ -78,7 +85,8 @@ export function NovaVendaUnicaForm({ onSuccess, onCancel }: NovaVendaUnicaFormPr
     setBuscando(true)
     setVendasIxc([])
     setVendaSelecionada(null)
-    setParcelasIxc([])
+    setParcelasLocal([])
+    setSemBoletos(false)
     setClienteNomeIxc('')
 
     try {
@@ -107,33 +115,48 @@ export function NovaVendaUnicaForm({ onSuccess, onCancel }: NovaVendaUnicaFormPr
 
   function handleSelecionarVenda(venda: IxcVendaSaida) {
     setVendaSelecionada(venda)
-    setParcelasIxc([])
+    setParcelasLocal([])
+    setSemBoletos(false)
     setValue('id_venda_ixc', venda.id)
     setValue('valor_total', venda.valor_total)
     setValue('ids_areceber', venda.ids_areceber ?? '')
     setValue('data_venda', venda.data_saida?.slice(0, 10) ?? venda.data_emissao?.slice(0, 10) ?? today)
   }
 
-  // ── Buscar parcelas/boletos da venda ───────────────────────────────────────
+  // ── Carregar parcelas do ids_areceber da vd_saida ───────────────────────────
 
-  async function handleBuscarParcelas() {
+  function handleCarregarParcelas() {
     if (!vendaSelecionada) return
 
-    setBuscandoParcelas(true)
-    try {
-      const parcelas = await ixcBuscarAreceberPorVenda(vendaSelecionada.id)
-      setParcelasIxc(parcelas)
-      setValue('parcelas', parcelas.length || 1)
+    const idsStr = vendaSelecionada.ids_areceber?.trim() ?? ''
+    const datasStr = vendaSelecionada.data_vencimento_areceber?.trim() ?? ''
 
-      if (parcelas.length === 0) {
-        toast('info', 'Nenhum boleto encontrado para esta venda')
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erro ao buscar parcelas'
-      toast('error', msg)
-    } finally {
-      setBuscandoParcelas(false)
+    // Se não tem IDs de boletos, marcar como sem boletos
+    if (!idsStr) {
+      setParcelasLocal([])
+      setSemBoletos(true)
+      setValue('parcelas', 1)
+      return
     }
+
+    // Parsear os IDs (separados por vírgula)
+    const ids = idsStr.split(',').map(s => s.trim()).filter(Boolean)
+    const datas = datasStr.split(',').map(s => s.trim())
+
+    // Calcular valor de cada parcela
+    const valorParcela = vendaSelecionada.valor_total / ids.length
+
+    // Criar lista de parcelas
+    const parcelas: ParcelaLocal[] = ids.map((id, i) => ({
+      id,
+      valor: valorParcela,
+      data_vencimento: datas[i] ?? '—',
+    }))
+
+    setParcelasLocal(parcelas)
+    setSemBoletos(false)
+    setValue('parcelas', parcelas.length)
+    toast('success', `${parcelas.length} parcela(s) carregada(s) da venda`)
   }
 
   // ── Salvar venda única ─────────────────────────────────────────────────────
@@ -184,7 +207,8 @@ export function NovaVendaUnicaForm({ onSuccess, onCancel }: NovaVendaUnicaFormPr
       setMode('select')
       setVendasIxc([])
       setVendaSelecionada(null)
-      setParcelasIxc([])
+      setParcelasLocal([])
+      setSemBoletos(false)
       onSuccess?.()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro ao salvar'
@@ -256,7 +280,7 @@ export function NovaVendaUnicaForm({ onSuccess, onCancel }: NovaVendaUnicaFormPr
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => { setMode('select'); setVendasIxc([]); setVendaSelecionada(null); setParcelasIxc([]) }}
+              onClick={() => { setMode('select'); setVendasIxc([]); setVendaSelecionada(null); setParcelasLocal([]); setSemBoletos(false) }}
               className="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
             >
               <X size={16} />
@@ -355,36 +379,43 @@ export function NovaVendaUnicaForm({ onSuccess, onCancel }: NovaVendaUnicaFormPr
               <Button
                 type="button"
                 variant="secondary"
-                onClick={handleBuscarParcelas}
-                loading={buscandoParcelas}
-                disabled={buscandoParcelas}
+                onClick={handleCarregarParcelas}
               >
                 <DollarSign size={14} />
-                Buscar Parcelas
+                Carregar Parcelas
               </Button>
             </div>
 
-            {/* Parcelas encontradas */}
-            {parcelasIxc.length > 0 && (
+            {/* Aviso: sem boletos vinculados */}
+            {semBoletos && (
+              <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="flex items-start gap-3 p-3 rounded-xl" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                  <AlertTriangle size={16} className="text-amber-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm text-amber-200 font-medium">Esta venda não possui boletos vinculados no IXC.</p>
+                    <p className="text-xs text-white/40 mt-1">As parcelas serão controladas manualmente.</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Parcelas carregadas */}
+            {parcelasLocal.length > 0 && (
               <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                 <p className="text-xs font-semibold uppercase tracking-wide text-white/40 mb-2">
-                  Parcelas ({parcelasIxc.length})
+                  Parcelas ({parcelasLocal.length})
                 </p>
                 <div className="flex flex-col gap-1.5">
-                  {parcelasIxc.map((p, i) => {
-                    const isPago = p.status.toLowerCase().includes('em dia')
-                    const isAtraso = p.status.toLowerCase().includes('atraso')
-                    return (
-                      <div key={p.id} className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)' }}>
-                        <span className="text-white/50">Parcela {i + 1}</span>
-                        <span className="text-white/40">{p.data_vencimento}</span>
-                        <span className="text-white font-medium">{formatBRL(p.valor)}</span>
-                        <span className={isPago ? 'text-emerald-400' : isAtraso ? 'text-red-400' : 'text-amber-400'}>
-                          {isPago ? 'Pago' : isAtraso ? 'Atrasado' : 'A receber'}
-                        </span>
-                      </div>
-                    )
-                  })}
+                  {parcelasLocal.map((p, i) => (
+                    <div key={p.id} className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                      <span className="text-white/50">Parcela {i + 1}</span>
+                      <span className="text-white/40">{p.data_vencimento}</span>
+                      <span className="text-white font-medium">{formatBRL(p.valor)}</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,214,143,0.1)', color: '#00d68f' }}>
+                        ID {p.id}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

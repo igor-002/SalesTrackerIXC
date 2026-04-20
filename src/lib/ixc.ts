@@ -292,6 +292,7 @@ export interface IxcVendaSaida {
   valor_total: number
   status: string // F=Finalizado, A=Aberto, C=Cancelado
   ids_areceber: string | null
+  data_vencimento_areceber: string | null
   data_emissao: string | null
   data_saida: string | null
   id_contrato: string
@@ -338,6 +339,7 @@ export async function ixcBuscarVendasCliente(idCliente: string): Promise<IxcVend
       valor_total: parseFloat(String(r.valor_total ?? '0')),
       status: String(r.status ?? ''),
       ids_areceber: (r.ids_areceber as string | undefined) ?? null,
+      data_vencimento_areceber: (r.data_vencimento_areceber as string | undefined) ?? null,
       data_emissao: (r.data_emissao as string | undefined) ?? null,
       data_saida: (r.data_saida as string | undefined) ?? null,
       id_contrato: String(r.id_contrato ?? ''),
