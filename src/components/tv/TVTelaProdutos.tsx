@@ -12,7 +12,7 @@ interface ProjetoSimples {
   cliente_nome: string
   valor_total: number
   progresso_pct: number
-  status_geral: 'a_receber' | 'pago' | 'em_atraso' | 'cancelado'
+  status_geral: 'pendente' | 'quitado' | 'em_atraso' | 'em_dia' | 'parcial' | 'cancelado'
 }
 
 interface ProjetosStats {
@@ -184,8 +184,9 @@ export function TVTelaProdutos({ planosMes, projetos, projetosStats, t }: TVTela
             {/* Lista */}
             <div className="flex-1 overflow-y-auto">
               {projetos.slice(0, 5).map((p) => {
-                const statusColor = p.status_geral === 'pago' ? '#00d68f' :
-                                   p.status_geral === 'em_atraso' ? '#ef4444' : '#f59e0b'
+                const statusColor = p.status_geral === 'quitado' ? '#00d68f' :
+                                   p.status_geral === 'em_atraso' ? '#ef4444' :
+                                   p.status_geral === 'cancelado' ? '#666' : '#f59e0b'
 
                 return (
                   <div

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { TrendingUp, DollarSign, Users, Repeat2, Award, RefreshCw, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Loader2, FolderKanban, Clock, CircleDollarSign, AlertCircle } from 'lucide-react'
+import { TrendingUp, DollarSign, Users, Repeat2, Award, RefreshCw, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Loader2, FolderKanban } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Spinner } from '@/components/ui/Spinner'
@@ -465,16 +465,16 @@ export default function Dashboard() {
                   <div className="flex items-center gap-3 ml-4 flex-shrink-0">
                     <div className="text-right">
                       <p className="text-sm font-semibold text-white tabular-nums">{formatBRL(projeto.valor_total)}</p>
-                      <p className="text-xs text-white/35 tabular-nums">{projeto.parcelas} parcela{projeto.parcelas > 1 ? 's' : ''}</p>
+                      <p className="text-xs text-white/35 tabular-nums">{projeto.parcelas ?? 0} parcela{(projeto.parcelas ?? 0) > 1 ? 's' : ''}</p>
                     </div>
                     <Badge
                       variant={
-                        projeto.status_geral === 'pago' ? 'success' :
+                        projeto.status_geral === 'quitado' ? 'success' :
                         projeto.status_geral === 'em_atraso' ? 'danger' :
-                        projeto.status_geral === 'cancelado' ? 'neutral' : 'warning'
+                        projeto.status_geral === 'cancelado' ? 'default' : 'warning'
                       }
                     >
-                      {projeto.status_geral === 'pago' ? 'Pago' :
+                      {projeto.status_geral === 'quitado' ? 'Quitado' :
                        projeto.status_geral === 'em_atraso' ? 'Atraso' :
                        projeto.status_geral === 'cancelado' ? 'Cancelado' :
                        `${projeto.progresso_pct}%`}

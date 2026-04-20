@@ -48,7 +48,9 @@
       "Bash(node:*)",
       "Bash(grep -E \"IXC_PROXY|IXC_BASE\" .env.production)",
       "Bash(grep -E \"IXC_PROXY|IXC_BASE\" .env.local)",
-      "Bash(grep -E \"IXC_PROXY|IXC_BASE\" .env)"
+      "Bash(grep -E \"IXC_PROXY|IXC_BASE\" .env)",
+      "Bash(git checkout *)",
+      "Bash(git reset *)"
     ]
   }
 }

@@ -7,7 +7,6 @@
  * - Faturamento real = soma das parcelas com status_pagamento = 'pago'
  * - valor_total é apenas referência; receita real é valor_recebido
  */
-import { useState, useEffect, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { ixcBuscarAreceberPorVenda, ixcBuscarAreceberPorId } from '@/lib/ixc'

@@ -707,7 +707,7 @@ function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
 
 // ── Aba 4: Projetos & Serviços ────────────────────────────────────────────────
 
-type StatusFiltroProjeto = 'todos' | 'a_receber' | 'pago' | 'em_atraso' | 'cancelado'
+type StatusFiltroProjeto = 'todos' | 'pendente' | 'quitado' | 'em_atraso' | 'cancelado'
 
 function TabProjetos() {
   const now = new Date()
@@ -715,7 +715,7 @@ function TabProjetos() {
   const [ano, setAno] = useState(now.getFullYear())
   const [statusFiltro, setStatusFiltro] = useState<StatusFiltroProjeto>('todos')
 
-  const { vendas, isLoading } = useVendasUnicas()
+  const { vendas, loading } = useVendasUnicas()
 
   // Filtrar por mês/ano
   const projetosMes = useMemo(() => {
@@ -746,13 +746,13 @@ function TabProjetos() {
 
   const statusOptions: { key: StatusFiltroProjeto; label: string; color: string }[] = [
     { key: 'todos', label: 'Todos', color: '#a78bfa' },
-    { key: 'a_receber', label: 'A Receber', color: '#f59e0b' },
-    { key: 'pago', label: 'Pagos', color: '#00d68f' },
+    { key: 'pendente', label: 'Pendente', color: '#f59e0b' },
+    { key: 'quitado', label: 'Quitados', color: '#00d68f' },
     { key: 'em_atraso', label: 'Em Atraso', color: '#ef4444' },
     { key: 'cancelado', label: 'Cancelados', color: '#666' },
   ]
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex justify-center py-16">
         <Spinner style={{ color: '#a78bfa' }} />
@@ -853,10 +853,10 @@ function TabProjetos() {
               </thead>
               <tbody>
                 {projetosFiltrados.map(projeto => {
-                  const statusColor = projeto.status_geral === 'pago' ? '#00d68f' :
+                  const statusColor = projeto.status_geral === 'quitado' ? '#00d68f' :
                                      projeto.status_geral === 'em_atraso' ? '#ef4444' :
                                      projeto.status_geral === 'cancelado' ? '#666' : '#f59e0b'
-                  const StatusIcon = projeto.status_geral === 'pago' ? CheckCircle2 :
+                  const StatusIcon = projeto.status_geral === 'quitado' ? CheckCircle2 :
                                     projeto.status_geral === 'em_atraso' ? AlertCircle : Clock
 
                   return (
@@ -887,9 +887,9 @@ function TabProjetos() {
                           style={{ background: `${statusColor}18`, color: statusColor, border: `1px solid ${statusColor}30` }}
                         >
                           <StatusIcon size={12} />
-                          {projeto.status_geral === 'pago' ? 'Pago' :
+                          {projeto.status_geral === 'quitado' ? 'Quitado' :
                            projeto.status_geral === 'em_atraso' ? 'Atraso' :
-                           projeto.status_geral === 'cancelado' ? 'Cancelado' : 'A receber'}
+                           projeto.status_geral === 'cancelado' ? 'Cancelado' : 'Pendente'}
                         </span>
                       </td>
                     </tr>

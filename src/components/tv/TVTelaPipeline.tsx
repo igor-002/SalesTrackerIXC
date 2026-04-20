@@ -31,7 +31,6 @@ export function TVTelaPipeline({
   // Calcular totais para proporções do funil
   const totalPipeline = funilCounts.A + funilCounts.AA
   const pctAtivos = totalPipeline > 0 ? (funilCounts.A / totalPipeline) * 100 : 50
-  const pctAguardando = totalPipeline > 0 ? (funilCounts.AA / totalPipeline) * 100 : 50
 
   return (
     <div className="min-w-full h-full flex flex-col gap-4">
