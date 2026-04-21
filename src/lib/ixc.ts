@@ -426,3 +426,154 @@ export async function ixcBuscarAreceberPorId(idAreceber: string): Promise<IxcAre
     raw: r,
   }
 }
+
+// ── Sync Completo de Contratos ──────────────────────────────────────────────
+
+export interface IxcContratoFull {
+  id: string
+  id_cliente: string
+  id_vendedor: string | null
+  id_vendedor_ativ: string | null
+  status: string // A, AA, B, C, etc.
+  contrato: string // nome do plano
+  data_ativacao: string | null
+  data_cadastro_sistema: string | null
+  ultima_atualizacao: string | null
+  taxa_instalacao: number
+  id_filial: string
+  raw: Record<string, unknown>
+}
+
+interface IxcListResponse {
+  total: string
+  registros: Record<string, unknown>[] | Record<string, unknown>
+}
+
+/**
+ * Lista contratos do IXC com paginação.
+ * Retorna todos os contratos de uma página específica.
+ */
+export async function ixcListarContratosPagina(
+  page: number,
+  rp: number = 200,
+  filtros?: { status?: string; filial?: string }
+): Promise<{ contratos: IxcContratoFull[]; total: number }> {
+  const body: Record<string, string> = {
+    qtype: 'cliente_contrato.id',
+    query: '1',
+    oper: '>=',
+    page: String(page),
+    rp: String(rp),
+    sortname: 'cliente_contrato.id',
+    sortorder: 'desc',
+  }
+
+  // Filtro por status se especificado
+  if (filtros?.status) {
+    body.qtype = 'cliente_contrato.status'
+    body.query = filtros.status
+    body.oper = '='
+  }
+
+  const resp = await fetch(ixcUrl('cliente_contrato'), {
+    method: 'POST',
+    headers: { ...ixcHeaders(), ixcsoft: 'listar' },
+    body: JSON.stringify(body),
+  })
+
+  if (!resp.ok) throw new Error(`IXC API erro ${resp.status}: ${resp.statusText}`)
+
+  const data = (await resp.json()) as IxcListResponse
+  const total = parseInt(data.total ?? '0', 10)
+  const registros = normalizeRegistros(data)
+
+  const contratos: IxcContratoFull[] = registros.map((r) => ({
+    id: String(r.id ?? ''),
+    id_cliente: String(r.id_cliente ?? ''),
+    id_vendedor: (r.id_vendedor as string | undefined) ?? null,
+    id_vendedor_ativ: (r.id_vendedor_ativ as string | undefined) ?? null,
+    status: String(r.status ?? ''),
+    contrato: String(r.contrato ?? ''),
+    data_ativacao: (r.data_ativacao as string | undefined) ?? null,
+    data_cadastro_sistema: (r.data_cadastro_sistema as string | undefined) ?? null,
+    ultima_atualizacao: (r.ultima_atualizacao as string | undefined) ?? null,
+    taxa_instalacao: parseFloat(String(r.taxa_instalacao ?? '0')),
+    id_filial: String(r.id_filial ?? ''),
+    raw: r,
+  }))
+
+  return { contratos, total }
+}
+
+/**
+ * Lista todos os contratos do IXC com status específico, paginando automaticamente.
+ * Filtra apenas filiais permitidas (1 e 6).
+ */
+export async function ixcListarTodosContratos(
+  status: 'A' | 'AA',
+  filiaisPermitidas: string[] = ['1', '6']
+): Promise<IxcContratoFull[]> {
+  const rp = 200
+  let page = 1
+  let allContratos: IxcContratoFull[] = []
+
+  // Primeira página para obter o total
+  const { contratos: firstPage, total } = await ixcListarContratosPagina(page, rp, { status })
+  allContratos = [...firstPage]
+
+  const totalPages = Math.ceil(total / rp)
+
+  // Buscar páginas restantes
+  while (page < totalPages) {
+    page++
+    const { contratos } = await ixcListarContratosPagina(page, rp, { status })
+    allContratos = [...allContratos, ...contratos]
+  }
+
+  // Filtrar apenas filiais permitidas
+  return allContratos.filter((c) => filiaisPermitidas.includes(c.id_filial))
+}
+
+/**
+ * Busca boletos de um contrato no IXC (fn_areceber por id_contrato).
+ * Usado para calcular MRR quando taxa_instalacao = 0.
+ */
+export async function ixcBuscarAreceberPorContrato(idContrato: string): Promise<IxcAreceber[]> {
+  const resp = await fetch(ixcUrl('fn_areceber'), {
+    method: 'POST',
+    headers: { ...ixcHeaders(), ixcsoft: 'listar' },
+    body: JSON.stringify({
+      qtype: 'fn_areceber.id_contrato',
+      query: idContrato,
+      oper: '=',
+      page: '1',
+      rp: '5',
+      sortname: 'fn_areceber.id',
+      sortorder: 'desc',
+    }),
+  })
+  if (!resp.ok) throw new Error(`IXC API erro ${resp.status}: ${resp.statusText}`)
+  const data = (await resp.json()) as { registros?: Record<string, unknown>[] | Record<string, unknown> }
+  const registros = normalizeRegistros(data)
+  return registros.map((r) => ({
+    id: String(r.id ?? ''),
+    id_venda: String(r.id_venda ?? ''),
+    valor: parseFloat(String(r.valor ?? '0')),
+    valor_baixado: parseFloat(String(r.valor_baixado ?? '0')),
+    data_vencimento: String(r.data_vencimento ?? ''),
+    data_pagamento: (r.data_pagamento as string | undefined) || null,
+    status: String(r.status ?? ''),
+    raw: r,
+  }))
+}
+
+/**
+ * Verifica se uma data está no mês/ano atual.
+ */
+export function isDataNoMesAtual(dataStr: string | null): boolean {
+  if (!dataStr) return false
+  const date = new Date(dataStr)
+  if (isNaN(date.getTime())) return false
+  const now = new Date()
+  return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
+}

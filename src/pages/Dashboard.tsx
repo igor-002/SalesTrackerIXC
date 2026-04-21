@@ -6,7 +6,7 @@ import { Spinner } from '@/components/ui/Spinner'
 import { Badge } from '@/components/ui/Badge'
 import { VendasTable } from '@/components/vendas/VendasTable'
 import { useDashboardStats } from '@/hooks/useDashboardStats'
-import { useIxcSync } from '@/hooks/useIxcSync'
+import { useIxcSync, useIxcSyncFull } from '@/hooks/useIxcSync'
 import { useHistoricoSync } from '@/hooks/useSyncStatus'
 import type { SyncLogRow } from '@/hooks/useSyncStatus'
 import { runReconciliacao } from '@/services/reconciliacao'
@@ -98,6 +98,7 @@ function SyncHistoricoCard({ sincronizarAgora, sincronizando }: {
   const [aberto, setAberto] = useState(false)
   const [reconciliando, setReconciliando] = useState(false)
   const { data: historico = [], isFetching, refetchTudo } = useHistoricoSync()
+  const { progress, executarSyncCompleto, resetProgress } = useIxcSyncFull()
 
   const ultimo = historico[0] ?? null
 
@@ -201,25 +202,86 @@ function SyncHistoricoCard({ sincronizarAgora, sincronizando }: {
             )}
           </div>
 
+          {/* Progress do sync completo */}
+          {progress.running && (
+            <div className="px-5 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-cyan-400">Sync completo em andamento</span>
+                <span className="text-xs text-white/40 tabular-nums">{progress.percent}%</span>
+              </div>
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+                <div
+                  className="h-full rounded-full transition-all duration-300"
+                  style={{ width: `${progress.percent}%`, background: '#06b6d4' }}
+                />
+              </div>
+              <p className="text-xs text-white/40 mt-2">{progress.message}</p>
+            </div>
+          )}
+
+          {/* Resultado do sync completo */}
+          {progress.result && !progress.running && (
+            <div className="px-5 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 size={14} className="text-emerald-400" />
+                  <span className="text-sm text-white font-medium">
+                    {progress.result.importados} contratos importados
+                  </span>
+                </div>
+                <button
+                  onClick={resetProgress}
+                  className="text-xs text-white/40 hover:text-white cursor-pointer"
+                >
+                  Fechar
+                </button>
+              </div>
+              <p className="text-xs text-white/40 mt-1">
+                {progress.result.backupCount} registros salvos no backup · {progress.result.deletados} antigos removidos
+                {progress.result.erros > 0 && ` · ${progress.result.erros} erros`}
+              </p>
+            </div>
+          )}
+
+          {/* Erro do sync completo */}
+          {progress.error && !progress.running && (
+            <div className="px-5 py-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <div className="flex items-center gap-2">
+                <XCircle size={14} className="text-red-400" />
+                <span className="text-sm text-red-400 font-medium">Erro no sync</span>
+              </div>
+              <p className="text-xs text-red-400/70 mt-1">{progress.error}</p>
+            </div>
+          )}
+
           {/* Botões de ação */}
           <div className="px-5 pb-4 flex gap-2 flex-wrap">
             <button
               onClick={handleSync}
-              disabled={sincronizando}
+              disabled={sincronizando || progress.running}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: 'rgba(0,214,143,0.12)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.2)' }}
             >
               {sincronizando ? <Spinner size="sm" /> : <RefreshCw size={12} />}
-              Sincronizar agora
+              Atualizar status
+            </button>
+            <button
+              onClick={executarSyncCompleto}
+              disabled={progress.running || sincronizando}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: 'rgba(6,182,212,0.12)', color: '#06b6d4', border: '1px solid rgba(6,182,212,0.2)' }}
+            >
+              {progress.running ? <Spinner size="sm" /> : <RefreshCw size={12} />}
+              Sync completo IXC
             </button>
             <button
               onClick={handleReconciliar}
-              disabled={reconciliando}
+              disabled={reconciliando || progress.running}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
               style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}
             >
               {reconciliando ? <Spinner size="sm" /> : <RefreshCw size={12} />}
-              Reconciliar agora
+              Reconciliar
             </button>
           </div>
         </div>

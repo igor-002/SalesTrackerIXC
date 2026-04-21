@@ -1,9 +1,14 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { sincronizarStatusIxc, type SyncResultado } from '@/services/ixcSync'
+import {
+  sincronizarStatusIxc,
+  syncContratosFromIXC,
+  type SyncResultado,
+  type SyncContratosResult,
+} from '@/services/ixcSync'
 import { ixcConfigurado } from '@/lib/ixc'
 
-export type { SyncResultado }
+export type { SyncResultado, SyncContratosResult }
 
 const SYNC_QUERY_KEY = ['ixc-sync'] as const
 
@@ -45,5 +50,90 @@ export function useIxcSync(options?: UseIxcSyncOptions) {
     sincronizando: isFetching,
     sincronizarAgora,
     resultado: data ?? null,
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Hook para sync completo de contratos IXC (Fase 6)
+// ══════════════════════════════════════════════════════════════════════════════
+
+export interface SyncProgressState {
+  message: string
+  percent: number
+  running: boolean
+  error: string | null
+  result: SyncContratosResult | null
+}
+
+export function useIxcSyncFull() {
+  const queryClient = useQueryClient()
+  const [progress, setProgress] = useState<SyncProgressState>({
+    message: '',
+    percent: 0,
+    running: false,
+    error: null,
+    result: null,
+  })
+
+  const executarSyncCompleto = useCallback(async () => {
+    if (progress.running) return
+
+    setProgress({
+      message: 'Iniciando...',
+      percent: 0,
+      running: true,
+      error: null,
+      result: null,
+    })
+
+    try {
+      const result = await syncContratosFromIXC((msg, pct) => {
+        setProgress((prev) => ({
+          ...prev,
+          message: msg,
+          percent: pct ?? prev.percent,
+        }))
+      })
+
+      setProgress({
+        message: `Sync concluído — ${result.importados} contratos importados`,
+        percent: 100,
+        running: false,
+        error: null,
+        result,
+      })
+
+      // Invalidar queries para atualizar dados no Dashboard
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+      queryClient.invalidateQueries({ queryKey: ['vendas'] })
+      queryClient.invalidateQueries({ queryKey: ['ixc-sync'] })
+      queryClient.invalidateQueries({ queryKey: ['sync-status'] })
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Erro desconhecido'
+      setProgress({
+        message: errorMsg,
+        percent: 0,
+        running: false,
+        error: errorMsg,
+        result: null,
+      })
+    }
+  }, [progress.running, queryClient])
+
+  const resetProgress = useCallback(() => {
+    setProgress({
+      message: '',
+      percent: 0,
+      running: false,
+      error: null,
+      result: null,
+    })
+  }, [])
+
+  return {
+    progress,
+    executarSyncCompleto,
+    resetProgress,
+    habilitado: ixcConfigurado(),
   }
 }
