@@ -2,8 +2,14 @@
 
 ## Visão Geral
 
-O sistema mantém o `status_ixc` dos contratos sincronizado com o IXCSoft via polling ativo
-e reconciliação automática. Toda execução é registrada na tabela `sync_log`.
+O sistema sincroniza contratos do IXCSoft de duas formas:
+
+1. **Sync Completo (Fase 6)**: Importa todos os contratos do mês diretamente do IXC, substituindo
+   os dados da tabela `vendas`. Elimina necessidade de cadastro manual.
+
+2. **Sync de Status**: Atualiza apenas o `status_ixc` dos contratos já cadastrados (polling a cada 30min).
+
+Toda execução é registrada na tabela `sync_log`.
 
 ---
 
@@ -150,3 +156,101 @@ divergências operacionais críticas.
 | 4.2 | `TVSyncIndicator` no footer do TV Dashboard com semáforo temporal (30/60 min) |
 | 4.3 | Card colapsável "Sincronização IXC" no Dashboard com histórico e botão de sync manual |
 | 4.4 | `reconciliacao.ts` detecta e corrige AA→A, A→B/C; disparada automaticamente após sync e por botão manual |
+
+---
+
+## Sync Completo de Contratos (Fase 6)
+
+### Fluxo `syncContratosFromIXC()`
+
+**Arquivo:** `src/services/ixcSync.ts`
+**Hook:** `useIxcSyncFull()` em `src/hooks/useIxcSync.ts`
+
+```
+1. Registra início em sync_log (tipo='ixc_contratos_full')
+2. Carrega lista de vendedores do Supabase para mapeamento
+3. Busca contratos com status 'A' (ativos) do IXC (paginado, rp=200)
+4. Busca contratos com status 'AA' (aguardando) do IXC (paginado, rp=200)
+5. Filtra apenas filiais permitidas (1 e 6)
+6. Filtra apenas contratos do mês corrente:
+   - Ativos: data_ativacao no mês
+   - Aguardando: data_cadastro_sistema no mês
+7. Para cada contrato (em lotes de 10):
+   a. Busca dados do cliente via /cliente
+   b. Mapeia id_vendedor → vendedor_id (cria "Vendedor IXC {id}" se não existir)
+   c. Calcula MRR (taxa_instalacao ou valor do boleto não-proporcional)
+8. Faz backup da tabela vendas → vendas_backup
+9. Limpa tabela vendas
+10. Insere novos registros com mapeamento de campos
+11. Atualiza sync_log com resultado
+```
+
+### Mapeamento de Campos IXC → Supabase
+
+| Campo IXC | Campo Supabase | Observação |
+|-----------|----------------|------------|
+| `cliente.razao` | `cliente_nome` | Via busca /cliente |
+| `cliente.cnpj_cpf` | `cliente_cpf_cnpj` | Via busca /cliente |
+| `cliente.uf` | `cliente_uf` | Via busca /cliente |
+| `id_cliente` | `codigo_cliente_ixc` | ID do cliente no IXC |
+| `id` (contrato) | `codigo_contrato_ixc` | ID do contrato no IXC |
+| `id_vendedor` ou `id_vendedor_ativ` | `vendedor_id` | Mapeado via `ixc_id` da tabela vendedores |
+| `taxa_instalacao` ou `fn_areceber.valor` | `valor_total`, `valor_unitario` | MRR calculado |
+| `status` | `status_ixc` | 'A' ou 'AA' |
+| `data_ativacao` | `data_venda` | Se status='A' |
+| `data_cadastro_sistema` | `data_venda` | Se status='AA' |
+| — | `mrr` | Sempre `true` (contratos são recorrentes) |
+| — | `quantidade` | Sempre `1` |
+
+### Regras de Negócio
+
+1. **Filiais**: Apenas filiais 1 e 6 são sincronizadas
+2. **Período**: Apenas contratos com data no mês corrente
+3. **Ativos (A)**: Conta na "Realidade" (meta real do mês)
+4. **Aguardando (AA)**: Conta na "Promessa" (pipeline)
+5. **MRR**: Prioriza `taxa_instalacao`; se zero, busca `fn_areceber` ignorando `parcela_proporcional='S'`
+6. **Vendedores**: Se `ixc_id` não encontrado, cria registro automático
+
+### Tabela `vendas_backup`
+
+**Migration:** `supabase/migrations/20260421_create_vendas_backup.sql`
+
+Guarda histórico de todas as vendas antes de cada sync completo.
+
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `backup_id` | uuid | PK do registro de backup |
+| `backup_at` | timestamptz | Momento do backup |
+| `sync_tipo` | text | Tipo do sync (ex: 'ixc_contratos_full') |
+| _demais_ | — | Todos os campos da tabela `vendas` |
+
+### Botão no Dashboard
+
+- **"Sync completo IXC"** (ciano): Executa `syncContratosFromIXC()`
+- Exibe barra de progresso com percentual e mensagem
+- Após conclusão: mostra quantidade importada, backup realizado, erros
+
+### Cron / Agendamento
+
+O sync automático às 18h (21h UTC) deve ser configurado via:
+
+1. **Vercel Cron** (recomendado para deploy Vercel):
+   - Criar arquivo `vercel.json` com cron job
+   - Criar API route que chama `syncContratosFromIXC()`
+
+2. **Supabase Edge Functions** (alternativa):
+   - Criar função schedulada que chama a API IXC
+
+3. **Serviço externo** (cron-job.org, etc.):
+   - Configurar webhook para chamar endpoint de sync
+
+### Fase 6 (2026-04-21)
+
+| Tarefa | Mudança |
+|--------|---------|
+| 6.1 | `syncContratosFromIXC()` - sync completo de contratos do IXC |
+| 6.2 | Migration `vendas_backup` para histórico pré-sync |
+| 6.3 | Hook `useIxcSyncFull()` com estado de progresso e botão no Dashboard |
+| 6.4 | Documentação de opções de cron/agendamento |
+| 6.5 | Badge "Última sync" no header do Dashboard |
+| 6.6 | Atualização da documentação SYNC.md e FASE6.md |
