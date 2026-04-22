@@ -190,31 +190,19 @@ async function getOrCreateVendedor(
   const cached = vendedoresCache.get(ixcVendedorId)
   if (cached) return cached
 
-  // Buscar na lista local
+  // Buscar na lista local (já filtrada para incluir_historico = true)
   const found = vendedoresList.find((v) => v.ixc_id === ixcVendedorId)
   if (found) {
     vendedoresCache.set(ixcVendedorId, found.id)
     return found.id
   }
 
-  // Criar novo vendedor
-  const { data: newVendedor, error } = await supabase
-    .from('vendedores')
-    .insert({
-      nome: `Vendedor IXC ${ixcVendedorId}`,
-      ixc_id: ixcVendedorId,
-      ativo: true,
-    })
-    .select('id')
-    .single()
-
-  if (error || !newVendedor) {
-    console.warn(`[syncContratos] Erro ao criar vendedor IXC ${ixcVendedorId}:`, error)
-    return null
-  }
-
-  vendedoresCache.set(ixcVendedorId, newVendedor.id)
-  return newVendedor.id
+  // Não criar vendedor automaticamente - retornar null se não estiver autorizado
+  // (A lista vendedoresList já contém apenas vendedores autorizados)
+  console.warn(
+    `[syncContratos] Vendedor IXC ${ixcVendedorId} não autorizado (incluir_historico != true)`
+  )
+  return null
 }
 
 /**
@@ -354,18 +342,33 @@ export async function syncContratosFromIXC(
   onProgress?.('Iniciando sincronização...', 0)
 
   try {
-    // 1. Buscar lista de vendedores para mapeamento
-    onProgress?.('Carregando vendedores...', 5)
+    // 1. Buscar lista de vendedores autorizados para mapeamento
+    onProgress?.('Carregando vendedores autorizados...', 5)
     const { data: vendedoresList } = await supabase
       .from('vendedores')
       .select('id, nome, ixc_id')
+      .eq('incluir_historico', true)
+      .not('ixc_id', 'is', null)
+
     const vendedoresCache = new Map<string, string>()
+    const ixcIdsAutorizados = new Set<string>(
+      (vendedoresList ?? []).map(v => v.ixc_id).filter((id): id is string => id !== null)
+    )
 
     // 2. Buscar contratos do mês (já filtrados no IXC via grid_param)
     onProgress?.('Buscando contratos do IXC...', 10)
-    const contratosFiltrados = await ixcListarTodosContratos()
+    const contratosIXC = await ixcListarTodosContratos()
 
-    onProgress?.(`${contratosFiltrados.length} contratos do mês encontrados`, 30)
+    // 3. Filtrar apenas contratos de vendedores autorizados
+    const contratosFiltrados = contratosIXC.filter(contrato => {
+      const vendedorId = contrato.id_vendedor ?? contrato.id_vendedor_ativ
+      return vendedorId && ixcIdsAutorizados.has(vendedorId)
+    })
+
+    onProgress?.(
+      `${contratosFiltrados.length} contratos de vendedores autorizados encontrados (${contratosIXC.length} total)`,
+      30
+    )
 
     if (contratosFiltrados.length === 0) {
       // Nenhum contrato para importar
