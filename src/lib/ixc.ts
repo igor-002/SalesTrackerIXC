@@ -449,30 +449,52 @@ interface IxcListResponse {
   registros: Record<string, unknown>[] | Record<string, unknown>
 }
 
+interface GridParamFilter {
+  TB: string
+  COL: string
+  OP: string
+  VAL: string
+}
+
+/**
+ * Retorna primeiro e último dia do mês corrente em formato YYYY-MM-DD.
+ */
+export function getMesAtualRange(): { inicio: string; fim: string } {
+  const now = new Date()
+  const ano = now.getFullYear()
+  const mes = now.getMonth()
+  const inicio = new Date(ano, mes, 1)
+  const fim = new Date(ano, mes + 1, 0) // Último dia do mês
+  return {
+    inicio: inicio.toISOString().slice(0, 10),
+    fim: fim.toISOString().slice(0, 10),
+  }
+}
+
 /**
  * Lista contratos do IXC com paginação.
- * Retorna todos os contratos de uma página específica.
+ * Aceita grid_param para filtros combinados (AND).
  */
 export async function ixcListarContratosPagina(
   page: number,
   rp: number = 200,
-  filtros?: { status?: string; filial?: string }
+  gridParams?: GridParamFilter[]
 ): Promise<{ contratos: IxcContratoFull[]; total: number }> {
   const body: Record<string, string> = {
-    qtype: 'cliente_contrato.id',
-    query: '1',
-    oper: '>=',
     page: String(page),
     rp: String(rp),
     sortname: 'cliente_contrato.id',
     sortorder: 'desc',
   }
 
-  // Filtro por status se especificado
-  if (filtros?.status) {
-    body.qtype = 'cliente_contrato.status'
-    body.query = filtros.status
-    body.oper = '='
+  if (gridParams && gridParams.length > 0) {
+    // Usar grid_param para filtros combinados
+    body.grid_param = JSON.stringify(gridParams)
+  } else {
+    // Fallback: query simples para buscar tudo
+    body.qtype = 'cliente_contrato.id'
+    body.query = '1'
+    body.oper = '>='
   }
 
   const resp = await fetch(ixcUrl('cliente_contrato'), {
@@ -506,32 +528,56 @@ export async function ixcListarContratosPagina(
 }
 
 /**
- * Lista todos os contratos do IXC com status específico, paginando automaticamente.
- * Filtra apenas filiais permitidas (1 e 6).
+ * Lista contratos do IXC do mês corrente usando grid_param para filtrar diretamente na API.
+ * Faz 4 queries: (status A/AA) × (filial 1/6), filtrando pela data apropriada.
+ * Retorna apenas contratos do mês corrente das filiais permitidas.
  */
-export async function ixcListarTodosContratos(
-  status: 'A' | 'AA',
-  filiaisPermitidas: string[] = ['1', '6']
-): Promise<IxcContratoFull[]> {
+export async function ixcListarTodosContratos(): Promise<IxcContratoFull[]> {
+  const { inicio, fim } = getMesAtualRange()
   const rp = 200
-  let page = 1
-  let allContratos: IxcContratoFull[] = []
+  const allContratos: IxcContratoFull[] = []
+  const idsSeen = new Set<string>()
 
-  // Primeira página para obter o total
-  const { contratos: firstPage, total } = await ixcListarContratosPagina(page, rp, { status })
-  allContratos = [...firstPage]
+  // Definir as 4 queries (status × filial)
+  const queries = [
+    // Ativos (A) - filial 1 - data_ativacao no mês
+    { status: 'A', filial: '1', campoData: 'data_ativacao' },
+    // Ativos (A) - filial 6 - data_ativacao no mês
+    { status: 'A', filial: '6', campoData: 'data_ativacao' },
+    // Aguardando (AA) - filial 1 - data_cadastro_sistema no mês
+    { status: 'AA', filial: '1', campoData: 'data_cadastro_sistema' },
+    // Aguardando (AA) - filial 6 - data_cadastro_sistema no mês
+    { status: 'AA', filial: '6', campoData: 'data_cadastro_sistema' },
+  ]
 
-  const totalPages = Math.ceil(total / rp)
+  for (const q of queries) {
+    const gridParams: GridParamFilter[] = [
+      { TB: 'cliente_contrato', COL: 'status', OP: '=', VAL: q.status },
+      { TB: 'cliente_contrato', COL: 'id_filial', OP: '=', VAL: q.filial },
+      { TB: 'cliente_contrato', COL: q.campoData, OP: '>=', VAL: inicio },
+      { TB: 'cliente_contrato', COL: q.campoData, OP: '<=', VAL: fim },
+    ]
 
-  // Buscar páginas restantes
-  while (page < totalPages) {
-    page++
-    const { contratos } = await ixcListarContratosPagina(page, rp, { status })
-    allContratos = [...allContratos, ...contratos]
+    let page = 1
+    let total = 0
+
+    do {
+      const result = await ixcListarContratosPagina(page, rp, gridParams)
+      total = result.total
+
+      // Adicionar apenas contratos não vistos (evitar duplicatas)
+      for (const c of result.contratos) {
+        if (!idsSeen.has(c.id)) {
+          idsSeen.add(c.id)
+          allContratos.push(c)
+        }
+      }
+
+      page++
+    } while ((page - 1) * rp < total)
   }
 
-  // Filtrar apenas filiais permitidas
-  return allContratos.filter((c) => filiaisPermitidas.includes(c.id_filial))
+  return allContratos
 }
 
 /**

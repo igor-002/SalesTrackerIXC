@@ -4,7 +4,6 @@ import {
   ixcBuscarCliente,
   ixcListarTodosContratos,
   ixcBuscarAreceberPorContrato,
-  isDataNoMesAtual,
   type IxcContratoFull,
 } from '@/lib/ixc'
 import { runReconciliacao } from '@/services/reconciliacao'
@@ -336,28 +335,9 @@ export async function syncContratosFromIXC(
       .select('id, nome, ixc_id')
     const vendedoresCache = new Map<string, string>()
 
-    // 2. Buscar contratos Ativos e Aguardando do IXC
-    onProgress?.('Buscando contratos ativos do IXC...', 10)
-    const contratosAtivos = await ixcListarTodosContratos('A', ['1', '6'])
-
-    onProgress?.('Buscando contratos aguardando do IXC...', 20)
-    const contratosAguardando = await ixcListarTodosContratos('AA', ['1', '6'])
-
-    // 3. Filtrar apenas contratos do mês corrente
-    const filtrarMesAtual = (c: IxcContratoFull) => {
-      if (c.status === 'A') {
-        // Ativos: data_ativacao no mês corrente
-        return isDataNoMesAtual(c.data_ativacao)
-      } else {
-        // Aguardando: data_cadastro_sistema no mês corrente
-        return isDataNoMesAtual(c.data_cadastro_sistema)
-      }
-    }
-
-    const contratosFiltrados = [
-      ...contratosAtivos.filter(filtrarMesAtual),
-      ...contratosAguardando.filter(filtrarMesAtual),
-    ]
+    // 2. Buscar contratos do mês (já filtrados no IXC via grid_param)
+    onProgress?.('Buscando contratos do IXC...', 10)
+    const contratosFiltrados = await ixcListarTodosContratos()
 
     onProgress?.(`${contratosFiltrados.length} contratos do mês encontrados`, 30)
 
