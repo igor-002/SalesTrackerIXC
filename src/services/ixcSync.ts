@@ -240,6 +240,19 @@ async function calcularMRR(contrato: IxcContratoFull): Promise<number> {
 }
 
 /**
+ * Mapeia status_ixc para status_id do Supabase.
+ */
+function mapStatusIxcToId(statusIxc: string): string {
+  const map: Record<string, string> = {
+    'A': '02d9280f-39dd-4e9f-9866-a2c442c74544',   // Ativo
+    'AA': '3ab54213-e70b-435d-b707-1140b9f26e69',  // Pendente
+    'B': 'b191728e-56ac-435f-8777-723473ec7cce',   // Inativo
+    'C': '641cba2c-09c9-468e-a303-8be54b999998',   // Cancelado
+  }
+  return map[statusIxc] ?? '3ab54213-e70b-435d-b707-1140b9f26e69' // Default: Pendente
+}
+
+/**
  * Processa lote de contratos buscando dados de clientes em paralelo.
  */
 async function processarLoteContratos(
@@ -287,6 +300,7 @@ async function processarLoteContratos(
             valor_unitario: mrr,
             quantidade: 1,
             mrr: true, // Contratos são sempre recorrentes
+            status_id: mapStatusIxcToId(contrato.status),
             status_ixc: contrato.status,
             data_venda: dataVenda?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
             created_at: new Date().toISOString(),
@@ -398,6 +412,7 @@ export async function syncContratosFromIXC(
         valor_unitario: Number(v.valor_unitario ?? 0),
         quantidade: Number(v.quantidade ?? 1),
         mrr: Boolean(v.mrr),
+        status_id: v.status_id as string,
         status_ixc: v.status_ixc as string | null,
         data_venda: v.data_venda as string,
       }))
