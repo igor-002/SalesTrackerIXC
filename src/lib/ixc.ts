@@ -441,6 +441,7 @@ export interface IxcContratoFull {
   ultima_atualizacao: string | null
   taxa_instalacao: number
   id_filial: string
+  id_vd_contrato: string | null // ID para buscar produtos do plano
   raw: Record<string, unknown>
 }
 
@@ -504,6 +505,7 @@ export async function ixcListarContratosPagina(
     ultima_atualizacao: (r.ultima_atualizacao as string | undefined) ?? null,
     taxa_instalacao: parseFloat(String(r.taxa_instalacao ?? '0')),
     id_filial: String(r.id_filial ?? ''),
+    id_vd_contrato: (r.id_vd_contrato as string | undefined) ?? null,
     raw: r,
   }))
 
@@ -645,6 +647,45 @@ export async function ixcBuscarAreceberPorContrato(idContrato: string): Promise<
     status: String(r.status ?? ''),
     raw: r,
   }))
+}
+
+/**
+ * Busca valor total do plano via vd_contratos_produtos usando id_vd_contrato.
+ * Usado para calcular MRR de contratos AA/P que ainda não têm boletos.
+ * Soma valor_unit * qtde de todos os produtos do plano.
+ */
+export async function ixcBuscarValorPorPlano(idVdContrato: string): Promise<number> {
+  if (!idVdContrato || idVdContrato === '0' || idVdContrato.trim() === '') {
+    return 0
+  }
+
+  const resp = await fetch(ixcUrl('vd_contratos_produtos'), {
+    method: 'POST',
+    headers: { ...ixcHeaders(), ixcsoft: 'listar' },
+    body: JSON.stringify({
+      qtype: 'vd_contratos_produtos.id_vd_contrato',
+      query: idVdContrato,
+      oper: '=',
+      page: '1',
+      rp: '50',
+      sortname: 'id',
+      sortorder: 'asc',
+    }),
+  })
+
+  if (!resp.ok) throw new Error(`IXC API erro ${resp.status}: ${resp.statusText}`)
+
+  const data = (await resp.json()) as { registros?: Record<string, unknown>[] | Record<string, unknown> }
+  const registros = normalizeRegistros(data)
+
+  let total = 0
+  for (const r of registros) {
+    const valorUnit = parseFloat(String(r.valor_unit ?? '0'))
+    const qtde = parseInt(String(r.qtde ?? '1'), 10) || 1
+    total += valorUnit * qtde
+  }
+
+  return total
 }
 
 /**

@@ -4,6 +4,7 @@ import {
   ixcBuscarCliente,
   ixcListarTodosContratos,
   ixcBuscarAreceberPorContrato,
+  ixcBuscarValorPorPlano,
   ixcListarContratosPorVendedor,
   type IxcContratoFull,
 } from '@/lib/ixc'
@@ -206,33 +207,59 @@ async function getOrCreateVendedor(
 }
 
 /**
- * Calcula o MRR de um contrato via fn_areceber.
- * Ignora boletos proporcionais (primeiro boleto) e pega o mais recente válido.
- * Se só existirem boletos proporcionais, usa o maior valor.
+ * Calcula o MRR de um contrato.
+ *
+ * Lógica por status:
+ * - Contratos ativos (A): busca fn_areceber por boleto real
+ * - Contratos aguardando (AA/P): busca vd_contratos_produtos pelo plano
+ *
+ * Se status A não encontrar boleto válido, faz fallback para plano.
  */
 async function calcularMRR(contrato: IxcContratoFull): Promise<number> {
-  try {
-    const boletos = await ixcBuscarAreceberPorContrato(contrato.id)
+  // Step 1: Se status = 'A', tentar buscar boleto real
+  if (contrato.status === 'A') {
+    try {
+      const boletos = await ixcBuscarAreceberPorContrato(contrato.id)
 
-    if (boletos.length === 0) return 0
+      if (boletos.length > 0) {
+        // Separar boletos não-proporcionais (parcela_proporcional !== 'S')
+        const boletosNaoProp = boletos.filter((b) => {
+          const proporcional = (b.raw.parcela_proporcional as string | undefined) ?? 'N'
+          return proporcional !== 'S' && b.valor > 0
+        })
 
-    // Separar boletos não-proporcionais (parcela_proporcional !== 'S')
-    const boletosNaoProp = boletos.filter((b) => {
-      const proporcional = (b.raw.parcela_proporcional as string | undefined) ?? 'N'
-      return proporcional !== 'S' && b.valor > 0
-    })
+        // Se existem boletos não-proporcionais, pegar o mais recente
+        if (boletosNaoProp.length > 0) {
+          return boletosNaoProp[0].valor
+        }
 
-    // Se existem boletos não-proporcionais, pegar o mais recente (já vem ordenado desc por id)
-    if (boletosNaoProp.length > 0) {
-      return boletosNaoProp[0].valor
+        // Se só existem proporcionais, pegar o maior valor
+        const maiorValor = Math.max(...boletos.map((b) => b.valor))
+        if (maiorValor > 0) {
+          return maiorValor
+        }
+      }
+      // Se não encontrou boleto válido, faz fallback para Step 2
+    } catch {
+      // Erro ao buscar boletos, faz fallback para Step 2
     }
-
-    // Se só existem proporcionais, pegar o maior valor
-    const maiorValor = Math.max(...boletos.map((b) => b.valor))
-    return maiorValor > 0 ? maiorValor : 0
-  } catch {
-    return 0
   }
+
+  // Step 2: Buscar valor pelo plano (vd_contratos_produtos via id_vd_contrato)
+  // Usado para AA, P, ou fallback de A sem boletos
+  try {
+    if (contrato.id_vd_contrato) {
+      const valorPlano = await ixcBuscarValorPorPlano(contrato.id_vd_contrato)
+      if (valorPlano > 0) {
+        return valorPlano
+      }
+    }
+  } catch {
+    // Erro ao buscar plano, retorna 0
+  }
+
+  // Step 3: Nada encontrado
+  return 0
 }
 
 /**
