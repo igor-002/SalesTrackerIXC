@@ -64,6 +64,16 @@ export function useVendedores() {
     if (existing) await updateVendedor(existing.id, { ativo: false })
   }
 
+  /** Alterna incluir_historico para um vendedor pelo ID. */
+  async function toggleIncluirHistorico(vendedorId: string, incluir: boolean) {
+    const { error } = await supabase
+      .from('vendedores')
+      .update({ incluir_historico: incluir })
+      .eq('id', vendedorId)
+    if (error) throw error
+    await fetch()
+  }
+
   return {
     vendedores,
     loading,
@@ -74,5 +84,6 @@ export function useVendedores() {
     deleteVendedor,
     syncVendedorIxc,
     disableVendedorIxc,
+    toggleIncluirHistorico,
   }
 }
