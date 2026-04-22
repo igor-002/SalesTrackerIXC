@@ -284,7 +284,6 @@ async function processarLoteContratos(
             codigo_cliente_ixc: contrato.id_cliente,
             codigo_contrato_ixc: contrato.id,
             vendedor_id: vendedorId,
-            valor_total: mrr,
             valor_unitario: mrr,
             quantidade: 1,
             mrr: true, // Contratos são sempre recorrentes
@@ -367,27 +366,10 @@ export async function syncContratosFromIXC(
     const vendasValidas = vendasParaInserir.filter((v): v is Record<string, unknown> => v !== null)
     const erros = vendasParaInserir.length - vendasValidas.length
 
-    // 5. Fazer backup antes de deletar (via insert manual, pois a function RPC pode não existir)
-    onProgress?.('Fazendo backup dos dados atuais...', 80)
-    let backupCount = 0
-    try {
-      // Buscar todas as vendas atuais
-      const { data: vendasAtuais } = await supabase.from('vendas').select('*')
-      if (vendasAtuais && vendasAtuais.length > 0) {
-        // Inserir no backup com timestamp
-        // Nota: vendas_backup é uma tabela custom, usamos type assertion
-        const backupRows = vendasAtuais.map((v) => ({
-          ...v,
-          backup_at: new Date().toISOString(),
-          sync_tipo: 'ixc_contratos_full',
-        }))
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase as any).from('vendas_backup').insert(backupRows)
-        backupCount = vendasAtuais.length
-      }
-    } catch (backupErr) {
-      console.warn('[syncContratos] Erro no backup (ignorado):', backupErr)
-    }
+    // 5. Backup desabilitado temporariamente (RLS bloqueando insert em vendas_backup)
+    // TODO: reativar quando políticas RLS estiverem configuradas
+    const backupCount = 0
+    onProgress?.('Preparando importação...', 80)
 
     // 6. Limpar tabela vendas
     onProgress?.('Limpando registros antigos...', 85)
@@ -405,6 +387,7 @@ export async function syncContratosFromIXC(
     onProgress?.('Importando contratos...', 90)
     if (vendasValidas.length > 0) {
       // Converter para tipo correto antes de inserir
+      // Nota: valor_total é coluna gerada (valor_unitario * quantidade), não inserir
       const vendasTyped = vendasValidas.map((v) => ({
         cliente_nome: String(v.cliente_nome ?? ''),
         cliente_cpf_cnpj: v.cliente_cpf_cnpj as string | null,
@@ -412,7 +395,6 @@ export async function syncContratosFromIXC(
         codigo_cliente_ixc: v.codigo_cliente_ixc as string | null,
         codigo_contrato_ixc: v.codigo_contrato_ixc as string | null,
         vendedor_id: v.vendedor_id as string | null,
-        valor_total: Number(v.valor_total ?? 0),
         valor_unitario: Number(v.valor_unitario ?? 0),
         quantidade: Number(v.quantidade ?? 1),
         mrr: Boolean(v.mrr),
