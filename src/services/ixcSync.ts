@@ -218,26 +218,30 @@ async function getOrCreateVendedor(
 }
 
 /**
- * Calcula o MRR de um contrato.
- * Prioriza taxa_instalacao; se zero, busca último boleto não-proporcional.
+ * Calcula o MRR de um contrato via fn_areceber.
+ * Ignora boletos proporcionais (primeiro boleto) e pega o mais recente válido.
+ * Se só existirem boletos proporcionais, usa o maior valor.
  */
 async function calcularMRR(contrato: IxcContratoFull): Promise<number> {
-  // Se taxa_instalacao > 0, usar direto
-  if (contrato.taxa_instalacao > 0) {
-    return contrato.taxa_instalacao
-  }
-
-  // Buscar boletos do contrato
   try {
     const boletos = await ixcBuscarAreceberPorContrato(contrato.id)
 
-    // Filtrar boletos não-proporcionais (parcela_proporcional !== 'S')
-    const boletoValido = boletos.find((b) => {
+    if (boletos.length === 0) return 0
+
+    // Separar boletos não-proporcionais (parcela_proporcional !== 'S')
+    const boletosNaoProp = boletos.filter((b) => {
       const proporcional = (b.raw.parcela_proporcional as string | undefined) ?? 'N'
       return proporcional !== 'S' && b.valor > 0
     })
 
-    return boletoValido?.valor ?? 0
+    // Se existem boletos não-proporcionais, pegar o mais recente (já vem ordenado desc por id)
+    if (boletosNaoProp.length > 0) {
+      return boletosNaoProp[0].valor
+    }
+
+    // Se só existem proporcionais, pegar o maior valor
+    const maiorValor = Math.max(...boletos.map((b) => b.valor))
+    return maiorValor > 0 ? maiorValor : 0
   } catch {
     return 0
   }
@@ -250,6 +254,7 @@ function mapStatusIxcToId(statusIxc: string): string {
   const map: Record<string, string> = {
     'A': '02d9280f-39dd-4e9f-9866-a2c442c74544',   // Ativo
     'AA': '3ab54213-e70b-435d-b707-1140b9f26e69',  // Pendente
+    'P': '3ab54213-e70b-435d-b707-1140b9f26e69',   // Proposta (trata como Pendente)
     'B': 'b191728e-56ac-435f-8777-723473ec7cce',   // Inativo
     'C': '641cba2c-09c9-468e-a303-8be54b999998',   // Cancelado
   }
@@ -290,9 +295,13 @@ async function processarLoteContratos(
           const mrr = await calcularMRR(contrato)
 
           // Determinar data_venda
-          const dataVenda = contrato.status === 'A'
-            ? contrato.data_ativacao
-            : contrato.data_cadastro_sistema
+          // Para status A: data_ativacao
+          // Para status AA, P ou outros: data_cadastro_sistema
+          // Se data_ativacao for '0000-00-00', usar data_cadastro_sistema
+          const dataVenda =
+            contrato.status === 'A' && contrato.data_ativacao && contrato.data_ativacao !== '0000-00-00'
+              ? contrato.data_ativacao
+              : contrato.data_cadastro_sistema
 
           return {
             cliente_nome: cliente.razao,

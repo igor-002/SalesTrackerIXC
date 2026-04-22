@@ -518,7 +518,7 @@ export async function ixcListarContratosPagina(
 export async function ixcListarTodosContratos(): Promise<IxcContratoFull[]> {
   const { inicio, fim } = getMesAtualRange()
   const rp = 200
-  const filiaisPermitidas = ['1', '6']
+  const filiaisPermitidas = ['1', '2', '6']
   const allContratos: IxcContratoFull[] = []
   const idsSeen = new Set<string>()
 
@@ -568,6 +568,39 @@ export async function ixcListarTodosContratos(): Promise<IxcContratoFull[]> {
         c.status === 'AA' &&
         c.data_cadastro_sistema &&
         c.data_cadastro_sistema <= fim &&
+        filiaisPermitidas.includes(c.id_filial) &&
+        !idsSeen.has(c.id)
+      ) {
+        idsSeen.add(c.id)
+        allContratos.push(c)
+      }
+    }
+    page++
+  } while ((page - 1) * rp < total)
+
+  // Query 3: Contratos com status P (Proposta) - trata como AA
+  const queryProposta = {
+    qtype: 'cliente_contrato.status',
+    query: 'P',
+    oper: '=',
+  }
+
+  page = 1
+  total = 0
+  do {
+    const result = await ixcListarContratosPagina(page, rp, queryProposta)
+    total = result.total
+    for (const c of result.contratos) {
+      // Para status P, usar data_cadastro_sistema se data_ativacao for inválida
+      const dataRef = c.data_ativacao && c.data_ativacao !== '0000-00-00'
+        ? c.data_ativacao
+        : c.data_cadastro_sistema
+
+      // Filtrar: data no range do mês, filial permitida
+      if (
+        dataRef &&
+        dataRef >= inicio &&
+        dataRef <= fim &&
         filiaisPermitidas.includes(c.id_filial) &&
         !idsSeen.has(c.id)
       ) {
@@ -634,7 +667,7 @@ export async function ixcListarContratosPorVendedor(
   ixcVendedorId: string
 ): Promise<IxcContratoFull[]> {
   const rp = 200
-  const filiaisPermitidas = ['1', '6']
+  const filiaisPermitidas = ['1', '2', '6']
   const allContratos: IxcContratoFull[] = []
 
   const filtro = {
