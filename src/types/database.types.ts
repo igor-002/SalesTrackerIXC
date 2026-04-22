@@ -641,6 +641,80 @@ export type Database = {
           },
         ]
       }
+      vendas_historico: {
+        Row: {
+          id: string
+          empresa_id: string | null
+          vendedor_id: string | null
+          ixc_vendedor_id: string
+          cliente_nome: string
+          cliente_cpf_cnpj: string | null
+          codigo_cliente_ixc: string | null
+          codigo_contrato_ixc: string | null
+          plano: string | null
+          valor_unitario: number | null
+          quantidade: number | null
+          mrr: boolean | null
+          status_ixc: string | null
+          data_ativacao: string | null
+          mes_referencia: number
+          ano_referencia: number
+          filial_id: string | null
+          created_at: string | null
+          ultima_atualizacao: string | null
+        }
+        Insert: {
+          id?: string
+          empresa_id?: string | null
+          vendedor_id?: string | null
+          ixc_vendedor_id: string
+          cliente_nome: string
+          cliente_cpf_cnpj?: string | null
+          codigo_cliente_ixc?: string | null
+          codigo_contrato_ixc?: string | null
+          plano?: string | null
+          valor_unitario?: number | null
+          quantidade?: number | null
+          mrr?: boolean | null
+          status_ixc?: string | null
+          data_ativacao?: string | null
+          mes_referencia: number
+          ano_referencia: number
+          filial_id?: string | null
+          created_at?: string | null
+          ultima_atualizacao?: string | null
+        }
+        Update: {
+          id?: string
+          empresa_id?: string | null
+          vendedor_id?: string | null
+          ixc_vendedor_id?: string
+          cliente_nome?: string
+          cliente_cpf_cnpj?: string | null
+          codigo_cliente_ixc?: string | null
+          codigo_contrato_ixc?: string | null
+          plano?: string | null
+          valor_unitario?: number | null
+          quantidade?: number | null
+          mrr?: boolean | null
+          status_ixc?: string | null
+          data_ativacao?: string | null
+          mes_referencia?: number
+          ano_referencia?: number
+          filial_id?: string | null
+          created_at?: string | null
+          ultima_atualizacao?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendas_historico_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendedores: {
         Row: {
           ativo: boolean | null
@@ -648,6 +722,7 @@ export type Database = {
           email: string | null
           empresa_id: string
           id: string
+          incluir_historico: boolean | null
           ixc_id: string | null
           meta_mensal: number | null
           nome: string
@@ -659,6 +734,7 @@ export type Database = {
           email?: string | null
           empresa_id?: string
           id?: string
+          incluir_historico?: boolean | null
           ixc_id?: string | null
           meta_mensal?: number | null
           nome: string
@@ -670,6 +746,7 @@ export type Database = {
           email?: string | null
           empresa_id?: string
           id?: string
+          incluir_historico?: boolean | null
           ixc_id?: string | null
           meta_mensal?: number | null
           nome?: string

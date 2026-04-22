@@ -148,7 +148,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
   const { data: contratosRange = [] } = useRelatoriosRange(meses6, vendedorEfetivo)
 
   // Dados de evolução com histórico (3 passados + atual + 2 projeção)
-  const { totalTime: evolucao6Meses, porVendedor: evolucaoPorVendedor, loading: loadingEvolucao } = useEvolucao6Meses(vendedorEfetivo)
+  const { totalTime: evolucao6Meses, porVendedor: evolucaoPorVendedor } = useEvolucao6Meses(vendedorEfetivo)
 
   // Metas do time
   const { getMetaAtual } = useMetas()
@@ -163,6 +163,8 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
     if (evolucao6Meses.length > 0) {
       return evolucao6Meses.map(e => ({
         mesLabel: e.mesLabel,
+        mes: e.mes,
+        ano: e.ano,
         total: e.total_contratos,
         ativos: e.total_contratos,
         aguardando: 0,
