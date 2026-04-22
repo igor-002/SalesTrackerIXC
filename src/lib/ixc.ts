@@ -449,52 +449,35 @@ interface IxcListResponse {
   registros: Record<string, unknown>[] | Record<string, unknown>
 }
 
-interface GridParamFilter {
-  TB: string
-  COL: string
-  OP: string
-  VAL: string
-}
-
 /**
  * Retorna primeiro e último dia do mês corrente em formato YYYY-MM-DD.
  */
 export function getMesAtualRange(): { inicio: string; fim: string } {
-  const now = new Date()
-  const ano = now.getFullYear()
-  const mes = now.getMonth()
-  const inicio = new Date(ano, mes, 1)
-  const fim = new Date(ano, mes + 1, 0) // Último dia do mês
-  return {
-    inicio: inicio.toISOString().slice(0, 10),
-    fim: fim.toISOString().slice(0, 10),
-  }
+  const hoje = new Date()
+  const ano = hoje.getFullYear()
+  const mes = hoje.getMonth() + 1
+  const inicio = `${ano}-${String(mes).padStart(2, '0')}-01`
+  const ultimoDia = new Date(ano, mes, 0).getDate()
+  const fim = `${ano}-${String(mes).padStart(2, '0')}-${String(ultimoDia).padStart(2, '0')}`
+  return { inicio, fim }
 }
 
 /**
- * Lista contratos do IXC com paginação.
- * Aceita grid_param para filtros combinados (AND).
+ * Lista contratos do IXC com paginação usando qtype/query/oper.
  */
 export async function ixcListarContratosPagina(
   page: number,
   rp: number = 200,
-  gridParams?: GridParamFilter[]
+  filtro?: { qtype: string; query: string; oper: string }
 ): Promise<{ contratos: IxcContratoFull[]; total: number }> {
   const body: Record<string, string> = {
+    qtype: filtro?.qtype ?? 'cliente_contrato.id',
+    query: filtro?.query ?? '1',
+    oper: filtro?.oper ?? '>=',
     page: String(page),
     rp: String(rp),
-    sortname: 'cliente_contrato.id',
+    sortname: filtro?.qtype ?? 'cliente_contrato.id',
     sortorder: 'desc',
-  }
-
-  if (gridParams && gridParams.length > 0) {
-    // Usar grid_param para filtros combinados
-    body.grid_param = JSON.stringify(gridParams)
-  } else {
-    // Fallback: query simples para buscar tudo
-    body.qtype = 'cliente_contrato.id'
-    body.query = '1'
-    body.oper = '>='
   }
 
   const resp = await fetch(ixcUrl('cliente_contrato'), {
@@ -528,54 +511,72 @@ export async function ixcListarContratosPagina(
 }
 
 /**
- * Lista contratos do IXC do mês corrente usando grid_param para filtrar diretamente na API.
- * Faz 4 queries: (status A/AA) × (filial 1/6), filtrando pela data apropriada.
- * Retorna apenas contratos do mês corrente das filiais permitidas.
+ * Lista contratos do IXC do mês corrente.
+ * Faz 2 queries filtrando por data >= inicio_mes via qtype, depois filtra em JS.
+ * Retorna apenas contratos do mês corrente das filiais permitidas (1 e 6).
  */
 export async function ixcListarTodosContratos(): Promise<IxcContratoFull[]> {
   const { inicio, fim } = getMesAtualRange()
   const rp = 200
+  const filiaisPermitidas = ['1', '6']
   const allContratos: IxcContratoFull[] = []
   const idsSeen = new Set<string>()
 
-  // Definir as 4 queries (status × filial)
-  const queries = [
-    // Ativos (A) - filial 1 - data_ativacao no mês
-    { status: 'A', filial: '1', campoData: 'data_ativacao' },
-    // Ativos (A) - filial 6 - data_ativacao no mês
-    { status: 'A', filial: '6', campoData: 'data_ativacao' },
-    // Aguardando (AA) - filial 1 - data_cadastro_sistema no mês
-    { status: 'AA', filial: '1', campoData: 'data_cadastro_sistema' },
-    // Aguardando (AA) - filial 6 - data_cadastro_sistema no mês
-    { status: 'AA', filial: '6', campoData: 'data_cadastro_sistema' },
-  ]
-
-  for (const q of queries) {
-    const gridParams: GridParamFilter[] = [
-      { TB: 'cliente_contrato', COL: 'status', OP: '=', VAL: q.status },
-      { TB: 'cliente_contrato', COL: 'id_filial', OP: '=', VAL: q.filial },
-      { TB: 'cliente_contrato', COL: q.campoData, OP: '>=', VAL: inicio },
-      { TB: 'cliente_contrato', COL: q.campoData, OP: '<=', VAL: fim },
-    ]
-
-    let page = 1
-    let total = 0
-
-    do {
-      const result = await ixcListarContratosPagina(page, rp, gridParams)
-      total = result.total
-
-      // Adicionar apenas contratos não vistos (evitar duplicatas)
-      for (const c of result.contratos) {
-        if (!idsSeen.has(c.id)) {
-          idsSeen.add(c.id)
-          allContratos.push(c)
-        }
-      }
-
-      page++
-    } while ((page - 1) * rp < total)
+  // Query 1: Contratos com data_ativacao >= inicio do mês (captura status A)
+  const queryAtivos = {
+    qtype: 'cliente_contrato.data_ativacao',
+    query: inicio,
+    oper: '>=',
   }
+
+  let page = 1
+  let total = 0
+  do {
+    const result = await ixcListarContratosPagina(page, rp, queryAtivos)
+    total = result.total
+    for (const c of result.contratos) {
+      // Filtrar: status A, data <= fim, filial permitida
+      if (
+        c.status === 'A' &&
+        c.data_ativacao &&
+        c.data_ativacao <= fim &&
+        filiaisPermitidas.includes(c.id_filial) &&
+        !idsSeen.has(c.id)
+      ) {
+        idsSeen.add(c.id)
+        allContratos.push(c)
+      }
+    }
+    page++
+  } while ((page - 1) * rp < total)
+
+  // Query 2: Contratos com data_cadastro_sistema >= inicio do mês (captura status AA)
+  const queryAguardando = {
+    qtype: 'cliente_contrato.data_cadastro_sistema',
+    query: inicio,
+    oper: '>=',
+  }
+
+  page = 1
+  total = 0
+  do {
+    const result = await ixcListarContratosPagina(page, rp, queryAguardando)
+    total = result.total
+    for (const c of result.contratos) {
+      // Filtrar: status AA, data <= fim, filial permitida
+      if (
+        c.status === 'AA' &&
+        c.data_cadastro_sistema &&
+        c.data_cadastro_sistema <= fim &&
+        filiaisPermitidas.includes(c.id_filial) &&
+        !idsSeen.has(c.id)
+      ) {
+        idsSeen.add(c.id)
+        allContratos.push(c)
+      }
+    }
+    page++
+  } while ((page - 1) * rp < total)
 
   return allContratos
 }
