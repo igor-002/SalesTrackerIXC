@@ -9,6 +9,9 @@ import {
 } from '@/lib/ixc'
 import { runReconciliacao } from '@/services/reconciliacao'
 import { syncAllVendasUnicas } from '@/hooks/useVendasUnicas'
+import type { Database } from '@/types/database.types'
+
+type VendasHistoricoInsert = Database['public']['Tables']['vendas_historico']['Insert']
 
 const DAY_MS = 1000 * 60 * 60 * 24
 
@@ -617,7 +620,7 @@ export async function syncHistoricoVendedores(
         if (registrosParaInserir.length > 0) {
           const { error: insertError } = await supabase
             .from('vendas_historico')
-            .insert(registrosParaInserir)
+            .insert(registrosParaInserir as VendasHistoricoInsert[])
 
           if (insertError) {
             console.warn(`[syncHistorico] Erro ao inserir histórico:`, insertError)
