@@ -689,6 +689,50 @@ export async function ixcBuscarValorPorPlano(idVdContrato: string): Promise<numb
 }
 
 /**
+ * Busca produtos de um contrato via id_vd_contrato.
+ * Retorna lista detalhada de produtos (descricao, valor, qtde).
+ * Usado na página de diagnóstico para exibir detalhes do plano.
+ */
+export async function ixcBuscarProdutosPorVdContrato(
+  idVdContrato: string
+): Promise<IxcContratoProduto[]> {
+  if (!idVdContrato || idVdContrato === '0' || idVdContrato.trim() === '') {
+    return []
+  }
+
+  const resp = await fetch(ixcUrl('vd_contratos_produtos'), {
+    method: 'POST',
+    headers: { ...ixcHeaders(), ixcsoft: 'listar' },
+    body: JSON.stringify({
+      qtype: 'vd_contratos_produtos.id_vd_contrato',
+      query: idVdContrato,
+      oper: '=',
+      page: '1',
+      rp: '50',
+      sortname: 'id',
+      sortorder: 'asc',
+    }),
+  })
+
+  if (!resp.ok) throw new Error(`IXC API erro ${resp.status}: ${resp.statusText}`)
+
+  const data = (await resp.json()) as { registros?: Record<string, unknown>[] | Record<string, unknown> }
+  const registros = normalizeRegistros(data)
+
+  return registros.map((r) => {
+    const valorUnit = parseFloat(String(r.valor_unit ?? '0'))
+    const qtde = parseInt(String(r.qtde ?? '1'), 10) || 1
+    return {
+      id: String(r.id ?? ''),
+      descricao: (r.descricao as string | undefined) ?? '',
+      valor_unit: valorUnit,
+      qtde,
+      valor_bruto: valorUnit * qtde,
+    }
+  })
+}
+
+/**
  * Verifica se uma data está no mês/ano atual.
  */
 export function isDataNoMesAtual(dataStr: string | null): boolean {

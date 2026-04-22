@@ -10,6 +10,7 @@ import {
   UserCheck,
   Users,
   BarChart2,
+  Wrench,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { Avatar } from '@/components/ui/Avatar'
@@ -23,7 +24,8 @@ const navItems = [
   { to: '/metas',      icon: Target,           label: 'Metas',        permissao: 'metas'        as keyof Permissoes },
   { to: '/relatorios',  icon: BarChart2,        label: 'Relatórios',   permissao: 'relatorios'   as keyof Permissoes },
   { to: '/tv',         icon: Monitor,          label: 'TV Dashboard', permissao: 'tv_dashboard' as keyof Permissoes },
-  { to: '/usuarios',   icon: Users,            label: 'Usuários',     permissao: 'admin'        as keyof Permissoes },
+  { to: '/usuarios',        icon: Users,  label: 'Usuários',        permissao: 'admin' as keyof Permissoes },
+  { to: '/diagnostico-ixc', icon: Wrench, label: 'Diagnóstico IXC', permissao: 'admin' as keyof Permissoes },
 ]
 
 export function Sidebar() {

@@ -12,8 +12,9 @@ const Vendedores  = lazy(() => import('@/pages/Vendedores'))
 const Metas       = lazy(() => import('@/pages/Metas'))
 const Clientes    = lazy(() => import('@/pages/Clientes'))
 const TVDashboard = lazy(() => import('@/pages/TVDashboard'))
-const Usuarios    = lazy(() => import('@/pages/Usuarios'))
-const Relatorios  = lazy(() => import('@/pages/Relatorios'))
+const Usuarios       = lazy(() => import('@/pages/Usuarios'))
+const Relatorios     = lazy(() => import('@/pages/Relatorios'))
+const DiagnosticoIXC = lazy(() => import('@/pages/DiagnosticoIXC'))
 
 function PageLoader() {
   return (
@@ -70,6 +71,12 @@ export function Router() {
           <Route path="/usuarios" element={
             <ProtectedRoute permissao="admin">
               <AppShell><Usuarios /></AppShell>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/diagnostico-ixc" element={
+            <ProtectedRoute permissao="admin">
+              <AppShell><DiagnosticoIXC /></AppShell>
             </ProtectedRoute>
           } />
 
