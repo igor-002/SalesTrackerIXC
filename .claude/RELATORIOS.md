@@ -187,3 +187,30 @@ Filtros:
 | 3.2 | Tabela de ARPU por segmento com badge "mais rentável" |
 | 3.3 | Card de tempo médio de ativação (consistente com TVTelaVelocidade) |
 | 3.4 | Perfil expandido por vendedor: conversão, ativação, cancelamentos, meta individual, badges |
+
+### Fase 7 (2026-04-22) — Histórico de Vendedores
+
+**Documentação completa:** `.claude/HISTORICO.md`
+
+#### Evolução 6 Meses com Histórico
+
+**Hook:** `useEvolucao6Meses(vendedorIdFiltro?)` em `useVendasHistorico.ts`
+
+| Posição | Tipo | Fonte |
+|---------|------|-------|
+| Meses 1-3 | `real` | `vendas_historico` |
+| Mês 4 | `atual` | `vendas` (mês corrente) |
+| Meses 5-6 | `projecao` | Média dos 3 meses reais |
+
+**Gráfico:** Barras com cores diferenciadas (verde=real, cyan=atual, verde translúcido=projeção)
+
+#### Tabela Performance por Vendedor
+
+- Visível apenas para gestores
+- Somente vendedores com `incluir_historico = true`
+- Colunas: Vendedor + 6 meses (quantidade + valor)
+- Linha de total do time
+
+| Tarefa | Mudança |
+|--------|---------|
+| 7.4 | Gráfico com cores por tipo e tabela de performance |
