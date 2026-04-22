@@ -624,3 +624,37 @@ export function isDataNoMesAtual(dataStr: string | null): boolean {
   const now = new Date()
   return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
 }
+
+/**
+ * Lista todos os contratos de um vendedor específico no IXC.
+ * Usado para sync de histórico — busca contratos filtrando por id_vendedor.
+ * Retorna apenas contratos com status='A' e filiais 1 ou 6.
+ */
+export async function ixcListarContratosPorVendedor(
+  ixcVendedorId: string
+): Promise<IxcContratoFull[]> {
+  const rp = 200
+  const filiaisPermitidas = ['1', '6']
+  const allContratos: IxcContratoFull[] = []
+
+  const filtro = {
+    qtype: 'cliente_contrato.id_vendedor',
+    query: ixcVendedorId,
+    oper: '=',
+  }
+
+  let page = 1
+  let total = 0
+  do {
+    const result = await ixcListarContratosPagina(page, rp, filtro)
+    total = result.total
+    for (const c of result.contratos) {
+      if (c.status === 'A' && filiaisPermitidas.includes(c.id_filial)) {
+        allContratos.push(c)
+      }
+    }
+    page++
+  } while ((page - 1) * rp < total)
+
+  return allContratos
+}

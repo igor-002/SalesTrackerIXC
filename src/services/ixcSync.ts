@@ -4,6 +4,7 @@ import {
   ixcBuscarCliente,
   ixcListarTodosContratos,
   ixcBuscarAreceberPorContrato,
+  ixcListarContratosPorVendedor,
   type IxcContratoFull,
 } from '@/lib/ixc'
 import { runReconciliacao } from '@/services/reconciliacao'
@@ -437,11 +438,217 @@ export async function syncContratosFromIXC(
 
     onProgress?.(`Sync concluído — ${vendasValidas.length} contratos importados`, 100)
 
+    // Sync de histórico de vendedores — não-fatal
+    try {
+      onProgress?.('Sincronizando histórico de vendedores...', 96)
+      await syncHistoricoVendedores()
+      onProgress?.('Histórico atualizado', 98)
+    } catch (err) {
+      console.warn('[syncContratosFromIXC] Erro no sync de histórico:', err)
+    }
+
     return {
       importados: vendasValidas.length,
       erros,
       backupCount: backupCount ?? 0,
       deletados: deletados ?? 0,
+    }
+  } catch (err) {
+    if (logId) {
+      await atualizarLogSync(logId, {
+        status: 'erro',
+        finalizado_em: new Date().toISOString(),
+        duracao_ms: Date.now() - iniciadoEm,
+        erro_mensagem: err instanceof Error ? err.message : 'erro desconhecido',
+      }).catch(() => undefined)
+    }
+    throw err
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SYNC DE HISTÓRICO DE VENDEDORES (Fase 7)
+// ══════════════════════════════════════════════════════════════════════════════
+
+export interface SyncHistoricoResult {
+  vendedoresProcessados: number
+  mesesProcessados: number
+  contratosInseridos: number
+  erros: number
+}
+
+interface VendedorHistorico {
+  id: string
+  nome: string
+  ixc_id: string
+}
+
+function getMesesAnteriores(n: number): { mes: number; ano: number; inicio: string; fim: string }[] {
+  const now = new Date()
+  const result: { mes: number; ano: number; inicio: string; fim: string }[] = []
+  for (let i = 1; i <= n; i++) {
+    let m = now.getMonth() + 1 - i
+    let a = now.getFullYear()
+    while (m <= 0) { m += 12; a-- }
+    const inicio = `${a}-${String(m).padStart(2, '0')}-01`
+    const ultimoDia = new Date(a, m, 0).getDate()
+    const fim = `${a}-${String(m).padStart(2, '0')}-${String(ultimoDia).padStart(2, '0')}`
+    result.push({ mes: m, ano: a, inicio, fim })
+  }
+  return result
+}
+
+/**
+ * Sincroniza histórico de vendedores selecionados (incluir_historico = true).
+ * Busca contratos dos últimos 3 meses e armazena em vendas_historico.
+ */
+export async function syncHistoricoVendedores(
+  onProgress?: SyncProgressCallback
+): Promise<SyncHistoricoResult> {
+  const iniciadoEm = Date.now()
+  const logId = await inserirLogSync('historico_vendedores').catch(() => null)
+
+  onProgress?.('Buscando vendedores para histórico...', 0)
+
+  try {
+    // 1. Buscar vendedores com incluir_historico = true
+    const { data: vendedoresData, error: vendedoresError } = await supabase
+      .from('vendedores')
+      .select('id, nome, ixc_id')
+      .eq('incluir_historico', true)
+      .not('ixc_id', 'is', null)
+
+    if (vendedoresError) throw new Error(`Erro ao buscar vendedores: ${vendedoresError.message}`)
+
+    const vendedoresHistorico = (vendedoresData ?? []) as VendedorHistorico[]
+    if (vendedoresHistorico.length === 0) {
+      onProgress?.('Nenhum vendedor configurado para histórico', 100)
+      if (logId) {
+        await atualizarLogSync(logId, {
+          status: 'sucesso',
+          finalizado_em: new Date().toISOString(),
+          duracao_ms: Date.now() - iniciadoEm,
+          registros_processados: 0,
+          registros_atualizados: 0,
+        }).catch(() => undefined)
+      }
+      return { vendedoresProcessados: 0, mesesProcessados: 0, contratosInseridos: 0, erros: 0 }
+    }
+
+    // 2. Calcular os 3 meses anteriores
+    const meses = getMesesAnteriores(3)
+    const totalOperacoes = vendedoresHistorico.length * meses.length
+    let operacaoAtual = 0
+    let totalContratosInseridos = 0
+    let totalErros = 0
+
+    onProgress?.(`Processando ${vendedoresHistorico.length} vendedores × ${meses.length} meses...`, 5)
+
+    // 3. Para cada vendedor + cada mês
+    for (const vendedor of vendedoresHistorico) {
+      // Buscar todos os contratos do vendedor
+      let contratosVendedor: IxcContratoFull[]
+      try {
+        contratosVendedor = await ixcListarContratosPorVendedor(vendedor.ixc_id)
+      } catch (err) {
+        console.warn(`[syncHistorico] Erro ao buscar contratos do vendedor ${vendedor.nome}:`, err)
+        totalErros++
+        operacaoAtual += meses.length
+        continue
+      }
+
+      for (const mesRef of meses) {
+        operacaoAtual++
+        const pct = Math.round((operacaoAtual / totalOperacoes) * 90) + 5
+        onProgress?.(`${vendedor.nome} — ${mesRef.mes}/${mesRef.ano}`, pct)
+
+        // Filtrar contratos do mês específico
+        const contratosDoMes = contratosVendedor.filter((c) => {
+          if (!c.data_ativacao) return false
+          return c.data_ativacao >= mesRef.inicio && c.data_ativacao <= mesRef.fim
+        })
+
+        // Deletar registros existentes do mesmo vendedor/mês/ano
+        const { error: deleteError } = await supabase
+          .from('vendas_historico')
+          .delete()
+          .eq('vendedor_id', vendedor.id)
+          .eq('mes_referencia', mesRef.mes)
+          .eq('ano_referencia', mesRef.ano)
+
+        if (deleteError) {
+          console.warn(`[syncHistorico] Erro ao deletar histórico existente:`, deleteError)
+        }
+
+        if (contratosDoMes.length === 0) continue
+
+        // Processar e inserir contratos
+        const registrosParaInserir: Record<string, unknown>[] = []
+
+        for (const contrato of contratosDoMes) {
+          try {
+            const cliente = await ixcBuscarCliente(contrato.id_cliente)
+            const mrr = await calcularMRR(contrato)
+
+            registrosParaInserir.push({
+              vendedor_id: vendedor.id,
+              ixc_vendedor_id: vendedor.ixc_id,
+              cliente_nome: cliente.razao,
+              cliente_cpf_cnpj: cliente.cnpj_cpf || null,
+              codigo_cliente_ixc: contrato.id_cliente,
+              codigo_contrato_ixc: contrato.id,
+              plano: contrato.contrato,
+              valor_unitario: mrr,
+              quantidade: 1,
+              mrr: true,
+              status_ixc: contrato.status,
+              data_ativacao: contrato.data_ativacao?.slice(0, 10) ?? null,
+              mes_referencia: mesRef.mes,
+              ano_referencia: mesRef.ano,
+              filial_id: contrato.id_filial,
+              ultima_atualizacao: contrato.ultima_atualizacao,
+            })
+          } catch (err) {
+            console.warn(`[syncHistorico] Erro ao processar contrato ${contrato.id}:`, err)
+            totalErros++
+          }
+        }
+
+        if (registrosParaInserir.length > 0) {
+          const { error: insertError } = await supabase
+            .from('vendas_historico')
+            .insert(registrosParaInserir)
+
+          if (insertError) {
+            console.warn(`[syncHistorico] Erro ao inserir histórico:`, insertError)
+            totalErros++
+          } else {
+            totalContratosInseridos += registrosParaInserir.length
+          }
+        }
+      }
+    }
+
+    // 4. Atualizar log
+    onProgress?.('Finalizando histórico...', 95)
+    if (logId) {
+      await atualizarLogSync(logId, {
+        status: 'sucesso',
+        finalizado_em: new Date().toISOString(),
+        duracao_ms: Date.now() - iniciadoEm,
+        registros_processados: totalOperacoes,
+        registros_atualizados: totalContratosInseridos,
+        registros_erro: totalErros,
+      }).catch(() => undefined)
+    }
+
+    onProgress?.(`Histórico sincronizado — ${totalContratosInseridos} contratos`, 100)
+
+    return {
+      vendedoresProcessados: vendedoresHistorico.length,
+      mesesProcessados: meses.length,
+      contratosInseridos: totalContratosInseridos,
+      erros: totalErros,
     }
   } catch (err) {
     if (logId) {
