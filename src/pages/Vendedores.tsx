@@ -1,17 +1,14 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { RefreshCw, Users, Search, History } from 'lucide-react'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
 import { toast } from '@/components/ui/Toast'
-import { ixcListarVendedores, ixcConfigurado, type IxcVendedor } from '@/lib/ixc'
 import { useVendedores } from '@/hooks/useVendedores'
 import { syncHistoricoVendedores } from '@/services/ixcSync'
 
 export default function Vendedores() {
-  const { vendedores, loading: loadingSupabase, syncVendedorIxc, disableVendedorIxc, toggleIncluirHistorico } = useVendedores()
-  const [ixcVendedores, setIxcVendedores] = useState<IxcVendedor[]>([])
-  const [loadingIxc, setLoadingIxc] = useState(false)
+  const { vendedores, loading, updateVendedor, toggleIncluirHistorico, refetch } = useVendedores()
   const [syncing, setSyncing] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
   const [syncingHistorico, setSyncingHistorico] = useState(false)
@@ -20,40 +17,17 @@ export default function Vendedores() {
 
   const vendedoresFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase()
-    if (!termo) return ixcVendedores
-    return ixcVendedores.filter(
-      (v) => v.nome.toLowerCase().includes(termo) || v.id.includes(termo)
+    if (!termo) return vendedores
+    return vendedores.filter(
+      (v) => v.nome.toLowerCase().includes(termo) || (v.ixc_id ?? '').includes(termo)
     )
-  }, [ixcVendedores, busca])
+  }, [vendedores, busca])
 
-  async function fetchFromIxc() {
-    if (!ixcConfigurado()) {
-      toast('error', 'Proxy IXC não configurado (VITE_IXC_PROXY_URL)')
-      return
-    }
-    setLoadingIxc(true)
+  async function handleToggleAtivo(vendedorId: string, nome: string, checked: boolean) {
+    setSyncing(vendedorId)
     try {
-      const data = await ixcListarVendedores()
-      setIxcVendedores(data)
-    } catch (err) {
-      toast('error', err instanceof Error ? err.message : 'Erro ao buscar vendedores do IXC')
-    } finally {
-      setLoadingIxc(false)
-    }
-  }
-
-  useEffect(() => { fetchFromIxc() }, [])
-
-  async function handleToggle(ixcVend: IxcVendedor, checked: boolean) {
-    setSyncing(ixcVend.id)
-    try {
-      if (checked) {
-        await syncVendedorIxc(ixcVend)
-        toast('success', `${ixcVend.nome} ativado no CRM`)
-      } else {
-        await disableVendedorIxc(ixcVend.id)
-        toast('success', `${ixcVend.nome} desativado`)
-      }
+      await updateVendedor(vendedorId, { ativo: checked })
+      toast('success', checked ? `${nome} ativado no CRM` : `${nome} desativado`)
     } catch (err) {
       toast('error', err instanceof Error ? err.message : 'Erro ao salvar')
     } finally {
@@ -61,25 +35,10 @@ export default function Vendedores() {
     }
   }
 
-  function isAtivo(ixcId: string): boolean {
-    return vendedores.some((v) => v.ixc_id === ixcId && v.ativo === true)
-  }
-
-  function getVendedorByIxcId(ixcId: string) {
-    return vendedores.find((v) => v.ixc_id === ixcId)
-  }
-
-  function incluiHistorico(ixcId: string): boolean {
-    const v = getVendedorByIxcId(ixcId)
-    return v?.incluir_historico === true
-  }
-
-  async function handleToggleHistorico(ixcId: string, checked: boolean) {
-    const vendedor = getVendedorByIxcId(ixcId)
-    if (!vendedor) return
-    setTogglingHistorico(ixcId)
+  async function handleToggleHistorico(vendedorId: string, checked: boolean) {
+    setTogglingHistorico(vendedorId)
     try {
-      await toggleIncluirHistorico(vendedor.id, checked)
+      await toggleIncluirHistorico(vendedorId, checked)
       toast('success', checked ? 'Incluído no histórico' : 'Removido do histórico')
     } catch (err) {
       toast('error', err instanceof Error ? err.message : 'Erro ao salvar')
@@ -103,8 +62,6 @@ export default function Vendedores() {
     }
   }
 
-  const isLoading = loadingIxc || loadingSupabase
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -124,9 +81,9 @@ export default function Vendedores() {
             <History size={15} className={syncingHistorico ? 'animate-spin' : ''} />
             Sync Histórico
           </Button>
-          <Button variant="secondary" onClick={fetchFromIxc} disabled={loadingIxc}>
-            <RefreshCw size={15} className={loadingIxc ? 'animate-spin' : ''} />
-            Sincronizar
+          <Button variant="secondary" onClick={() => refetch()} disabled={loading}>
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+            Atualizar
           </Button>
         </div>
       </div>
@@ -148,7 +105,7 @@ export default function Vendedores() {
         </GlassCard>
       )}
 
-      {ixcVendedores.length > 0 && (
+      {vendedores.length > 0 && (
         <div className="relative">
           <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
           <input
@@ -163,15 +120,15 @@ export default function Vendedores() {
       )}
 
       <GlassCard className="p-0 overflow-hidden">
-        {isLoading && !ixcVendedores.length ? (
+        {loading && !vendedores.length ? (
           <div className="flex items-center justify-center py-16">
             <Spinner size="lg" style={{ color: '#00d68f' }} />
           </div>
-        ) : !ixcVendedores.length ? (
+        ) : !vendedores.length ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3">
             <Users size={40} className="text-white/20" />
-            <p className="text-sm text-white/40">Nenhum vendedor ativo encontrado no IXC</p>
-            <Button variant="secondary" size="sm" onClick={fetchFromIxc}>
+            <p className="text-sm text-white/40">Nenhum vendedor cadastrado</p>
+            <Button variant="secondary" size="sm" onClick={() => refetch()}>
               Tentar novamente
             </Button>
           </div>
@@ -200,10 +157,7 @@ export default function Vendedores() {
                     Nenhum resultado para "{busca}"
                   </td>
                 </tr>
-              ) : vendedoresFiltrados.map((v, i) => {
-                const ativo = isAtivo(v.id)
-                const historico = incluiHistorico(v.id)
-                return (
+              ) : vendedoresFiltrados.map((v, i) => (
                   <tr
                     key={v.id}
                     style={{
@@ -216,7 +170,7 @@ export default function Vendedores() {
                     <td className="px-5 py-3.5 text-sm text-white font-medium">
                       <span className="flex items-center gap-2">
                         {v.nome}
-                        {historico && (
+                        {v.incluir_historico && (
                           <span
                             className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
                             style={{ background: 'rgba(6,182,212,0.15)', color: '#06b6d4', border: '1px solid rgba(6,182,212,0.3)' }}
@@ -226,7 +180,7 @@ export default function Vendedores() {
                         )}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-sm text-white/40 font-mono">{v.id}</td>
+                    <td className="px-5 py-3.5 text-sm text-white/40 font-mono">{v.ixc_id ?? '—'}</td>
                     <td className="px-5 py-3.5 text-center">
                       {syncing === v.id ? (
                         <Spinner size="sm" style={{ color: '#00d68f' }} />
@@ -235,8 +189,8 @@ export default function Vendedores() {
                           <input
                             type="checkbox"
                             className="sr-only peer"
-                            checked={ativo}
-                            onChange={(e) => handleToggle(v, e.target.checked)}
+                            checked={v.ativo ?? false}
+                            onChange={(e) => handleToggleAtivo(v.id, v.nome, e.target.checked)}
                           />
                           <div
                             className="w-10 h-5 rounded-full transition-all duration-200
@@ -250,7 +204,7 @@ export default function Vendedores() {
                       )}
                     </td>
                     <td className="px-5 py-3.5 text-center">
-                      {!ativo ? (
+                      {!v.ativo ? (
                         <span className="text-xs text-white/20">—</span>
                       ) : togglingHistorico === v.id ? (
                         <Spinner size="sm" style={{ color: '#06b6d4' }} />
@@ -259,7 +213,7 @@ export default function Vendedores() {
                           <input
                             type="checkbox"
                             className="sr-only peer"
-                            checked={historico}
+                            checked={v.incluir_historico ?? false}
                             onChange={(e) => handleToggleHistorico(v.id, e.target.checked)}
                           />
                           <div
@@ -274,17 +228,16 @@ export default function Vendedores() {
                       )}
                     </td>
                   </tr>
-                )
-              })}
+                ))}
             </tbody>
 
           </table>
         )}
       </GlassCard>
 
-      {ixcVendedores.length > 0 && (
+      {vendedores.length > 0 && (
         <p className="text-xs text-white/25 text-center">
-          {vendedores.filter((v) => v.ativo && v.ixc_id).length} de {ixcVendedores.length} vendedores ativos no CRM
+          {vendedores.filter((v) => v.ativo).length} de {vendedores.length} vendedores ativos no CRM
         </p>
       )}
     </div>
