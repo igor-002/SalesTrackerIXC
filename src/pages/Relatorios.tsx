@@ -33,6 +33,7 @@ import {
   agruparPorMes,
   ultimosMeses,
 } from '@/hooks/useRelatoriosIxc'
+import { useEvolucao6Meses } from '@/hooks/useVendasHistorico'
 import { formatBRL, formatPercent } from '@/lib/formatters'
 import { useVendasUnicas } from '@/hooks/useVendasUnicas'
 
@@ -142,9 +143,12 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
   // Dados do mês atual
   const { data: contratos = [], isFetching } = useRelatoriosMes(mes, ano, vendedorEfetivo)
 
-  // Dados dos últimos 6 meses para o gráfico
+  // Dados dos últimos 6 meses para o gráfico (fallback)
   const meses6 = useMemo(() => ultimosMeses(6, mes, ano), [mes, ano])
   const { data: contratosRange = [] } = useRelatoriosRange(meses6, vendedorEfetivo)
+
+  // Dados de evolução com histórico (3 passados + atual + 2 projeção)
+  const { totalTime: evolucao6Meses, porVendedor: evolucaoPorVendedor, loading: loadingEvolucao } = useEvolucao6Meses(vendedorEfetivo)
 
   // Metas do time
   const { getMetaAtual } = useMetas()
@@ -154,7 +158,19 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
   const kpis = useMemo(() => calcKpis(contratos), [contratos])
   const pctMeta = metaTime > 0 ? Math.min((kpis.ativos / metaTime) * 100, 100) : 0
 
-  const chartData = useMemo(() => agruparPorMes(contratosRange, meses6), [contratosRange, meses6])
+  // Usa dados de evolução se disponíveis, senão fallback para dados antigos
+  const chartData = useMemo(() => {
+    if (evolucao6Meses.length > 0) {
+      return evolucao6Meses.map(e => ({
+        mesLabel: e.mesLabel,
+        total: e.total_contratos,
+        ativos: e.total_contratos,
+        aguardando: 0,
+        tipo: e.tipo,
+      }))
+    }
+    return agruparPorMes(contratosRange, meses6)
+  }, [evolucao6Meses, contratosRange, meses6])
   const forecast  = useMemo(() => calcForecast(contratos, mes, ano), [contratos, mes, ano])
   const arpuList  = useMemo(() => calcArpuPorSegmento(contratos), [contratos])
   const tempoAtiv = useMemo(() => calcTempoAtivacao(contratos), [contratos])
@@ -309,9 +325,25 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
             </GlassCard>
           </div>
 
-          {/* Gráfico 6 meses */}
+          {/* Gráfico 6 meses com cores por tipo */}
           <GlassCard className="p-5">
-            <h3 className="text-sm font-semibold text-white mb-4">Evolução — últimos 6 meses</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-white">Evolução — 6 meses</h3>
+              <div className="flex items-center gap-3 text-xs">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#00d68f' }} />
+                  <span className="text-white/40">Real</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#06b6d4' }} />
+                  <span className="text-white/40">Atual</span>
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#00d68f40' }} />
+                  <span className="text-white/40">Projeção</span>
+                </span>
+              </div>
+            </div>
             {chartData.every(d => d.total === 0) ? (
               <p className="text-sm text-white/30 text-center py-8">Sem dados no período.</p>
             ) : (
@@ -321,14 +353,86 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                   <XAxis dataKey="mesLabel" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fill: 'rgba(255,255,255,0.3)', fontSize: 10 }} axisLine={false} tickLine={false} width={28} allowDecimals={false} />
                   <Tooltip content={<DarkTooltip />} />
-                  <Legend iconType="circle" wrapperStyle={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }} />
-                  <Bar dataKey="total"     name="Cadastrados" fill="#6b7280" radius={[3,3,0,0]} />
-                  <Bar dataKey="ativos"    name="Ativos"      fill="#00d68f" radius={[3,3,0,0]} />
-                  <Bar dataKey="aguardando" name="Aguardando" fill="#06b6d4" radius={[3,3,0,0]} />
+                  <Bar
+                    dataKey="ativos"
+                    name="Contratos"
+                    radius={[3,3,0,0]}
+                    fill="#00d68f"
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    shape={(props: any) => {
+                      const { x, y, width, height, payload } = props
+                      const tipo = payload?.tipo
+                      const fill = tipo === 'projecao' ? '#00d68f40' : tipo === 'atual' ? '#06b6d4' : '#00d68f'
+                      return <rect x={x} y={y} width={width} height={height} fill={fill} rx={3} ry={3} />
+                    }}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             )}
           </GlassCard>
+
+          {/* Tabela Performance por Vendedor — Histórico */}
+          {isGestor && evolucaoPorVendedor.length > 0 && (
+            <GlassCard className="p-5">
+              <h3 className="text-sm font-semibold text-white mb-4">Performance por Vendedor — Histórico</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                      <th className="text-left px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white/40">Vendedor</th>
+                      {evolucao6Meses.map(m => (
+                        <th
+                          key={`${m.mes}-${m.ano}`}
+                          className="text-center px-2 py-2 text-xs font-semibold uppercase tracking-wider"
+                          style={{
+                            color: m.tipo === 'projecao' ? 'rgba(255,255,255,0.25)' : m.tipo === 'atual' ? '#06b6d4' : 'rgba(255,255,255,0.4)'
+                          }}
+                        >
+                          {m.mesLabel}
+                          {m.tipo === 'projecao' && <span className="text-[9px] ml-0.5">(proj)</span>}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {evolucaoPorVendedor.map(v => (
+                      <tr key={v.vendedor_id} className="hover:bg-white/3" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td className="px-3 py-2.5 text-white font-medium">{v.vendedor_nome}</td>
+                        {v.meses.map(m => (
+                          <td
+                            key={`${v.vendedor_id}-${m.mes}-${m.ano}`}
+                            className="text-center px-2 py-2.5 tabular-nums"
+                            style={{ color: m.tipo === 'projecao' ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.7)' }}
+                          >
+                            <span className="font-semibold">{m.total_contratos}</span>
+                            <br />
+                            <span className="text-xs text-white/30">{formatBRL(m.valor_total)}</span>
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                    {/* Linha de total */}
+                    <tr className="font-bold" style={{ borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                      <td className="px-3 py-2.5 text-white">Total Time</td>
+                      {evolucao6Meses.map(m => (
+                        <td
+                          key={`total-${m.mes}-${m.ano}`}
+                          className="text-center px-2 py-2.5 tabular-nums"
+                          style={{ color: m.tipo === 'projecao' ? 'rgba(255,255,255,0.4)' : '#00d68f' }}
+                        >
+                          <span>{m.total_contratos}</span>
+                          <br />
+                          <span className="text-xs" style={{ color: m.tipo === 'projecao' ? 'rgba(255,255,255,0.25)' : 'rgba(0,214,143,0.6)' }}>
+                            {formatBRL(m.valor_total)}
+                          </span>
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </GlassCard>
+          )}
         </>
       )}
     </div>
