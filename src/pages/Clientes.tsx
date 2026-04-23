@@ -18,6 +18,21 @@ const MESES = [
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ]
 
+const MESES_CURTO = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+function get3MesesRef(): { mes: number; ano: number; label: string }[] {
+  const now = new Date()
+  const result: { mes: number; ano: number; label: string }[] = []
+  for (let i = 0; i <= 2; i++) {
+    let m = now.getMonth() + 1 - i
+    let a = now.getFullYear()
+    while (m <= 0) { m += 12; a-- }
+    const label = i === 0 ? 'Mês atual' : i === 1 ? 'Mês anterior' : '2 meses atrás'
+    result.push({ mes: m, ano: a, label })
+  }
+  return result
+}
+
 export default function Clientes() {
   const { permissoes, vendedorDbId } = useAuthStore()
   const vendaFilter = !permissoes?.admin && vendedorDbId ? { vendedorId: vendedorDbId } : undefined
@@ -34,6 +49,9 @@ export default function Clientes() {
   const [filtroStatus, setFiltroStatus] = useState('')
   const [filtroMes, setFiltroMes] = useState('')
   const [filtroAno, setFiltroAno] = useState('')
+  const [filtroMesRef, setFiltroMesRef] = useState<number | null>(null)
+
+  const mesesRefOpcoes = useMemo(() => get3MesesRef(), [])
 
   // anos disponíveis a partir das vendas
   const anos = useMemo(() => {
@@ -49,6 +67,10 @@ export default function Clientes() {
       if (filtroStatus && v.status?.id !== filtroStatus) return false
       if (filtroAno && !v.data_venda.startsWith(filtroAno)) return false
       if (filtroMes && v.data_venda.slice(5, 7) !== filtroMes) return false
+      if (filtroMesRef !== null) {
+        const opt = mesesRefOpcoes[filtroMesRef]
+        if (v.mes_referencia !== opt.mes || v.ano_referencia !== opt.ano) return false
+      }
       if (busca) {
         const q = busca.toLowerCase()
         const nome = v.cliente_nome?.toLowerCase() ?? ''
@@ -57,12 +79,12 @@ export default function Clientes() {
       }
       return true
     })
-  }, [vendas, filtroTipo, filtroVendedor, filtroStatus, filtroAno, filtroMes, busca])
+  }, [vendas, filtroTipo, filtroVendedor, filtroStatus, filtroAno, filtroMes, filtroMesRef, mesesRefOpcoes, busca])
 
   const totalFaturamento = filtradas.reduce((s, v) => s + (v.valor_total ?? 0), 0)
   const totalMrr = vendas.filter((v) => v.mrr).reduce((s, v) => s + (v.valor_total ?? 0), 0)
 
-  const temFiltroAtivo = filtroTipo !== 'todos' || filtroVendedor || filtroStatus || filtroMes || filtroAno || busca
+  const temFiltroAtivo = filtroTipo !== 'todos' || filtroVendedor || filtroStatus || filtroMes || filtroAno || filtroMesRef !== null || busca
 
   function limparFiltros() {
     setBusca('')
@@ -71,6 +93,7 @@ export default function Clientes() {
     setFiltroStatus('')
     setFiltroMes('')
     setFiltroAno('')
+    setFiltroMesRef(null)
   }
 
   async function handleSalvarEdicao(id: string, data: NovaVendaFormData) {
@@ -236,6 +259,36 @@ export default function Clientes() {
             <option key={a} value={a} style={{ background: '#0f2419' }}>{a}</option>
           ))}
         </select>
+
+        {/* Mês de Referência */}
+        <div
+          className="flex items-center gap-1 rounded-full p-1"
+          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+        >
+          <button
+            onClick={() => setFiltroMesRef(null)}
+            className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer"
+            style={filtroMesRef === null
+              ? { background: 'rgba(6,182,212,0.15)', color: '#06b6d4', border: '1px solid rgba(6,182,212,0.3)' }
+              : { color: 'rgba(255,255,255,0.35)', border: '1px solid transparent' }
+            }
+          >
+            Todos
+          </button>
+          {mesesRefOpcoes.map((opt, idx) => (
+            <button
+              key={idx}
+              onClick={() => setFiltroMesRef(idx)}
+              className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer"
+              style={filtroMesRef === idx
+                ? { background: 'rgba(6,182,212,0.15)', color: '#06b6d4', border: '1px solid rgba(6,182,212,0.3)' }
+                : { color: 'rgba(255,255,255,0.35)', border: '1px solid transparent' }
+              }
+            >
+              {MESES_CURTO[opt.mes - 1]}/{opt.ano % 100}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Cards resumo */}
@@ -282,6 +335,7 @@ export default function Clientes() {
                   <th className="text-left px-4 py-3.5 text-xs font-semibold text-white/35 uppercase tracking-wider">Vendedor</th>
                   <th className="text-left px-4 py-3.5 text-xs font-semibold text-white/35 uppercase tracking-wider">Produto</th>
                   <th className="text-center px-4 py-3.5 text-xs font-semibold text-white/35 uppercase tracking-wider">Tipo</th>
+                  <th className="text-center px-4 py-3.5 text-xs font-semibold text-white/35 uppercase tracking-wider">Mês</th>
                   <th className="text-left px-4 py-3.5 text-xs font-semibold text-white/35 uppercase tracking-wider">Data</th>
                   <th className="text-right px-4 py-3.5 text-xs font-semibold text-white/35 uppercase tracking-wider">Total</th>
                   <th className="text-right px-4 py-3.5 text-xs font-semibold text-white/35 uppercase tracking-wider">Status</th>
@@ -322,6 +376,15 @@ export default function Clientes() {
                           <ShoppingBag size={11} />
                           Único
                         </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      {v.mes_referencia && v.ano_referencia ? (
+                        <span className="text-xs text-white/50">
+                          {MESES_CURTO[v.mes_referencia - 1]}/{v.ano_referencia % 100}
+                        </span>
+                      ) : (
+                        <span className="text-white/20 text-xs">—</span>
                       )}
                     </td>
                     <td className="px-4 py-4 text-white/45">{formatDate(v.data_venda)}</td>
