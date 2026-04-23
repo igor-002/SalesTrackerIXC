@@ -309,7 +309,7 @@ async function processarLoteContratos(
           // Calcular MRR
           const mrr = await calcularMRR(contrato)
 
-          // Determinar data_venda
+          // Determinar data_venda e data de referência para mes/ano
           // Para status A: data_ativacao
           // Para status AA, P ou outros: data_cadastro_sistema
           // Se data_ativacao for '0000-00-00', usar data_cadastro_sistema
@@ -317,6 +317,12 @@ async function processarLoteContratos(
             contrato.status === 'A' && contrato.data_ativacao && contrato.data_ativacao !== '0000-00-00'
               ? contrato.data_ativacao
               : contrato.data_cadastro_sistema
+
+          // Calcular mes_referencia e ano_referencia
+          const dataRef = dataVenda ?? new Date().toISOString().slice(0, 10)
+          const dateObj = new Date(dataRef)
+          const mes_referencia = dateObj.getMonth() + 1
+          const ano_referencia = dateObj.getFullYear()
 
           return {
             cliente_nome: cliente.razao,
@@ -330,7 +336,9 @@ async function processarLoteContratos(
             mrr: true, // Contratos são sempre recorrentes
             status_id: mapStatusIxcToId(contrato.status),
             status_ixc: contrato.status,
-            data_venda: dataVenda?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+            data_venda: dataRef.slice(0, 10),
+            mes_referencia,
+            ano_referencia,
             created_at: new Date().toISOString(),
           }
         } catch (err) {
@@ -458,6 +466,8 @@ export async function syncContratosFromIXC(
         status_id: v.status_id as string,
         status_ixc: v.status_ixc as string | null,
         data_venda: v.data_venda as string,
+        mes_referencia: Number(v.mes_referencia ?? new Date().getMonth() + 1),
+        ano_referencia: Number(v.ano_referencia ?? new Date().getFullYear()),
       }))
       const { error: insertError } = await supabase.from('vendas').insert(vendasTyped)
       if (insertError) {

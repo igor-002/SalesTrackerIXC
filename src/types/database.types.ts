@@ -537,6 +537,8 @@ export type Database = {
           dias_em_aa: number | null
           empresa_id: string
           id: string
+          mes_referencia: number | null
+          ano_referencia: number | null
           mrr: boolean | null
           produto_id: string | null
           produtos: Json | null
@@ -564,6 +566,8 @@ export type Database = {
           dias_em_aa?: number | null
           empresa_id?: string
           id?: string
+          mes_referencia?: number | null
+          ano_referencia?: number | null
           mrr?: boolean | null
           produto_id?: string | null
           produtos?: Json | null
@@ -591,6 +595,8 @@ export type Database = {
           dias_em_aa?: number | null
           empresa_id?: string
           id?: string
+          mes_referencia?: number | null
+          ano_referencia?: number | null
           mrr?: boolean | null
           produto_id?: string | null
           produtos?: Json | null
