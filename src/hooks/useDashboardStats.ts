@@ -105,7 +105,7 @@ export function useDashboardStats() {
     const [vendasMesRes, vendasSemanaRes, cancelamentosRes, ultimasRes, vendasHistoricoRes] = await Promise.all([
       supabase
         .from('vendas')
-        .select('id, cliente_nome, valor_total, comissao_valor, mrr, data_venda, status_ixc, dias_em_aa, codigo_contrato_ixc, vendedor:vendedores(nome)')
+        .select('id, cliente_nome, valor_total, comissao_valor, mrr, data_venda, status_ixc, dias_em_aa, dias_aguardando, tags, codigo_contrato_ixc, vendedor:vendedores(nome)')
         .gte('data_venda', inicioMes),
       supabase
         .from('vendas')

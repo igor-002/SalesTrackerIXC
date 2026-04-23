@@ -476,9 +476,9 @@ export default function Dashboard() {
                       {dias > 15 ? 'Urgente' : 'Atenção'}
                     </Badge>
                     {alerta.tags === 'antigo' && (
-                      <Badge variant="warning" className="text-[10px]" style={{ background: 'rgba(249,115,22,0.12)', color: '#f97316', border: '1px solid rgba(249,115,22,0.25)' }}>
+                      <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/25">
                         Parado +30d
-                      </Badge>
+                      </span>
                     )}
                   </div>
                 </div>
