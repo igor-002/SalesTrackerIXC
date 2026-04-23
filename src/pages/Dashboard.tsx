@@ -1,11 +1,12 @@
-import { useState } from 'react'
-import { TrendingUp, DollarSign, Users, Repeat2, Award, RefreshCw, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Loader2, FolderKanban } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { TrendingUp, DollarSign, Users, Repeat2, Award, RefreshCw, AlertTriangle, ChevronDown, ChevronUp, CheckCircle2, XCircle, Loader2, FolderKanban, Calendar } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Spinner } from '@/components/ui/Spinner'
 import { Badge } from '@/components/ui/Badge'
 import { VendasTable } from '@/components/vendas/VendasTable'
 import { useDashboardStats } from '@/hooks/useDashboardStats'
+import { useStatusContratosMes } from '@/hooks/useStatusContratosMes'
 import { useIxcSync, useIxcSyncFull } from '@/hooks/useIxcSync'
 import { useHistoricoSync } from '@/hooks/useSyncStatus'
 import type { SyncLogRow } from '@/hooks/useSyncStatus'
@@ -290,6 +291,21 @@ function SyncHistoricoCard({ sincronizarAgora, sincronizando }: {
   )
 }
 
+const MESES_NOME = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+
+function get3Meses(): { mes: number; ano: number; label: string }[] {
+  const now = new Date()
+  const result: { mes: number; ano: number; label: string }[] = []
+  for (let i = 0; i <= 2; i++) {
+    let m = now.getMonth() + 1 - i
+    let a = now.getFullYear()
+    while (m <= 0) { m += 12; a-- }
+    const label = i === 0 ? 'Mês atual' : i === 1 ? 'Mês anterior' : '2 meses atrás'
+    result.push({ mes: m, ano: a, label })
+  }
+  return result
+}
+
 export default function Dashboard() {
   const { stats, loading } = useDashboardStats()
   const { ultimaSincronizacao, sincronizando, sincronizarAgora } = useIxcSync()
@@ -297,6 +313,11 @@ export default function Dashboard() {
   const ixcAtivo = ixcConfigurado()
   const now = new Date()
   const monthLabel = now.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
+
+  const mesesOpcoes = useMemo(() => get3Meses(), [])
+  const [mesSelecionado, setMesSelecionado] = useState(0)
+  const { mes: mesRef, ano: anoRef } = mesesOpcoes[mesSelecionado]
+  const { stats: statusMes, loading: loadingStatusMes } = useStatusContratosMes(mesRef, anoRef)
 
   return (
     <div className="flex flex-col gap-6">
@@ -350,32 +371,64 @@ export default function Dashboard() {
       {!loading && (
         <GlassCard className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-white">Status dos Contratos</h3>
-            <span className="text-xs text-white/35">Mês atual · via IXC</span>
+            <div className="flex items-center gap-2">
+              <Calendar size={14} className="text-cyan-400" />
+              <h3 className="text-sm font-semibold text-white">Status dos Contratos</h3>
+            </div>
+            <div
+              className="flex items-center gap-1 rounded-full p-1"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              {mesesOpcoes.map((opt, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setMesSelecionado(idx)}
+                  className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer"
+                  style={mesSelecionado === idx
+                    ? { background: 'rgba(6,182,212,0.15)', color: '#06b6d4', border: '1px solid rgba(6,182,212,0.3)' }
+                    : { color: 'rgba(255,255,255,0.35)', border: '1px solid transparent' }
+                  }
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
+          <p className="text-xs text-white/30 mb-4">{MESES_NOME[mesRef - 1]} {anoRef} · via IXC</p>
+          {loadingStatusMes ? (
+            <div className="flex justify-center py-8"><Spinner style={{ color: '#06b6d4' }} /></div>
+          ) : (
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
             {/* Ativos */}
             <div className="rounded-xl p-4 relative overflow-hidden" style={{ background: 'rgba(0,214,143,0.06)', border: '1px solid rgba(0,214,143,0.15)' }}>
               <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400/70 mb-1">Realidade</p>
-              <p className="text-2xl font-bold text-white mb-0.5">{formatNumber(stats.countPorStatus.A)}</p>
+              <p className="text-2xl font-bold text-white mb-0.5">{formatNumber(statusMes.ativos)}</p>
               <p className="text-xs font-medium text-emerald-400">Ativos</p>
-              <p className="text-xs text-white/30 mt-0.5">{formatBRL(stats.faturamentoAtivos)}</p>
+              <p className="text-xs text-white/30 mt-0.5">{formatBRL(statusMes.valorAtivos)}</p>
               <div className="absolute -right-3 -bottom-3 w-14 h-14 rounded-full opacity-10 bg-emerald-400" />
             </div>
 
             {/* Aguardando Assinatura */}
             <div className="rounded-xl p-4 relative overflow-hidden" style={{ background: 'rgba(6,182,212,0.06)', border: '1px solid rgba(6,182,212,0.15)' }}>
               <p className="text-[10px] font-bold uppercase tracking-widest text-cyan-400/70 mb-1">Promessa</p>
-              <p className="text-2xl font-bold text-white mb-0.5">{formatNumber(stats.countPorStatus.AA)}</p>
+              <p className="text-2xl font-bold text-white mb-0.5">{formatNumber(statusMes.aguardando)}</p>
               <p className="text-xs font-medium text-cyan-400">Aguardando Assinatura</p>
-              <p className="text-xs text-white/30 mt-0.5">{formatBRL(stats.faturamentoAguardando)}</p>
+              <p className="text-xs text-white/30 mt-0.5">{formatBRL(statusMes.valorAguardando)}</p>
+              {statusMes.parados30d > 0 && (
+                <span
+                  className="inline-flex items-center text-[9px] font-semibold px-1.5 py-0.5 rounded-full mt-1"
+                  style={{ background: 'rgba(249,115,22,0.12)', color: '#f97316', border: '1px solid rgba(249,115,22,0.25)' }}
+                >
+                  {statusMes.parados30d} parados +30d
+                </span>
+              )}
               <div className="absolute -right-3 -bottom-3 w-14 h-14 rounded-full opacity-10 bg-cyan-400" />
             </div>
 
             {/* Cancelados */}
             <div className="rounded-xl p-4 relative overflow-hidden" style={{ background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.15)' }}>
               <p className="text-[10px] font-bold uppercase tracking-widest text-red-400/70 mb-1">Realidade</p>
-              <p className="text-2xl font-bold text-white mb-0.5">{formatNumber(stats.countPorStatus.CN)}</p>
+              <p className="text-2xl font-bold text-white mb-0.5">{formatNumber(statusMes.cancelados)}</p>
               <p className="text-xs font-medium text-red-400">Cancelados</p>
               <div className="absolute -right-3 -bottom-3 w-14 h-14 rounded-full opacity-10 bg-red-400" />
             </div>
@@ -383,12 +436,12 @@ export default function Dashboard() {
             {/* Bloqueados */}
             <div className="rounded-xl p-4 relative overflow-hidden" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
               <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400/70 mb-1">&nbsp;</p>
-              <p className="text-2xl font-bold text-white mb-0.5">{formatNumber(stats.countPorStatus.CM + stats.countPorStatus.FA)}</p>
+              <p className="text-2xl font-bold text-white mb-0.5">{formatNumber(statusMes.bloqueados)}</p>
               <p className="text-xs font-medium text-amber-400">Bloqueados</p>
-              <p className="text-xs text-white/30 mt-0.5">CM: {stats.countPorStatus.CM} · FA: {stats.countPorStatus.FA}</p>
               <div className="absolute -right-3 -bottom-3 w-14 h-14 rounded-full opacity-10 bg-amber-400" />
             </div>
           </div>
+          )}
         </GlassCard>
       )}
 
