@@ -21,8 +21,10 @@ export interface VendaComJoins {
   status_ixc: string | null
   status_atualizado_em: string | null
   dias_em_aa: number | null
+  dias_aguardando: number | null
   mes_referencia: number | null
   ano_referencia: number | null
+  tags: string | null
   vendedor: { id: string; nome: string } | null
   segmento: { id: string; nome: string } | null
   produto: { id: string; nome: string } | null

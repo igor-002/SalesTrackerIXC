@@ -324,6 +324,18 @@ async function processarLoteContratos(
           const mes_referencia = dateObj.getMonth() + 1
           const ano_referencia = dateObj.getFullYear()
 
+          // Calcular dias_aguardando e tag para contratos AA/P
+          let dias_aguardando: number | null = null
+          let tags: string | null = null
+          if ((contrato.status === 'AA' || contrato.status === 'P') && contrato.data_cadastro_sistema) {
+            const dataCadastro = new Date(contrato.data_cadastro_sistema)
+            const hoje = new Date()
+            dias_aguardando = Math.floor((hoje.getTime() - dataCadastro.getTime()) / (1000 * 60 * 60 * 24))
+            if (dias_aguardando > 30) {
+              tags = 'antigo'
+            }
+          }
+
           return {
             cliente_nome: cliente.razao,
             cliente_cpf_cnpj: cliente.cnpj_cpf || null,
@@ -339,6 +351,8 @@ async function processarLoteContratos(
             data_venda: dataRef.slice(0, 10),
             mes_referencia,
             ano_referencia,
+            dias_aguardando,
+            tags,
             created_at: new Date().toISOString(),
           }
         } catch (err) {
@@ -468,6 +482,8 @@ export async function syncContratosFromIXC(
         data_venda: v.data_venda as string,
         mes_referencia: Number(v.mes_referencia ?? new Date().getMonth() + 1),
         ano_referencia: Number(v.ano_referencia ?? new Date().getFullYear()),
+        dias_aguardando: v.dias_aguardando as number | null,
+        tags: v.tags as string | null,
       }))
       const { error: insertError } = await supabase.from('vendas').insert(vendasTyped)
       if (insertError) {

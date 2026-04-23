@@ -422,6 +422,11 @@ export default function Dashboard() {
                     <Badge variant={dias > 15 ? 'danger' : 'warning'}>
                       {dias > 15 ? 'Urgente' : 'Atenção'}
                     </Badge>
+                    {alerta.tags === 'antigo' && (
+                      <Badge variant="warning" className="text-[10px]" style={{ background: 'rgba(249,115,22,0.12)', color: '#f97316', border: '1px solid rgba(249,115,22,0.25)' }}>
+                        Parado +30d
+                      </Badge>
+                    )}
                   </div>
                 </div>
               )

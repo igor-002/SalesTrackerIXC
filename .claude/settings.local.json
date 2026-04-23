@@ -51,7 +51,8 @@
       "Bash(grep -E \"IXC_PROXY|IXC_BASE\" .env)",
       "Bash(git checkout *)",
       "Bash(git reset *)",
-      "Bash(grep -r \"ixc_id\" C:/www/salestrakerOPENITATT/src/hooks/useProdutos.ts C:/www/salestrakerOPENITATT/src/components/produtos/*.tsx)"
+      "Bash(grep -r \"ixc_id\" C:/www/salestrakerOPENITATT/src/hooks/useProdutos.ts C:/www/salestrakerOPENITATT/src/components/produtos/*.tsx)",
+      "mcp__supabase__list_migrations"
     ]
   }
 }

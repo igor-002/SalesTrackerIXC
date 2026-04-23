@@ -340,6 +340,14 @@ export default function Clientes() {
                             {(v.dias_em_aa ?? 0) > 15 ? 'Urgente' : 'Atenção'} · {v.dias_em_aa}d
                           </Badge>
                         )}
+                        {(v as VendaComJoins & { tags?: string | null }).tags === 'antigo' && (
+                          <span
+                            className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                            style={{ background: 'rgba(249,115,22,0.12)', color: '#f97316', border: '1px solid rgba(249,115,22,0.25)' }}
+                          >
+                            Parado +30d
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-5 py-4">
