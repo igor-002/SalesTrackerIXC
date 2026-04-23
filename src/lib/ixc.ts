@@ -702,7 +702,9 @@ export async function ixcBuscarValorPorPlano(idVdContrato: string): Promise<numb
   for (const r of registros) {
     const valorUnit = parseFloat(String(r.valor_unit ?? '0'))
     const qtde = parseInt(String(r.qtde ?? '1'), 10) || 1
-    total += valorUnit * qtde
+    if (valorUnit > 0) {
+      total += valorUnit * qtde
+    }
   }
 
   return total
