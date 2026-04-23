@@ -43,7 +43,7 @@ export interface AlertaAA {
   cliente_nome: string
   dias_em_aa: number | null
   dias_aguardando: number | null
-  tags: string | null
+  tags: string[] | null
   vendedor: { nome: string } | null
   codigo_contrato_ixc: string | null
 }

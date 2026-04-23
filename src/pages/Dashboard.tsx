@@ -475,7 +475,7 @@ export default function Dashboard() {
                     <Badge variant={dias > 15 ? 'danger' : 'warning'}>
                       {dias > 15 ? 'Urgente' : 'Atenção'}
                     </Badge>
-                    {alerta.tags === 'antigo' && (
+                    {alerta.tags?.includes('antigo') && (
                       <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/25">
                         Parado +30d
                       </span>

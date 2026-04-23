@@ -24,7 +24,7 @@ export interface VendaComJoins {
   dias_aguardando: number | null
   mes_referencia: number | null
   ano_referencia: number | null
-  tags: string | null
+  tags: string[] | null
   vendedor: { id: string; nome: string } | null
   segmento: { id: string; nome: string } | null
   produto: { id: string; nome: string } | null

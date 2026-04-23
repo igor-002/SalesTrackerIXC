@@ -54,7 +54,7 @@ export function useStatusContratosMes(mes: number, ano: number) {
         aguardando++
         valorAguardando += valor
         naoAtivados++
-        if (v.tags === 'antigo') parados30d++
+        if (v.tags?.includes('antigo')) parados30d++
       } else if (status === 'CN') {
         cancelados++
       } else if (status === 'CM' || status === 'FA') {

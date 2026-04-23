@@ -540,7 +540,7 @@ export type Database = {
           id: string
           mes_referencia: number | null
           ano_referencia: number | null
-          tags: string | null
+          tags: string[] | null
           mrr: boolean | null
           produto_id: string | null
           produtos: Json | null

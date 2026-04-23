@@ -326,13 +326,13 @@ async function processarLoteContratos(
 
           // Calcular dias_aguardando e tag para contratos AA/P
           let dias_aguardando: number | null = null
-          let tags: string | null = null
+          let tags: string[] = []
           if ((contrato.status === 'AA' || contrato.status === 'P') && contrato.data_cadastro_sistema) {
             const dataCadastro = new Date(contrato.data_cadastro_sistema)
             const hoje = new Date()
             dias_aguardando = Math.floor((hoje.getTime() - dataCadastro.getTime()) / (1000 * 60 * 60 * 24))
             if (dias_aguardando > 30) {
-              tags = 'antigo'
+              tags = ['antigo']
             }
           }
 
@@ -483,7 +483,7 @@ export async function syncContratosFromIXC(
         mes_referencia: Number(v.mes_referencia ?? new Date().getMonth() + 1),
         ano_referencia: Number(v.ano_referencia ?? new Date().getFullYear()),
         dias_aguardando: v.dias_aguardando as number | null,
-        tags: v.tags as string | null,
+        tags: v.tags as string[],
       }))
       const { error: insertError } = await supabase.from('vendas').insert(vendasTyped)
       if (insertError) {
