@@ -37,69 +37,55 @@ export function Sidebar() {
   )
 
   return (
-    <aside
-      className="w-60 flex-shrink-0 flex flex-col h-full"
-      style={{
-        background: 'linear-gradient(180deg, #0f2419 0%, #0c1e14 100%)',
-        borderRight: '1px solid rgba(0,214,143,0.1)',
-      }}
-    >
+    <aside className="w-56 flex-shrink-0 flex flex-col h-full bg-[#0f0f0f] border-r border-[#262626]">
       {/* Logo */}
-      <div className="px-5 py-5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+      <div className="px-4 py-5 border-b border-[#262626]">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg gradient-primary glow-primary flex items-center justify-center flex-shrink-0">
-            <TrendingUp size={15} className="text-white" />
+          <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center flex-shrink-0">
+            <TrendingUp size={16} className="text-[#0f0f0f]" />
           </div>
           <div>
-            <p className="text-sm font-bold text-white leading-tight">SalesTracker</p>
-            <p className="text-xs font-medium" style={{ color: 'rgba(0,214,143,0.7)' }}>CRM</p>
+            <p className="text-sm font-semibold text-white leading-tight">SalesTracker</p>
+            <p className="text-[11px] font-medium text-[#71717a]">CRM</p>
           </div>
         </div>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 px-3 py-4 flex flex-col gap-0.5" aria-label="Navegação principal">
+      <nav className="flex-1 px-2 py-3 flex flex-col gap-0.5" aria-label="Navegação principal">
         {navVisiveis.map(({ to, icon: Icon, label, exact }) => (
           <NavLink
             key={to}
             to={to}
             end={exact}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 cursor-pointer
+              `flex items-center gap-3 px-3 py-2 rounded-md text-[13px] font-medium transition-colors duration-150 cursor-pointer
               ${isActive
-                ? 'text-white'
-                : 'text-white/45 hover:text-white/80 hover:bg-white/5'
+                ? 'bg-[#1f1f1f] text-white border-l-2 border-white -ml-[2px] pl-[14px]'
+                : 'text-[#a1a1aa] hover:text-white hover:bg-[#1a1a1a]'
               }`
             }
-            style={({ isActive }) => isActive ? {
-              background: 'rgba(0,214,143,0.15)',
-              border: '1px solid rgba(0,214,143,0.25)',
-            } : {}}
           >
-            {({ isActive }) => (
-              <>
-                <Icon size={17} style={isActive ? { color: '#00d68f' } : {}} />
-                {label}
-              </>
-            )}
+            <Icon size={16} />
+            {label}
           </NavLink>
         ))}
       </nav>
 
       {/* User */}
-      <div className="px-3 pb-4 pt-3 flex flex-col gap-1" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-        <div className="flex items-center gap-3 px-3 py-2 rounded-xl">
+      <div className="px-2 pb-3 pt-2 border-t border-[#262626]">
+        <div className="flex items-center gap-2.5 px-3 py-2">
           <Avatar name={userName} size="sm" />
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-white truncate">{userName}</p>
-            <p className="text-xs text-white/40">
+            <p className="text-xs font-medium text-white truncate">{userName}</p>
+            <p className="text-[11px] text-[#71717a]">
               {permissoes?.admin ? 'Administrador' : 'Vendedor'}
             </p>
           </div>
         </div>
         <button
           onClick={signOut}
-          className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-white/40 hover:text-red-400 hover:bg-red-500/8 transition-all duration-150 cursor-pointer"
+          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-[13px] text-[#a1a1aa] hover:text-red-400 hover:bg-red-500/10 transition-colors duration-150 cursor-pointer"
         >
           <LogOut size={15} />
           Sair
