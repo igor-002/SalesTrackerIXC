@@ -48,7 +48,7 @@ export function useDiagnosticoIXC() {
         vendedor:vendedores(id, nome, ixc_id)
       `)
       .not('codigo_contrato_ixc', 'is', null)
-      .order('created_at', { ascending: false })
+      .order('data_venda', { ascending: false })
 
     setContratos((data ?? []) as ContratoComVendedor[])
     setLoading(false)

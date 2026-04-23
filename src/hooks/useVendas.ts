@@ -46,7 +46,7 @@ export function useVendas(options?: { vendedorId?: string | null }) {
         produto:produtos(id, nome),
         status:status_venda(id, nome)
       `)
-      .order('created_at', { ascending: false })
+      .order('data_venda', { ascending: false })
       .limit(200)
 
     if (options?.vendedorId) {

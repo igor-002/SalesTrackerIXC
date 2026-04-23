@@ -116,7 +116,7 @@ export function useDashboardStats() {
       supabase
         .from('vendas')
         .select('id, cliente_nome, cliente_uf, valor_total, data_venda, status:status_venda(nome), vendedor:vendedores(nome)')
-        .order('created_at', { ascending: false })
+        .order('data_venda', { ascending: false })
         .limit(5),
       supabase
         .from('vendas')
