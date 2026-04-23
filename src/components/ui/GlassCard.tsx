@@ -7,10 +7,10 @@ interface GlassCardProps {
   onClick?: () => void
 }
 
-export function GlassCard({ children, className = '', onClick }: GlassCardProps) {
+export function GlassCard({ children, className = '', strong = false, onClick }: GlassCardProps) {
   return (
     <div
-      className={`bg-white border border-[#e4e4e7] rounded-lg ${onClick ? 'cursor-pointer hover:bg-[#fafafa] transition-colors duration-150' : ''} ${className}`}
+      className={`${strong ? 'glass-strong' : 'glass'} ${onClick ? 'cursor-pointer hover:bg-white/7 transition-colors duration-200' : ''} ${className}`}
       onClick={onClick}
     >
       {children}

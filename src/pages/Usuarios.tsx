@@ -12,7 +12,7 @@ import { type Permissoes, PERMISSOES_DEFAULT, PERMISSAO_LABELS } from '@/types/p
 // ── Modal ──────────────────────────────────────────────────────────────────
 
 interface ModalProps {
-  usuario: UsuarioRow | null
+  usuario: UsuarioRow | null  // null = criar novo
   onClose: () => void
   onSave: (data: {
     nome: string
@@ -96,16 +96,20 @@ function UsuarioModal({ usuario, onClose, onSave, onUpdate, onUpdateSenha, vende
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="w-full max-w-lg rounded-lg flex flex-col max-h-[90vh] bg-white border border-[#e4e4e7] shadow-xl">
+      <div
+        className="w-full max-w-lg rounded-2xl flex flex-col max-h-[90vh]"
+        style={{ background: '#0f1f14', border: '1px solid rgba(0,214,143,0.2)' }}
+      >
         {/* Header */}
-        <div className="px-6 py-5 flex items-center justify-between flex-shrink-0 border-b border-[#e4e4e7]">
-          <h3 className="text-base font-bold text-[#09090b]">
+        <div className="px-6 py-5 flex items-center justify-between flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          <h3 className="text-base font-bold text-white">
             {isEditing ? 'Editar Usuário' : 'Novo Usuário'}
           </h3>
-          <button onClick={onClose} className="text-[#a1a1aa] hover:text-[#09090b] text-xl cursor-pointer leading-none">×</button>
+          <button onClick={onClose} className="text-white/30 hover:text-white text-xl cursor-pointer leading-none">×</button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
@@ -136,13 +140,18 @@ function UsuarioModal({ usuario, onClose, onSave, onUpdate, onUpdateSenha, vende
 
             {/* Vendedor IXC */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-[#71717a]">
+              <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.5)' }}>
                 Vincular ao Vendedor
               </label>
               <select
                 value={idVendedorIxc}
                 onChange={(e) => setIdVendedorIxc(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-md text-sm text-[#09090b] outline-none cursor-pointer bg-white border border-[#e4e4e7] focus:border-[#09090b] focus:ring-2 focus:ring-[#09090b]/10"
+                className="w-full px-3 py-2.5 rounded-xl text-sm text-white outline-none cursor-pointer"
+                style={{
+                  background: '#0f1f14',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  colorScheme: 'dark',
+                }}
               >
                 <option value="">— Nenhum —</option>
                 {vendedoresAtivos.map((v) => (
@@ -151,31 +160,31 @@ function UsuarioModal({ usuario, onClose, onSave, onUpdate, onUpdateSenha, vende
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-[#a1a1aa]">Restringe Clientes apenas às vendas deste vendedor.</p>
+              <p className="text-xs text-white/30">Restringe Clientes apenas às vendas deste vendedor.</p>
             </div>
 
             {/* Permissões */}
             <div>
-              <p className="text-xs font-medium text-[#71717a] mb-3">
+              <p className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: 'rgba(255,255,255,0.5)' }}>
                 Permissões de acesso
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {(Object.keys(PERMISSAO_LABELS) as (keyof Permissoes)[]).map((key) => (
                   <label
                     key={key}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-colors"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-colors"
                     style={{
-                      background: perms[key] ? '#f0fdf4' : '#f4f4f5',
-                      border: `1px solid ${perms[key] ? '#bbf7d0' : '#e4e4e7'}`,
+                      background: perms[key] ? 'rgba(0,214,143,0.1)' : 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${perms[key] ? 'rgba(0,214,143,0.25)' : 'rgba(255,255,255,0.08)'}`,
                     }}
                   >
                     <input
                       type="checkbox"
                       checked={perms[key]}
                       onChange={() => togglePerm(key)}
-                      className="w-4 h-4 rounded accent-[#15803d] cursor-pointer"
+                      className="w-4 h-4 rounded accent-emerald-500 cursor-pointer"
                     />
-                    <span className="text-sm font-medium" style={{ color: perms[key] ? '#15803d' : '#71717a' }}>
+                    <span className="text-sm font-medium" style={{ color: perms[key] ? '#00d68f' : 'rgba(255,255,255,0.55)' }}>
                       {PERMISSAO_LABELS[key]}
                     </span>
                   </label>
@@ -183,11 +192,11 @@ function UsuarioModal({ usuario, onClose, onSave, onUpdate, onUpdateSenha, vende
               </div>
             </div>
 
-            {error && <p className="text-sm text-[#b91c1c] text-center">{error}</p>}
+            {error && <p className="text-sm text-red-400 text-center">{error}</p>}
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 flex justify-end gap-3 flex-shrink-0 border-t border-[#e4e4e7]">
+          <div className="px-6 py-4 flex justify-end gap-3 flex-shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.07)' }}>
             <Button type="button" variant="secondary" onClick={onClose}>Cancelar</Button>
             <Button type="submit" loading={saving}>Salvar</Button>
           </div>
@@ -240,8 +249,8 @@ export default function Usuarios() {
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-xl font-bold text-[#09090b]">Gerenciar Usuários</h2>
-          <p className="text-sm text-[#71717a] font-medium">Perfis de acesso e permissões</p>
+          <h2 className="text-xl font-bold text-white">Gerenciar Usuários</h2>
+          <p className="text-sm text-white/40 font-medium">Perfis de acesso e permissões</p>
         </div>
         <Button onClick={abrirNovo}>
           <Plus size={15} className="mr-1.5" />
@@ -252,52 +261,52 @@ export default function Usuarios() {
       <GlassCard className="overflow-hidden">
         {loading ? (
           <div className="flex justify-center py-12">
-            <Spinner />
+            <Spinner style={{ color: '#00d68f' }} />
           </div>
         ) : usuarios.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <Shield size={36} className="text-[#a1a1aa]" />
-            <p className="text-sm text-[#71717a]">Nenhum usuário cadastrado.</p>
+            <Shield size={36} className="text-white/15" />
+            <p className="text-sm text-white/30">Nenhum usuário cadastrado.</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#e4e4e7] bg-[#fafafa]">
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                 {['Nome', 'Email', 'Vendedor IXC', 'Admin', 'Status', 'Ações'].map((col) => (
-                  <th key={col} className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[#71717a]">
+                  <th key={col} className="px-5 py-3 text-left text-xs font-bold uppercase tracking-widest text-white/30">
                     {col}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {usuarios.map((u, i) => (
+              {usuarios.map((u) => (
                 <tr
                   key={u.id}
-                  className="transition-colors hover:bg-[#fafafa]"
-                  style={{ borderBottom: i < usuarios.length - 1 ? '1px solid #f4f4f5' : undefined }}
+                  className="transition-colors hover:bg-white/3"
+                  style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}
                 >
-                  <td className="px-5 py-3.5 font-semibold text-[#09090b]">{u.nome}</td>
-                  <td className="px-5 py-3.5 text-[#71717a]">{u.email}</td>
-                  <td className="px-5 py-3.5 text-[#71717a]">
+                  <td className="px-5 py-3.5 font-semibold text-white">{u.nome}</td>
+                  <td className="px-5 py-3.5 text-white/50">{u.email}</td>
+                  <td className="px-5 py-3.5 text-white/40">
                     {u.id_vendedor_ixc
-                      ? <span className="font-mono text-xs px-2 py-0.5 rounded bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]">#{u.id_vendedor_ixc}</span>
-                      : <span className="text-[#a1a1aa]">—</span>
+                      ? <span className="font-mono text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(0,214,143,0.1)', color: '#00d68f' }}>#{u.id_vendedor_ixc}</span>
+                      : <span className="text-white/20">—</span>
                     }
                   </td>
                   <td className="px-5 py-3.5">
                     {u.permissoes?.admin ? (
-                      <ShieldCheck size={16} className="text-[#15803d]" />
+                      <ShieldCheck size={16} className="text-emerald-400" />
                     ) : (
-                      <Shield size={16} className="text-[#a1a1aa]" />
+                      <Shield size={16} className="text-white/20" />
                     )}
                   </td>
                   <td className="px-5 py-3.5">
                     <span
-                      className="text-xs font-bold px-2.5 py-1 rounded-md"
+                      className="text-xs font-bold px-2.5 py-1 rounded-full"
                       style={u.ativo
-                        ? { background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0' }
-                        : { background: '#f4f4f5', color: '#71717a', border: '1px solid #e4e4e7' }
+                        ? { background: 'rgba(0,214,143,0.12)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.2)' }
+                        : { background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.3)', border: '1px solid rgba(255,255,255,0.1)' }
                       }
                     >
                       {u.ativo ? 'Ativo' : 'Inativo'}
@@ -307,17 +316,17 @@ export default function Usuarios() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => abrirEditar(u)}
-                        className="p-1.5 rounded-md text-[#a1a1aa] hover:text-[#09090b] hover:bg-[#f4f4f5] transition-colors cursor-pointer"
+                        className="p-1.5 rounded-lg text-white/30 hover:text-white hover:bg-white/8 transition-colors cursor-pointer"
                         title="Editar permissões"
                       >
                         <Pencil size={14} />
                       </button>
                       <button
                         onClick={() => handleToggleAtivo(u)}
-                        className={`p-1.5 rounded-md transition-colors cursor-pointer ${
+                        className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                           u.ativo
-                            ? 'text-[#a1a1aa] hover:text-[#b91c1c] hover:bg-[#fef2f2]'
-                            : 'text-[#a1a1aa] hover:text-[#15803d] hover:bg-[#f0fdf4]'
+                            ? 'text-white/30 hover:text-red-400 hover:bg-red-500/8'
+                            : 'text-white/30 hover:text-emerald-400 hover:bg-emerald-500/8'
                         }`}
                         title={u.ativo ? 'Desativar usuário' : 'Reativar usuário'}
                       >
@@ -325,7 +334,7 @@ export default function Usuarios() {
                       </button>
                       <button
                         onClick={() => setConfirmandoDelete(u)}
-                        className="p-1.5 rounded-md text-[#a1a1aa] hover:text-[#b91c1c] hover:bg-[#fef2f2] transition-colors cursor-pointer"
+                        className="p-1.5 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-500/8 transition-colors cursor-pointer"
                         title="Excluir usuário"
                       >
                         <Trash2 size={14} />
@@ -340,24 +349,32 @@ export default function Usuarios() {
       </GlassCard>
 
       {confirmandoDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="w-full max-w-sm rounded-lg p-6 flex flex-col gap-5 bg-white border border-[#fecaca] shadow-xl">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl p-6 flex flex-col gap-5"
+            style={{ background: '#0f1f14', border: '1px solid rgba(239,68,68,0.3)' }}
+          >
             <div className="flex flex-col gap-1.5">
-              <p className="text-base font-bold text-[#09090b]">Excluir usuário?</p>
-              <p className="text-sm text-[#71717a]">
-                <span className="text-[#09090b] font-medium">{confirmandoDelete.nome}</span> será removido permanentemente do sistema e não poderá mais fazer login.
+              <p className="text-base font-bold text-white">Excluir usuário?</p>
+              <p className="text-sm text-white/50">
+                <span className="text-white/80 font-medium">{confirmandoDelete.nome}</span> será removido permanentemente do sistema e não poderá mais fazer login.
               </p>
             </div>
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setConfirmandoDelete(null)}
-                className="px-4 py-2 rounded-md text-sm font-medium text-[#71717a] hover:text-[#09090b] transition-colors cursor-pointer bg-[#f4f4f5] border border-[#e4e4e7]"
+                className="px-4 py-2 rounded-xl text-sm font-medium text-white/50 hover:text-white transition-colors cursor-pointer"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
               >
                 Cancelar
               </button>
               <button
                 onClick={() => handleDelete(confirmandoDelete)}
-                className="px-4 py-2 rounded-md text-sm font-bold cursor-pointer transition-opacity hover:opacity-80 bg-[#fef2f2] border border-[#fecaca] text-[#b91c1c]"
+                className="px-4 py-2 rounded-xl text-sm font-bold text-white cursor-pointer transition-opacity hover:opacity-80"
+                style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.4)', color: '#f87171' }}
               >
                 Excluir
               </button>

@@ -66,8 +66,8 @@ export default function Vendedores() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#09090b]">Vendedores</h1>
-          <p className="text-sm text-[#71717a] mt-0.5">
+          <h1 className="text-2xl font-bold text-white">Vendedores</h1>
+          <p className="text-sm text-white/40 mt-0.5">
             Selecione quais vendedores do IXC aparecem no CRM
           </p>
         </div>
@@ -76,7 +76,7 @@ export default function Vendedores() {
             variant="secondary"
             onClick={handleSyncHistorico}
             disabled={syncingHistorico}
-            className="bg-[#eff6ff] border-[#bfdbfe] text-[#1d4ed8] hover:bg-[#dbeafe]"
+            style={{ background: 'rgba(6,182,212,0.15)', borderColor: 'rgba(6,182,212,0.3)', color: '#06b6d4' }}
           >
             <History size={15} className={syncingHistorico ? 'animate-spin' : ''} />
             Sync Histórico
@@ -92,28 +92,29 @@ export default function Vendedores() {
       {syncingHistorico && (
         <GlassCard className="p-4">
           <div className="flex items-center gap-3 mb-2">
-            <Spinner size="sm" />
-            <span className="text-sm text-[#09090b] font-medium">Sincronizando histórico...</span>
+            <Spinner size="sm" style={{ color: '#06b6d4' }} />
+            <span className="text-sm text-white font-medium">Sincronizando histórico...</span>
           </div>
-          <div className="h-1.5 rounded-full overflow-hidden bg-[#e4e4e7]">
+          <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
             <div
-              className="h-full rounded-full transition-all duration-300 bg-[#1d4ed8]"
-              style={{ width: `${progressHistorico.percent}%` }}
+              className="h-full rounded-full transition-all duration-300"
+              style={{ width: `${progressHistorico.percent}%`, background: '#06b6d4' }}
             />
           </div>
-          <p className="text-xs text-[#71717a] mt-2">{progressHistorico.message}</p>
+          <p className="text-xs text-white/40 mt-2">{progressHistorico.message}</p>
         </GlassCard>
       )}
 
       {vendedores.length > 0 && (
         <div className="relative">
-          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#a1a1aa] pointer-events-none" />
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
           <input
             type="text"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar por nome ou ID IXC..."
-            className="w-full pl-9 pr-4 py-2.5 text-sm rounded-lg text-[#09090b] placeholder-[#a1a1aa] outline-none focus:ring-2 focus:ring-[#09090b]/10 bg-white border border-[#e4e4e7]"
+            className="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl text-white placeholder-white/30 outline-none focus:ring-1 focus:ring-emerald-500/50"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
           />
         </div>
       )}
@@ -121,12 +122,12 @@ export default function Vendedores() {
       <GlassCard className="p-0 overflow-hidden">
         {loading && !vendedores.length ? (
           <div className="flex items-center justify-center py-16">
-            <Spinner size="lg" />
+            <Spinner size="lg" style={{ color: '#00d68f' }} />
           </div>
         ) : !vendedores.length ? (
           <div className="flex flex-col items-center justify-center py-16 gap-3">
-            <Users size={40} className="text-[#a1a1aa]" />
-            <p className="text-sm text-[#71717a]">Nenhum vendedor cadastrado</p>
+            <Users size={40} className="text-white/20" />
+            <p className="text-sm text-white/40">Nenhum vendedor cadastrado</p>
             <Button variant="secondary" size="sm" onClick={() => refetch()}>
               Tentar novamente
             </Button>
@@ -134,17 +135,17 @@ export default function Vendedores() {
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="border-b border-[#e4e4e7] bg-[#fafafa]">
-                <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider text-[#71717a]">
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider text-white/40">
                   Vendedor
                 </th>
-                <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider text-[#71717a]">
+                <th className="text-left px-5 py-3 text-xs font-semibold uppercase tracking-wider text-white/40">
                   ID IXC
                 </th>
-                <th className="text-center px-5 py-3 text-xs font-semibold uppercase tracking-wider text-[#71717a]">
+                <th className="text-center px-5 py-3 text-xs font-semibold uppercase tracking-wider text-white/40">
                   Ativo no CRM
                 </th>
-                <th className="text-center px-5 py-3 text-xs font-semibold uppercase tracking-wider text-[#71717a]">
+                <th className="text-center px-5 py-3 text-xs font-semibold uppercase tracking-wider text-white/40">
                   Histórico
                 </th>
               </tr>
@@ -152,35 +153,37 @@ export default function Vendedores() {
             <tbody>
               {vendedoresFiltrados.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-5 py-10 text-center text-sm text-[#71717a]">
+                  <td colSpan={4} className="px-5 py-10 text-center text-sm text-white/30">
                     Nenhum resultado para "{busca}"
                   </td>
                 </tr>
               ) : vendedoresFiltrados.map((v, i) => (
                   <tr
                     key={v.id}
-                    className="hover:bg-[#fafafa] transition-colors"
                     style={{
                       borderBottom:
                         i < vendedoresFiltrados.length - 1
-                          ? '1px solid #f4f4f5'
+                          ? '1px solid rgba(255,255,255,0.04)'
                           : undefined,
                     }}
                   >
-                    <td className="px-5 py-3.5 text-sm text-[#09090b] font-medium">
+                    <td className="px-5 py-3.5 text-sm text-white font-medium">
                       <span className="flex items-center gap-2">
                         {v.nome}
                         {v.incluir_historico && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe]">
+                          <span
+                            className="text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                            style={{ background: 'rgba(6,182,212,0.15)', color: '#06b6d4', border: '1px solid rgba(6,182,212,0.3)' }}
+                          >
                             HIST
                           </span>
                         )}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-sm text-[#71717a] font-mono">{v.ixc_id ?? '—'}</td>
+                    <td className="px-5 py-3.5 text-sm text-white/40 font-mono">{v.ixc_id ?? '—'}</td>
                     <td className="px-5 py-3.5 text-center">
                       {syncing === v.id ? (
-                        <Spinner size="sm" />
+                        <Spinner size="sm" style={{ color: '#00d68f' }} />
                       ) : (
                         <label className="relative inline-flex items-center cursor-pointer justify-center">
                           <input
@@ -191,20 +194,20 @@ export default function Vendedores() {
                           />
                           <div
                             className="w-10 h-5 rounded-full transition-all duration-200
-                              bg-[#e4e4e7] peer-checked:bg-[#15803d]
+                              bg-white/10 peer-checked:bg-emerald-500
                               after:content-[''] after:absolute after:top-0.5 after:left-0.5
                               after:bg-white after:rounded-full after:h-4 after:w-4
                               after:transition-all after:duration-200
-                              peer-checked:after:translate-x-5 after:shadow-sm"
+                              peer-checked:after:translate-x-5"
                           />
                         </label>
                       )}
                     </td>
                     <td className="px-5 py-3.5 text-center">
                       {!v.ativo ? (
-                        <span className="text-xs text-[#a1a1aa]">—</span>
+                        <span className="text-xs text-white/20">—</span>
                       ) : togglingHistorico === v.id ? (
-                        <Spinner size="sm" />
+                        <Spinner size="sm" style={{ color: '#06b6d4' }} />
                       ) : (
                         <label className="relative inline-flex items-center cursor-pointer justify-center">
                           <input
@@ -215,11 +218,11 @@ export default function Vendedores() {
                           />
                           <div
                             className="w-10 h-5 rounded-full transition-all duration-200
-                              bg-[#e4e4e7] peer-checked:bg-[#1d4ed8]
+                              bg-white/10 peer-checked:bg-cyan-500
                               after:content-[''] after:absolute after:top-0.5 after:left-0.5
                               after:bg-white after:rounded-full after:h-4 after:w-4
                               after:transition-all after:duration-200
-                              peer-checked:after:translate-x-5 after:shadow-sm"
+                              peer-checked:after:translate-x-5"
                           />
                         </label>
                       )}
@@ -233,7 +236,7 @@ export default function Vendedores() {
       </GlassCard>
 
       {vendedores.length > 0 && (
-        <p className="text-xs text-[#a1a1aa] text-center">
+        <p className="text-xs text-white/25 text-center">
           {vendedores.filter((v) => v.ativo).length} de {vendedores.length} vendedores ativos no CRM
         </p>
       )}

@@ -53,6 +53,7 @@ export default function Clientes() {
 
   const mesesRefOpcoes = useMemo(() => get3MesesRef(), [])
 
+  // anos disponíveis a partir das vendas
   const anos = useMemo(() => {
     const set = new Set(vendas.map((v) => v.data_venda.slice(0, 4)))
     return Array.from(set).sort().reverse()
@@ -138,10 +139,10 @@ export default function Clientes() {
   }
 
   const selectStyle = {
-    background: '#ffffff',
-    border: '1px solid #e4e4e7',
-    color: '#71717a',
-    borderRadius: '0.5rem',
+    background: '#0f2419',
+    border: '1px solid rgba(255,255,255,0.08)',
+    color: 'rgba(255,255,255,0.7)',
+    borderRadius: '0.75rem',
     padding: '0.4rem 0.75rem',
     fontSize: '0.75rem',
     outline: 'none',
@@ -153,12 +154,12 @@ export default function Clientes() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-[#09090b]">Clientes</h1>
-          <p className="text-sm text-[#71717a] mt-0.5">
+          <h1 className="text-xl font-bold text-white">Clientes</h1>
+          <p className="text-sm text-white/40 mt-0.5">
             {filtradas.length} registro{filtradas.length !== 1 ? 's' : ''}
             {temFiltroAtivo && ` filtrado${filtradas.length !== 1 ? 's' : ''}`}
             {' · '}MRR{' '}
-            <span className="font-semibold text-[#15803d]">{formatBRL(totalMrr)}</span>
+            <span className="font-semibold" style={{ color: '#00d68f' }}>{formatBRL(totalMrr)}</span>
           </p>
         </div>
 
@@ -167,7 +168,8 @@ export default function Clientes() {
             <button
               onClick={handleSyncIxc}
               disabled={syncing || loading}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe] hover:bg-[#dbeafe]"
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: 'rgba(6,182,212,0.1)', color: '#06b6d4', border: '1px solid rgba(6,182,212,0.2)' }}
               title="Sincronizar status com IXC"
             >
               {syncing ? <Spinner size="sm" /> : <Zap size={12} />}
@@ -177,7 +179,8 @@ export default function Clientes() {
           {temFiltroAtivo && (
             <button
               onClick={limparFiltros}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md transition-all cursor-pointer bg-[#fef2f2] text-[#b91c1c] border border-[#fecaca] hover:bg-[#fee2e2]"
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+              style={{ background: 'rgba(239,68,68,0.1)', color: '#f87171', border: '1px solid rgba(239,68,68,0.2)' }}
             >
               <X size={12} />
               Limpar filtros
@@ -187,34 +190,37 @@ export default function Clientes() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white border border-[#e4e4e7] rounded-lg p-4 flex flex-wrap gap-3 items-center">
+      <div className="glass rounded-2xl p-4 flex flex-wrap gap-3 items-center">
         {/* Busca */}
-        <div className="flex items-center gap-2 flex-1 min-w-48 rounded-md px-3 py-2 bg-[#f4f4f5] border border-[#e4e4e7]">
-          <Search size={14} className="text-[#a1a1aa] flex-shrink-0" />
+        <div className="flex items-center gap-2 flex-1 min-w-48 rounded-xl px-3 py-2" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <Search size={14} className="text-white/30 flex-shrink-0" />
           <input
             type="text"
             placeholder="Buscar cliente..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            className="bg-transparent text-xs text-[#09090b] placeholder-[#a1a1aa] outline-none w-full"
+            className="bg-transparent text-xs text-white placeholder-white/30 outline-none w-full"
           />
           {busca && (
-            <button onClick={() => setBusca('')} className="text-[#a1a1aa] hover:text-[#71717a] cursor-pointer">
+            <button onClick={() => setBusca('')} className="text-white/30 hover:text-white/60 cursor-pointer">
               <X size={12} />
             </button>
           )}
         </div>
 
         {/* Tipo MRR */}
-        <div className="flex items-center gap-1 rounded-md p-1 bg-[#f4f4f5] border border-[#e4e4e7]">
+        <div
+          className="flex items-center gap-1 rounded-full p-1"
+          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+        >
           {(['todos', 'mrr', 'unico'] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFiltroTipo(f)}
-              className="px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200 cursor-pointer"
+              className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer"
               style={filtroTipo === f
-                ? { background: '#ffffff', color: '#15803d', border: '1px solid #bbf7d0', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }
-                : { color: '#71717a', border: '1px solid transparent' }
+                ? { background: 'rgba(0,214,143,0.15)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.3)' }
+                : { color: 'rgba(255,255,255,0.35)', border: '1px solid transparent' }
               }
             >
               {f === 'todos' ? 'Todos' : f === 'mrr' ? 'MRR' : 'Únicos'}
@@ -224,44 +230,47 @@ export default function Clientes() {
 
         {/* Vendedor */}
         <select value={filtroVendedor} onChange={(e) => setFiltroVendedor(e.target.value)} style={selectStyle}>
-          <option value="">Todos os vendedores</option>
+          <option value="" style={{ background: '#0f2419' }}>Todos os vendedores</option>
           {vendedores.map((v) => (
-            <option key={v.id} value={v.id}>{v.nome}</option>
+            <option key={v.id} value={v.id} style={{ background: '#0f2419' }}>{v.nome}</option>
           ))}
         </select>
 
         {/* Status */}
         <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} style={selectStyle}>
-          <option value="">Todos os status</option>
+          <option value="" style={{ background: '#0f2419' }}>Todos os status</option>
           {statuses.map((s) => (
-            <option key={s.id} value={s.id}>{s.nome}</option>
+            <option key={s.id} value={s.id} style={{ background: '#0f2419' }}>{s.nome}</option>
           ))}
         </select>
 
         {/* Mês */}
         <select value={filtroMes} onChange={(e) => setFiltroMes(e.target.value)} style={selectStyle}>
-          <option value="">Todos os meses</option>
+          <option value="" style={{ background: '#0f2419' }}>Todos os meses</option>
           {MESES.map((nome, i) => (
-            <option key={i} value={String(i + 1).padStart(2, '0')}>{nome}</option>
+            <option key={i} value={String(i + 1).padStart(2, '0')} style={{ background: '#0f2419' }}>{nome}</option>
           ))}
         </select>
 
         {/* Ano */}
         <select value={filtroAno} onChange={(e) => setFiltroAno(e.target.value)} style={selectStyle}>
-          <option value="">Todos os anos</option>
+          <option value="" style={{ background: '#0f2419' }}>Todos os anos</option>
           {anos.map((a) => (
-            <option key={a} value={a}>{a}</option>
+            <option key={a} value={a} style={{ background: '#0f2419' }}>{a}</option>
           ))}
         </select>
 
         {/* Mês de Referência */}
-        <div className="flex items-center gap-1 rounded-md p-1 bg-[#f4f4f5] border border-[#e4e4e7]">
+        <div
+          className="flex items-center gap-1 rounded-full p-1"
+          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+        >
           <button
             onClick={() => setFiltroMesRef(null)}
-            className="px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200 cursor-pointer"
+            className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer"
             style={filtroMesRef === null
-              ? { background: '#ffffff', color: '#1d4ed8', border: '1px solid #bfdbfe', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }
-              : { color: '#71717a', border: '1px solid transparent' }
+              ? { background: 'rgba(6,182,212,0.15)', color: '#06b6d4', border: '1px solid rgba(6,182,212,0.3)' }
+              : { color: 'rgba(255,255,255,0.35)', border: '1px solid transparent' }
             }
           >
             Todos
@@ -270,10 +279,10 @@ export default function Clientes() {
             <button
               key={idx}
               onClick={() => setFiltroMesRef(idx)}
-              className="px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-200 cursor-pointer"
+              className="px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer"
               style={filtroMesRef === idx
-                ? { background: '#ffffff', color: '#1d4ed8', border: '1px solid #bfdbfe', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }
-                : { color: '#71717a', border: '1px solid transparent' }
+                ? { background: 'rgba(6,182,212,0.15)', color: '#06b6d4', border: '1px solid rgba(6,182,212,0.3)' }
+                : { color: 'rgba(255,255,255,0.35)', border: '1px solid transparent' }
               }
             >
               {MESES_CURTO[opt.mes - 1]}/{opt.ano % 100}
@@ -285,13 +294,13 @@ export default function Clientes() {
       {/* Cards resumo */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: 'Registros filtrados', value: String(filtradas.length), color: '#1d4ed8' },
-          { label: 'Faturamento filtrado', value: formatBRL(totalFaturamento), color: '#15803d' },
-          { label: 'MRR total', value: formatBRL(totalMrr), color: '#7c3aed' },
+          { label: 'Registros filtrados', value: String(filtradas.length), color: '#06b6d4' },
+          { label: 'Faturamento filtrado', value: formatBRL(totalFaturamento), color: '#00d68f' },
+          { label: 'MRR total', value: formatBRL(totalMrr), color: '#8b5cf6' },
         ].map(({ label, value, color }) => (
-          <div key={label} className="bg-white border border-[#e4e4e7] rounded-lg px-5 py-4" style={{ borderTop: `2px solid ${color}` }}>
-            <p className="text-xl font-bold text-[#09090b]">{value}</p>
-            <p className="text-xs text-[#71717a] mt-0.5">{label}</p>
+          <div key={label} className="glass rounded-2xl px-5 py-4" style={{ borderTop: `2px solid ${color}` }}>
+            <p className="text-xl font-bold text-white">{value}</p>
+            <p className="text-xs text-white/40 mt-0.5">{label}</p>
           </div>
         ))}
       </div>
@@ -299,37 +308,37 @@ export default function Clientes() {
       {/* Tabela */}
       {loading ? (
         <div className="flex justify-center py-16">
-          <Spinner size="lg" />
+          <Spinner size="lg" style={{ color: '#00d68f' }} />
         </div>
       ) : filtradas.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
-          <div className="w-14 h-14 rounded-lg flex items-center justify-center bg-[#f4f4f5]">
-            <Users size={24} className="text-[#a1a1aa]" />
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
+            <Users size={24} className="text-white/25" />
           </div>
-          <p className="text-[#71717a] font-medium">
+          <p className="text-white/50 font-medium">
             {temFiltroAtivo ? 'Nenhum resultado para os filtros aplicados' : 'Nenhuma venda encontrada'}
           </p>
           {temFiltroAtivo && (
-            <button onClick={limparFiltros} className="text-sm cursor-pointer text-[#1d4ed8] hover:underline">
+            <button onClick={limparFiltros} className="text-sm cursor-pointer" style={{ color: '#00d68f' }}>
               Limpar filtros
             </button>
           )}
         </div>
       ) : (
-        <div className="bg-white border border-[#e4e4e7] rounded-lg overflow-hidden">
+        <div className="glass rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[#e4e4e7] bg-[#fafafa]">
-                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-[#71717a] uppercase tracking-wider">Cliente</th>
-                  <th className="text-left px-4 py-3.5 text-xs font-semibold text-[#71717a] uppercase tracking-wider">IXC</th>
-                  <th className="text-left px-4 py-3.5 text-xs font-semibold text-[#71717a] uppercase tracking-wider">Vendedor</th>
-                  <th className="text-left px-4 py-3.5 text-xs font-semibold text-[#71717a] uppercase tracking-wider">Produto</th>
-                  <th className="text-center px-4 py-3.5 text-xs font-semibold text-[#71717a] uppercase tracking-wider">Tipo</th>
-                  <th className="text-center px-4 py-3.5 text-xs font-semibold text-[#71717a] uppercase tracking-wider">Mês</th>
-                  <th className="text-left px-4 py-3.5 text-xs font-semibold text-[#71717a] uppercase tracking-wider">Data</th>
-                  <th className="text-right px-4 py-3.5 text-xs font-semibold text-[#71717a] uppercase tracking-wider">Total</th>
-                  <th className="text-right px-4 py-3.5 text-xs font-semibold text-[#71717a] uppercase tracking-wider">Status</th>
+                <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <th className="text-left px-5 py-3.5 text-xs font-semibold text-white/35 uppercase tracking-wider">Cliente</th>
+                  <th className="text-left px-4 py-3.5 text-xs font-semibold text-white/35 uppercase tracking-wider">IXC</th>
+                  <th className="text-left px-4 py-3.5 text-xs font-semibold text-white/35 uppercase tracking-wider">Vendedor</th>
+                  <th className="text-left px-4 py-3.5 text-xs font-semibold text-white/35 uppercase tracking-wider">Produto</th>
+                  <th className="text-center px-4 py-3.5 text-xs font-semibold text-white/35 uppercase tracking-wider">Tipo</th>
+                  <th className="text-center px-4 py-3.5 text-xs font-semibold text-white/35 uppercase tracking-wider">Mês</th>
+                  <th className="text-left px-4 py-3.5 text-xs font-semibold text-white/35 uppercase tracking-wider">Data</th>
+                  <th className="text-right px-4 py-3.5 text-xs font-semibold text-white/35 uppercase tracking-wider">Total</th>
+                  <th className="text-right px-4 py-3.5 text-xs font-semibold text-white/35 uppercase tracking-wider">Status</th>
                   <th className="px-5 py-3.5" />
                 </tr>
               </thead>
@@ -337,33 +346,33 @@ export default function Clientes() {
                 {filtradas.map((v, i) => (
                   <tr
                     key={v.id}
-                    className="transition-colors hover:bg-[#fafafa]"
-                    style={{ borderBottom: i < filtradas.length - 1 ? '1px solid #f4f4f5' : 'none' }}
+                    className="transition-colors hover:bg-white/3"
+                    style={{ borderBottom: i < filtradas.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
                   >
                     <td className="px-5 py-4">
-                      <p className="text-[#09090b] font-semibold">{v.cliente_nome}</p>
-                      {v.cliente_uf && <p className="text-xs text-[#a1a1aa] mt-0.5">{v.cliente_uf}</p>}
+                      <p className="text-white font-semibold">{v.cliente_nome}</p>
+                      {v.cliente_uf && <p className="text-xs text-white/35 mt-0.5">{v.cliente_uf}</p>}
                     </td>
                     <td className="px-4 py-4">
                       {v.codigo_contrato_ixc ? (
                         <div className="text-xs">
-                          <p className="text-[#71717a]">Contrato: <span className="font-mono text-[#09090b]">{v.codigo_contrato_ixc}</span></p>
-                          {v.codigo_cliente_ixc && <p className="text-[#a1a1aa] mt-0.5">Cliente: <span className="font-mono">{v.codigo_cliente_ixc}</span></p>}
+                          <p className="text-white/60">Contrato: <span className="font-mono text-white/80">{v.codigo_contrato_ixc}</span></p>
+                          {v.codigo_cliente_ixc && <p className="text-white/35 mt-0.5">Cliente: <span className="font-mono">{v.codigo_cliente_ixc}</span></p>}
                         </div>
                       ) : (
-                        <span className="text-[#a1a1aa] text-xs">—</span>
+                        <span className="text-white/20 text-xs">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-4 text-[#71717a]">{v.vendedor?.nome ?? '—'}</td>
-                    <td className="px-4 py-4 text-[#71717a]">{v.produto?.nome ?? '—'}</td>
+                    <td className="px-4 py-4 text-white/60">{v.vendedor?.nome ?? '—'}</td>
+                    <td className="px-4 py-4 text-white/60">{v.produto?.nome ?? '—'}</td>
                     <td className="px-4 py-4 text-center">
                       {v.mrr ? (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md bg-[#eff6ff] text-[#1d4ed8] border border-[#bfdbfe]">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: 'rgba(6,182,212,0.12)', color: '#06b6d4' }}>
                           <RefreshCw size={11} />
                           MRR
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: 'rgba(0,214,143,0.12)', color: '#00d68f' }}>
                           <ShoppingBag size={11} />
                           Único
                         </span>
@@ -371,15 +380,15 @@ export default function Clientes() {
                     </td>
                     <td className="px-4 py-4 text-center">
                       {v.mes_referencia && v.ano_referencia ? (
-                        <span className="text-xs text-[#71717a]">
+                        <span className="text-xs text-white/50">
                           {MESES_CURTO[v.mes_referencia - 1]}/{v.ano_referencia % 100}
                         </span>
                       ) : (
-                        <span className="text-[#a1a1aa] text-xs">—</span>
+                        <span className="text-white/20 text-xs">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-4 text-[#71717a]">{formatDate(v.data_venda)}</td>
-                    <td className="px-4 py-4 text-right font-bold text-[#09090b]">{formatBRL(v.valor_total)}</td>
+                    <td className="px-4 py-4 text-white/45">{formatDate(v.data_venda)}</td>
+                    <td className="px-4 py-4 text-right font-bold text-white">{formatBRL(v.valor_total)}</td>
                     <td className="px-4 py-4 text-right">
                       <div className="flex flex-col items-end gap-1">
                         {v.status_ixc
@@ -395,7 +404,10 @@ export default function Clientes() {
                           </Badge>
                         )}
                         {(v as VendaComJoins & { tags?: string[] | null }).tags?.includes('antigo') && (
-                          <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-md bg-[#fff7ed] text-[#c2410c] border border-[#fed7aa]">
+                          <span
+                            className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                            style={{ background: 'rgba(249,115,22,0.12)', color: '#f97316', border: '1px solid rgba(249,115,22,0.25)' }}
+                          >
                             Parado +30d
                           </span>
                         )}
@@ -405,7 +417,7 @@ export default function Clientes() {
                       <div className="flex items-center justify-end gap-1">
                         <button
                           onClick={() => setEditando(v)}
-                          className="p-1.5 rounded-md transition-colors cursor-pointer text-[#a1a1aa] hover:text-[#09090b] hover:bg-[#f4f4f5]"
+                          className="p-1.5 rounded-lg transition-colors cursor-pointer text-white/30 hover:text-white hover:bg-white/8"
                           title="Editar"
                         >
                           <Pencil size={14} />
@@ -413,7 +425,7 @@ export default function Clientes() {
                         <button
                           onClick={() => handleExcluir(v.id)}
                           disabled={excluindoId === v.id}
-                          className="p-1.5 rounded-md transition-colors cursor-pointer text-[#a1a1aa] hover:text-[#b91c1c] hover:bg-[#fef2f2] disabled:opacity-40 disabled:cursor-not-allowed"
+                          className="p-1.5 rounded-lg transition-colors cursor-pointer text-white/30 hover:text-red-400 hover:bg-red-500/10 disabled:opacity-40 disabled:cursor-not-allowed"
                           title="Excluir"
                         >
                           {excluindoId === v.id ? <Spinner size="sm" /> : <Trash2 size={14} />}

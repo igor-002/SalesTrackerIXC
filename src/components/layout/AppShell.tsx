@@ -9,7 +9,10 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   return (
-    <div className="min-h-dvh flex bg-[#fafafa] relative">
+    <div className="min-h-dvh flex bg-bg-base relative">
+      {/* Ambient background */}
+      <div className="bg-ambient" aria-hidden="true" />
+
       {/* Sidebar */}
       <Sidebar />
 

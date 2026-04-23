@@ -29,6 +29,7 @@ export default function NovaVenda() {
   const { createVenda } = useVendas()
   const { user } = useAuthStore()
 
+  // Persistir tipoVenda no sessionStorage
   useEffect(() => {
     try {
       const saved = sessionStorage.getItem(STORAGE_KEY)
@@ -76,8 +77,8 @@ export default function NovaVenda() {
           onClick={() => setTipoVenda('recorrente')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all cursor-pointer ${
             tipoVenda === 'recorrente'
-              ? 'bg-[#f0fdf4] text-[#15803d] border border-[#bbf7d0]'
-              : 'bg-white text-[#71717a] hover:bg-[#f4f4f5] border border-[#e4e4e7]'
+              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+              : 'bg-white/5 text-white/60 hover:bg-white/10 border border-transparent'
           }`}
         >
           <RefreshCw size={18} />
@@ -87,8 +88,8 @@ export default function NovaVenda() {
           onClick={() => setTipoVenda('unica')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all cursor-pointer ${
             tipoVenda === 'unica'
-              ? 'bg-[#faf5ff] text-[#7c3aed] border border-[#e9d5ff]'
-              : 'bg-white text-[#71717a] hover:bg-[#f4f4f5] border border-[#e4e4e7]'
+              ? 'bg-violet-500/20 text-violet-400 border border-violet-500/30'
+              : 'bg-white/5 text-white/60 hover:bg-white/10 border border-transparent'
           }`}
         >
           <FolderKanban size={18} />

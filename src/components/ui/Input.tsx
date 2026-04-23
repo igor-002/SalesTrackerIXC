@@ -12,29 +12,52 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     return (
       <div className="flex flex-col gap-1.5">
         {label && (
-          <label htmlFor={inputId} className="text-xs font-medium text-[#71717a]">
+          <label htmlFor={inputId} className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.5)' }}>
             {label}
-            {props.required && <span className="text-red-500 ml-1">*</span>}
+            {props.required && <span className="text-red-400 ml-1 normal-case">*</span>}
           </label>
         )}
         <input
           id={inputId}
           ref={ref}
           className={`
-            w-full px-3 py-2 rounded-md text-sm
-            bg-white text-[#09090b] placeholder:text-[#a1a1aa]
-            border outline-none transition-all duration-150
+            w-full px-3.5 py-2.5 rounded-xl text-sm font-medium
+            text-white placeholder:text-white/25 placeholder:font-normal
+            outline-none transition-all duration-150
             ${error
-              ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-500/20'
-              : 'border-[#e4e4e7] focus:border-[#09090b] focus:ring-2 focus:ring-[#09090b]/10'
+              ? 'border border-red-500/40 focus:border-red-400 focus:ring-2 focus:ring-red-400/15'
+              : 'border focus:ring-2'
             }
-            disabled:bg-[#f4f4f5] disabled:text-[#a1a1aa] disabled:cursor-not-allowed
+            disabled:opacity-40 disabled:cursor-not-allowed
             ${className}
           `}
+          style={error ? {
+            background: 'rgba(239,68,68,0.08)',
+            borderColor: 'rgba(239,68,68,0.4)',
+          } : {
+            background: 'rgba(255,255,255,0.05)',
+            borderColor: 'rgba(255,255,255,0.1)',
+          }}
           {...props}
+          onFocus={(e) => {
+            if (!error) {
+              e.currentTarget.style.borderColor = '#00d68f'
+              e.currentTarget.style.boxShadow = '0 0 0 2px rgba(0,214,143,0.12)'
+              e.currentTarget.style.background = 'rgba(0,214,143,0.04)'
+            }
+            props.onFocus?.(e)
+          }}
+          onBlur={(e) => {
+            if (!error) {
+              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'
+              e.currentTarget.style.boxShadow = 'none'
+              e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
+            }
+            props.onBlur?.(e)
+          }}
         />
-        {hint && !error && <p className="text-xs text-[#a1a1aa]">{hint}</p>}
-        {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
+        {hint && !error && <p className="text-xs text-white/35">{hint}</p>}
+        {error && <p className="text-xs text-red-400 font-medium">{error}</p>}
       </div>
     )
   }
