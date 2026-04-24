@@ -182,6 +182,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
     performanceVendedor,
     totaisTime,
     kpis,
+    aguardandoAntigos,
   } = useRelatoriosRedesign(vendedorEfetivo, periodoCustom)
 
   const { getMetaAtual } = useMetas()
@@ -450,6 +451,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
               radius={[4,4,0,0]}
               fill="#00d68f"
               fillOpacity={1}
+              maxBarSize={60}
               shape={(props: { x?: number; y?: number; width?: number; height?: number; payload?: { tipo?: string } }) => {
                 const { x = 0, y = 0, width = 0, height = 0, payload } = props
                 const isProj = payload?.tipo === 'projecao'
@@ -477,6 +479,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
               name="Aguardando"
               radius={[4,4,0,0]}
               fill="#06b6d4"
+              maxBarSize={60}
               shape={(props: { x?: number; y?: number; width?: number; height?: number; payload?: { tipo?: string } }) => {
                 const { x = 0, y = 0, width = 0, height = 0, payload } = props
                 const isProj = payload?.tipo === 'projecao'
@@ -605,6 +608,44 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
           </div>
         </div>
       </GlassCard>
+
+      {/* SEÇÃO 3b — Contratos Aguardando há Mais Tempo */}
+      {aguardandoAntigos.length > 0 && (
+        <GlassCard className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Clock size={15} className="text-cyan-400" />
+            <h3 className="text-sm font-semibold text-white">Contratos Aguardando há Mais Tempo</h3>
+            <span className="text-xs text-white/30 ml-auto">Top {aguardandoAntigos.length}</span>
+          </div>
+          <div className="flex flex-col gap-2">
+            {aguardandoAntigos.map((c, i) => {
+              const badge =
+                c.dias_aguardando > 30
+                  ? { bg: 'rgba(239,68,68,0.12)', color: '#ef4444', border: 'rgba(239,68,68,0.3)' }
+                  : c.dias_aguardando >= 8
+                    ? { bg: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' }
+                    : { bg: 'rgba(6,182,212,0.08)', color: '#06b6d4', border: 'rgba(6,182,212,0.25)' }
+              return (
+                <div
+                  key={c.id}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                >
+                  <span className="text-xs font-bold text-white/20 w-5 tabular-nums text-right">{i + 1}</span>
+                  <span className="flex-1 text-sm font-medium text-white truncate">{c.cliente_nome}</span>
+                  <span className="text-xs text-white/40 hidden sm:block shrink-0">{c.vendedor_nome}</span>
+                  <span
+                    className="text-xs font-bold px-2 py-0.5 rounded-full shrink-0 tabular-nums"
+                    style={{ background: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}
+                  >
+                    {c.dias_aguardando}d
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </GlassCard>
+      )}
 
       {/* SEÇÃO 4 — Gráficos de Pizza */}
       {distribuicaoVendedor.length > 0 && (

@@ -21,6 +21,14 @@ export interface ContratoRedesign {
   dias_aguardando: number | null
   created_at: string | null
   status_atualizado_em: string | null
+  data_venda: string | null
+}
+
+export interface AguardandoAntigo {
+  id: string
+  cliente_nome: string
+  vendedor_nome: string
+  dias_aguardando: number
 }
 
 export interface EvolucaoMes {
@@ -170,7 +178,7 @@ export function useRelatoriosRedesign(
 
       let q = supabase
         .from('vendas')
-        .select('id, cliente_nome, valor_unitario, valor_total, status_ixc, vendedor_id, mes_referencia, ano_referencia, dias_aguardando, created_at, status_atualizado_em, vendedor:vendedores(id, nome)')
+        .select('id, cliente_nome, valor_unitario, valor_total, status_ixc, vendedor_id, mes_referencia, ano_referencia, dias_aguardando, created_at, status_atualizado_em, data_venda, vendedor:vendedores(id, nome)')
         .or(orParts)
         .order('mes_referencia', { ascending: true })
         .order('ano_referencia', { ascending: true })
@@ -211,6 +219,7 @@ export function useRelatoriosRedesign(
             dias_aguardando: null,
             created_at: null,
             status_atualizado_em: null,
+            data_venda: null,
           }))
         }
       }
@@ -255,10 +264,13 @@ export function useRelatoriosRedesign(
     const taxaPerda = cadastrados > 0 ? (cancelados.length / cadastrados) * 100 : 0
 
     const temposAtivacao = ativos
-      .filter(c => c.status_atualizado_em && c.created_at)
-      .map(c => Math.round(
-        (new Date(c.status_atualizado_em!).getTime() - new Date(c.created_at!).getTime()) / 86400000
-      ))
+      .filter(c => c.status_atualizado_em && (c.created_at || c.data_venda))
+      .map(c => {
+        const inicio = c.created_at ?? c.data_venda!
+        return Math.round(
+          (new Date(c.status_atualizado_em!).getTime() - new Date(inicio).getTime()) / 86400000
+        )
+      })
       .filter(d => d >= 0)
 
     const tempoMedioAtivacao = temposAtivacao.length > 0
@@ -347,9 +359,10 @@ export function useRelatoriosRedesign(
       if (c.status_ixc === 'A') {
         existing.ativos++
         existing.mrrTotal += c.valor_unitario ?? 0
-        if (c.status_atualizado_em && c.created_at) {
+        if (c.status_atualizado_em && (c.created_at || c.data_venda)) {
+          const inicio = c.created_at ?? c.data_venda!
           const dias = Math.round(
-            (new Date(c.status_atualizado_em).getTime() - new Date(c.created_at).getTime()) / 86400000
+            (new Date(c.status_atualizado_em).getTime() - new Date(inicio).getTime()) / 86400000
           )
           if (dias >= 0) existing.temposAtivacao.push(dias)
         }
@@ -465,6 +478,20 @@ export function useRelatoriosRedesign(
     return resultado
   }, [evolucao3Meses, isCustom])
 
+  // ── Aguardando mais antigos (top 10 por dias_aguardando) ─────────────────────
+  const aguardandoAntigos = useMemo((): AguardandoAntigo[] => {
+    return contratos
+      .filter(c => (c.status_ixc === 'AA' || c.status_ixc === 'P') && c.dias_aguardando !== null && c.dias_aguardando > 0)
+      .sort((a, b) => (b.dias_aguardando ?? 0) - (a.dias_aguardando ?? 0))
+      .slice(0, 10)
+      .map(c => ({
+        id: c.id,
+        cliente_nome: c.cliente_nome,
+        vendedor_nome: c.vendedor?.nome ?? 'Sem vendedor',
+        dias_aguardando: c.dias_aguardando!,
+      }))
+  }, [contratos])
+
   // ── KPIs gerais ──────────────────────────────────────────────────────────────
   const kpis = useMemo(() => {
     const ativos = contratos.filter(c => c.status_ixc === 'A')
@@ -512,5 +539,6 @@ export function useRelatoriosRedesign(
     totaisTime,
     kpis,
     mesLabelCompleto,
+    aguardandoAntigos,
   }
 }
