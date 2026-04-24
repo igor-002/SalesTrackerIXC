@@ -4,7 +4,7 @@ import {
   ixcBuscarCliente,
   ixcListarTodosContratos,
   ixcBuscarAreceberPorContrato,
-  ixcBuscarValorPorPlano,
+  ixcBuscarProdutosContrato,
   ixcListarContratosPorVendedor,
   type IxcContratoFull,
 } from '@/lib/ixc'
@@ -245,17 +245,19 @@ async function calcularMRR(contrato: IxcContratoFull): Promise<number> {
     }
   }
 
-  // Step 2: Buscar valor pelo plano (vd_contratos_produtos via id_vd_contrato)
+  // Step 2: Buscar valor pelos produtos (id_contrato + id_vd_contrato)
+  // Produtos podem estar vinculados ao contrato OU ao plano
   // Usado para AA, P, ou fallback de A sem boletos
   try {
-    if (contrato.id_vd_contrato) {
-      const valorPlano = await ixcBuscarValorPorPlano(contrato.id_vd_contrato)
-      if (valorPlano > 0) {
-        return valorPlano
-      }
+    const valorProdutos = await ixcBuscarProdutosContrato(
+      contrato.id,
+      contrato.id_vd_contrato
+    )
+    if (valorProdutos > 0) {
+      return valorProdutos
     }
   } catch {
-    // Erro ao buscar plano, retorna 0
+    // Erro ao buscar produtos, retorna 0
   }
 
   // Step 3: Nada encontrado

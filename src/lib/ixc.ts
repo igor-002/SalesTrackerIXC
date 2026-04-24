@@ -711,6 +711,101 @@ export async function ixcBuscarValorPorPlano(idVdContrato: string): Promise<numb
 }
 
 /**
+ * Busca produtos de um contrato usando DUAS queries:
+ * 1. Por id_contrato (vínculo direto ao contrato)
+ * 2. Por id_vd_contrato (vínculo via plano) — só se não for "0"
+ *
+ * Combina resultados removendo duplicatas por id.
+ * Retorna soma de valor_unit * qtde onde valor_unit > 0.
+ *
+ * Descoberta: produtos no IXC podem ter dois tipos de vínculo:
+ * - Vínculo "Plano": id_vd_contrato = ID do plano, id_contrato = "0"
+ * - Vínculo "Contrato": id_contrato = ID do contrato, id_vd_contrato = "0"
+ */
+export async function ixcBuscarProdutosContrato(
+  idContrato: string,
+  idVdContrato: string | null
+): Promise<number> {
+  const produtosMap = new Map<string, { valorUnit: number; qtde: number }>()
+
+  // Query 1: Buscar por id_contrato
+  if (idContrato && idContrato !== '0' && idContrato.trim() !== '') {
+    try {
+      const resp = await fetch(ixcUrl('vd_contratos_produtos'), {
+        method: 'POST',
+        headers: { ...ixcHeaders(), ixcsoft: 'listar' },
+        body: JSON.stringify({
+          qtype: 'vd_contratos_produtos.id_contrato',
+          query: idContrato,
+          oper: '=',
+          page: '1',
+          rp: '50',
+          sortname: 'id',
+          sortorder: 'asc',
+        }),
+      })
+
+      if (resp.ok) {
+        const data = (await resp.json()) as { registros?: Record<string, unknown>[] | Record<string, unknown> }
+        const registros = normalizeRegistros(data)
+        for (const r of registros) {
+          const id = String(r.id ?? '')
+          const valorUnit = parseFloat(String(r.valor_unit ?? '0'))
+          const qtde = parseInt(String(r.qtde ?? '1'), 10) || 1
+          if (id && valorUnit > 0 && !produtosMap.has(id)) {
+            produtosMap.set(id, { valorUnit, qtde })
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[ixcBuscarProdutosContrato] Erro query id_contrato:', err)
+    }
+  }
+
+  // Query 2: Buscar por id_vd_contrato (só se não for "0")
+  if (idVdContrato && idVdContrato !== '0' && idVdContrato.trim() !== '') {
+    try {
+      const resp = await fetch(ixcUrl('vd_contratos_produtos'), {
+        method: 'POST',
+        headers: { ...ixcHeaders(), ixcsoft: 'listar' },
+        body: JSON.stringify({
+          qtype: 'vd_contratos_produtos.id_vd_contrato',
+          query: idVdContrato,
+          oper: '=',
+          page: '1',
+          rp: '50',
+          sortname: 'id',
+          sortorder: 'asc',
+        }),
+      })
+
+      if (resp.ok) {
+        const data = (await resp.json()) as { registros?: Record<string, unknown>[] | Record<string, unknown> }
+        const registros = normalizeRegistros(data)
+        for (const r of registros) {
+          const id = String(r.id ?? '')
+          const valorUnit = parseFloat(String(r.valor_unit ?? '0'))
+          const qtde = parseInt(String(r.qtde ?? '1'), 10) || 1
+          if (id && valorUnit > 0 && !produtosMap.has(id)) {
+            produtosMap.set(id, { valorUnit, qtde })
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[ixcBuscarProdutosContrato] Erro query id_vd_contrato:', err)
+    }
+  }
+
+  // Somar valor_unit * qtde
+  let total = 0
+  for (const { valorUnit, qtde } of produtosMap.values()) {
+    total += valorUnit * qtde
+  }
+
+  return total
+}
+
+/**
  * Busca produtos de um contrato via id_vd_contrato.
  * Retorna lista detalhada de produtos (descricao, valor, qtde).
  * Usado na página de diagnóstico para exibir detalhes do plano.
