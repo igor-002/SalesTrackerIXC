@@ -771,7 +771,7 @@ export async function migrarVendasParaHistorico(
   // 2. Buscar vendas de meses anteriores (mes_referencia/ano_referencia < mês atual)
   const { data: vendasData, error } = await supabase
     .from('vendas')
-    .select('id, vendedor_id, cliente_nome, codigo_cliente_ixc, codigo_contrato_ixc, valor_unitario, status_ixc, data_venda, mes_referencia, ano_referencia')
+    .select('id, empresa_id, vendedor_id, cliente_nome, codigo_cliente_ixc, codigo_contrato_ixc, valor_unitario, status_ixc, data_venda, mes_referencia, ano_referencia')
     .or(
       `ano_referencia.lt.${anoAtual},and(ano_referencia.eq.${anoAtual},mes_referencia.lt.${mesAtual})`
     )
@@ -818,6 +818,7 @@ export async function migrarVendasParaHistorico(
     }
 
     registros.push({
+      empresa_id: v.empresa_id ?? null,
       vendedor_id: v.vendedor_id,
       ixc_vendedor_id: ixcVendedorId,
       cliente_nome: v.cliente_nome ?? '',
@@ -849,7 +850,7 @@ export async function migrarVendasParaHistorico(
       .insert(batch)
 
     if (insertError) {
-      console.warn('[migrarVendasParaHistorico] Erro ao inserir lote:', insertError)
+      console.error('[migrarVendasParaHistorico] Erro ao inserir lote:', insertError.message, insertError.code)
       erros += batch.length
     } else {
       inseridos += batch.length
