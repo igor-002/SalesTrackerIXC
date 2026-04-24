@@ -144,37 +144,89 @@ function calcFatorTendencia(valores: number[]): number {
 
 // ── Hook principal ───────────────────────────────────────────────────────────
 
-export function useRelatoriosRedesign(vendedorIdFiltro: string | null) {
+export function useRelatoriosRedesign(
+  vendedorIdFiltro: string | null,
+  periodoCustom?: { mes: number; ano: number } | null
+) {
   const meses3 = useMemo(() => getUltimos3Meses(), [])
 
-  const { data: contratos = [], isLoading } = useQuery({
-    queryKey: ['relatorios-redesign', meses3, vendedorIdFiltro],
-    queryFn: async () => {
-      const primeiroMes = meses3[0]
-      const ultimoMes = meses3[meses3.length - 1]
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const mesesEfetivos = useMemo(() => {
+    if (periodoCustom) return [periodoCustom]
+    return meses3
+  }, [periodoCustom?.mes, periodoCustom?.ano, meses3])
 
-      let query = supabase
+  const isCustom = Boolean(periodoCustom)
+
+  // Stable string key to avoid object-reference issues in queryKey
+  const queryKeyPeriodo = mesesEfetivos.map(m => `${m.mes}-${m.ano}`).join(',')
+
+  const { data: resultado = { contratos: [] as ContratoRedesign[], isHistorico: false }, isLoading } = useQuery({
+    queryKey: ['relatorios-redesign', queryKeyPeriodo, vendedorIdFiltro],
+    queryFn: async () => {
+      const orParts = mesesEfetivos
+        .map(m => `and(mes_referencia.eq.${m.mes},ano_referencia.eq.${m.ano})`)
+        .join(',')
+
+      let q = supabase
         .from('vendas')
         .select('id, cliente_nome, valor_unitario, valor_total, status_ixc, vendedor_id, mes_referencia, ano_referencia, dias_aguardando, created_at, status_atualizado_em, vendedor:vendedores(id, nome)')
-        .or(`and(mes_referencia.eq.${primeiroMes.mes},ano_referencia.eq.${primeiroMes.ano}),and(mes_referencia.eq.${meses3[1].mes},ano_referencia.eq.${meses3[1].ano}),and(mes_referencia.eq.${ultimoMes.mes},ano_referencia.eq.${ultimoMes.ano})`)
+        .or(orParts)
         .order('mes_referencia', { ascending: true })
         .order('ano_referencia', { ascending: true })
 
-      if (vendedorIdFiltro) {
-        query = query.eq('vendedor_id', vendedorIdFiltro)
+      if (vendedorIdFiltro) q = q.eq('vendedor_id', vendedorIdFiltro)
+
+      const { data, error } = await q
+      if (error) throw error
+
+      let contratos = (data ?? []) as ContratoRedesign[]
+      let isHistorico = false
+
+      // Fallback para vendas_historico se mês customizado não tiver dados em vendas
+      if (isCustom && contratos.length === 0 && periodoCustom) {
+        const { mes, ano } = periodoCustom
+        let histQ = supabase
+          .from('vendas_historico')
+          .select('id, cliente_nome, valor_unitario, status_ixc, vendedor_id, mes_referencia, ano_referencia, vendedor:vendedores(id, nome)')
+          .eq('mes_referencia', mes)
+          .eq('ano_referencia', ano)
+
+        if (vendedorIdFiltro) histQ = histQ.eq('vendedor_id', vendedorIdFiltro)
+
+        const { data: histData } = await histQ
+
+        if ((histData ?? []).length > 0) {
+          isHistorico = true
+          contratos = (histData ?? []).map(h => ({
+            id: String(h.id),
+            cliente_nome: String(h.cliente_nome),
+            valor_unitario: Number(h.valor_unitario ?? 0),
+            valor_total: Number(h.valor_unitario ?? 0),
+            status_ixc: (h.status_ixc as string | null) ?? 'A',
+            vendedor_id: h.vendedor_id as string | null,
+            vendedor: h.vendedor as { id: string; nome: string } | null,
+            mes_referencia: Number(h.mes_referencia),
+            ano_referencia: Number(h.ano_referencia),
+            dias_aguardando: null,
+            created_at: null,
+            status_atualizado_em: null,
+          }))
+        }
       }
 
-      const { data, error } = await query
-      if (error) throw error
-      return (data ?? []) as ContratoRedesign[]
+      return { contratos, isHistorico }
     },
     staleTime: 30 * 60 * 1000,
     gcTime: 35 * 60 * 1000,
   })
 
-  // ── Evolução 3 meses ─────────────────────────────────────────────────────────
+  const contratos = resultado.contratos
+  const isHistorico = resultado.isHistorico
+
+  // ── Evolução mensal ───────────────────────────────────────────────────────────
   const evolucao3Meses = useMemo((): EvolucaoMes[] => {
-    return meses3.map(({ mes, ano }) => {
+    return mesesEfetivos.map(({ mes, ano }) => {
       const doMes = contratos.filter(c => c.mes_referencia === mes && c.ano_referencia === ano)
       const ativos = doMes.filter(c => c.status_ixc === 'A')
       const aguardando = doMes.filter(c => c.status_ixc === 'AA' || c.status_ixc === 'P')
@@ -190,7 +242,7 @@ export function useRelatoriosRedesign(vendedorIdFiltro: string | null) {
         mrr,
       }
     })
-  }, [contratos, meses3])
+  }, [contratos, mesesEfetivos])
 
   // ── Funil de vendas (período filtrado ou todos) ──────────────────────────────
   const funil = useMemo((): FunilVendas => {
@@ -245,7 +297,7 @@ export function useRelatoriosRedesign(vendedorIdFiltro: string | null) {
 
   // ── MRR Tendência por mês ────────────────────────────────────────────────────
   const mrrTendencia = useMemo((): MrrTendencia[] => {
-    return meses3.map(({ mes, ano }) => {
+    return mesesEfetivos.map(({ mes, ano }) => {
       const doMes = contratos.filter(c => c.mes_referencia === mes && c.ano_referencia === ano && c.status_ixc === 'A')
       const mrrTotal = doMes.reduce((s, c) => s + (c.valor_unitario ?? 0), 0)
 
@@ -264,7 +316,7 @@ export function useRelatoriosRedesign(vendedorIdFiltro: string | null) {
 
       return { mesLabel: mesLabel(mes, ano), mes, ano, mrrTotal, porVendedor }
     })
-  }, [contratos, meses3])
+  }, [contratos, mesesEfetivos])
 
   // ── Performance por vendedor ─────────────────────────────────────────────────
   const performanceVendedor = useMemo((): PerformanceVendedor[] => {
@@ -327,7 +379,17 @@ export function useRelatoriosRedesign(vendedorIdFiltro: string | null) {
   }, [contratos])
 
   // ── Projeção 3 meses com média ponderada e tendência ──────────────────────────
+  // Em modo custom (mês único) não projeta — apenas 1 ponto não gera tendência útil
   const projecao6Meses = useMemo((): ProjecaoMes[] => {
+    if (isCustom) {
+      return evolucao3Meses.map(e => ({
+        mesLabel: e.mesLabel, mes: e.mes, ano: e.ano,
+        tipo: 'real' as const,
+        cadastrados: e.cadastrados, ativos: e.ativos,
+        aguardando: e.aguardando, mrr: e.mrr,
+      }))
+    }
+
     const mesesFuturos = getProximos3Meses()
     const PESOS = [1, 2, 3] // peso 1 para mais antigo, 3 para mais recente
 
@@ -401,7 +463,7 @@ export function useRelatoriosRedesign(vendedorIdFiltro: string | null) {
     }
 
     return resultado
-  }, [evolucao3Meses])
+  }, [evolucao3Meses, isCustom])
 
   // ── KPIs gerais ──────────────────────────────────────────────────────────────
   const kpis = useMemo(() => {
@@ -437,6 +499,9 @@ export function useRelatoriosRedesign(vendedorIdFiltro: string | null) {
   return {
     loading: isLoading,
     meses3,
+    mesesEfetivos,
+    isCustom,
+    isHistorico,
     contratos,
     evolucao3Meses,
     projecao6Meses,

@@ -147,12 +147,34 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
   isGestor: boolean
   vendedores: { id: string; nome: string; ativo: boolean | null; meta_mensal?: number | null }[]
 }) {
+  const now = new Date()
   const [vendedorLocal, setVendedorLocal] = useState<string | null>(null)
   const vendedorEfetivo = isGestor ? vendedorLocal : vendedorIdFiltro
+
+  // Período — modo e valores pendentes (antes do Aplicar) e aplicados
+  const [periodoMode, setPeriodoMode] = useState<'ultimos3' | 'custom'>('ultimos3')
+  const [pendingMes, setPendingMes] = useState(now.getMonth() + 1)
+  const [pendingAno, setPendingAno] = useState(now.getFullYear())
+  const [aplicado, setAplicado] = useState<{ mes: number; ano: number } | null>(null)
+
+  const periodoCustom = periodoMode === 'custom' ? aplicado : null
+
+  const handleAplicar = () => {
+    setAplicado({ mes: pendingMes, ano: pendingAno })
+    setPeriodoMode('custom')
+  }
+
+  const handleUltimos3 = () => {
+    setPeriodoMode('ultimos3')
+    setAplicado(null)
+  }
 
   const {
     loading,
     meses3,
+    mesesEfetivos,
+    isCustom,
+    isHistorico,
     projecao6Meses,
     funil,
     distribuicaoVendedor,
@@ -160,7 +182,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
     performanceVendedor,
     totaisTime,
     kpis,
-  } = useRelatoriosRedesign(vendedorEfetivo)
+  } = useRelatoriosRedesign(vendedorEfetivo, periodoCustom)
 
   const { getMetaAtual } = useMetas()
   const metaAtual = getMetaAtual()
@@ -252,12 +274,84 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
       {/* Filtros */}
       <GlassCard className="p-4">
         <div className="flex flex-wrap items-end gap-4">
-          <div className="flex flex-col gap-1.5">
+          {/* Seletor de Período */}
+          <div className="flex flex-col gap-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-white/40">Período</p>
-            <p className="text-sm text-white/70">
-              {meses3.map(m => MESES_LABELS[m.mes - 1]).join(', ')} / {meses3[0].ano}
-            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Toggle Últimos 3 meses / Específico */}
+              <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
+                <button
+                  onClick={handleUltimos3}
+                  className="px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer"
+                  style={periodoMode === 'ultimos3'
+                    ? { background: 'rgba(0,214,143,0.2)', color: '#00d68f' }
+                    : { background: 'transparent', color: 'rgba(255,255,255,0.4)' }
+                  }
+                >
+                  Últimos 3 meses
+                </button>
+                <button
+                  onClick={() => setPeriodoMode('custom')}
+                  className="px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer"
+                  style={periodoMode === 'custom'
+                    ? { background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }
+                    : { background: 'transparent', color: 'rgba(255,255,255,0.4)' }
+                  }
+                >
+                  Período específico
+                </button>
+              </div>
+
+              {/* Dropdowns + Aplicar — só aparece em modo custom */}
+              {periodoMode === 'custom' && (
+                <div className="flex items-center gap-2">
+                  <select
+                    value={pendingMes}
+                    onChange={e => setPendingMes(Number(e.target.value))}
+                    className="px-2.5 py-1.5 rounded-lg text-xs text-white outline-none cursor-pointer"
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', colorScheme: 'dark' }}
+                  >
+                    {MESES_LABELS.map((l, i) => (
+                      <option key={i + 1} value={i + 1} style={{ background: '#0f2419', color: '#fff' }}>{l}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={pendingAno}
+                    onChange={e => setPendingAno(Number(e.target.value))}
+                    className="px-2.5 py-1.5 rounded-lg text-xs text-white outline-none cursor-pointer"
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', colorScheme: 'dark' }}
+                  >
+                    {[2024, 2025, 2026, 2027].map(a => (
+                      <option key={a} value={a} style={{ background: '#0f2419', color: '#fff' }}>{a}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleAplicar}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all"
+                    style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}
+                  >
+                    Aplicar
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Indicador do período ativo */}
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-white/50">
+                {isCustom && aplicado
+                  ? <>Exibindo: <span className="text-white/80 font-medium">{MESES_LABELS[aplicado.mes - 1]} / {aplicado.ano}</span></>
+                  : <>Exibindo: <span className="text-white/80 font-medium">{mesesEfetivos.map(m => MESES_LABELS[m.mes - 1]).join(', ')} / {meses3[0].ano}</span></>
+                }
+              </p>
+              {isHistorico && (
+                <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
+                  dados do histórico
+                </span>
+              )}
+            </div>
           </div>
+
           {isGestor && (
             <div className="flex flex-col gap-1.5">
               <p className="text-xs font-semibold uppercase tracking-wide text-white/40">Vendedor</p>
@@ -286,12 +380,20 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
         <KpiCard label="Taxa de Conversão" value={formatPercent(kpis.taxaConversao)} icon={<Percent size={18} />} accentHex="#8b5cf6" sub="ativos ÷ total" />
       </div>
 
-      {/* SEÇÃO 2 — Evolução + Projeção 6 Meses */}
+      {/* SEÇÃO 2 — Evolução + Projeção */}
       <GlassCard className="p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-sm font-semibold text-white">Evolução e Projeção</h3>
-            <p className="text-xs text-white/30 mt-0.5">3 meses reais + 3 meses projetados (média ponderada + tendência)</p>
+            <h3 className="text-sm font-semibold text-white">
+              {isCustom && aplicado
+                ? `Evolução — ${MESES_LABELS[aplicado.mes - 1]} / ${aplicado.ano}`
+                : 'Evolução e Projeção'}
+            </h3>
+            <p className="text-xs text-white/30 mt-0.5">
+              {isCustom
+                ? 'Mês selecionado'
+                : '3 meses reais + 3 meses projetados (média ponderada + tendência)'}
+            </p>
           </div>
           <div className="flex items-center gap-4 text-xs">
             <span className="flex items-center gap-1.5">
