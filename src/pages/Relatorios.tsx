@@ -153,7 +153,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
   const {
     loading,
     meses3,
-    evolucao3Meses,
+    projecao6Meses,
     funil,
     distribuicaoVendedor,
     mrrTendencia,
@@ -286,15 +286,14 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
         <KpiCard label="Taxa de Conversão" value={formatPercent(kpis.taxaConversao)} icon={<Percent size={18} />} accentHex="#8b5cf6" sub="ativos ÷ total" />
       </div>
 
-      {/* SEÇÃO 2 — Evolução Mensal (barras agrupadas) */}
+      {/* SEÇÃO 2 — Evolução + Projeção 6 Meses */}
       <GlassCard className="p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-white">Evolução dos Últimos 3 Meses</h3>
+          <div>
+            <h3 className="text-sm font-semibold text-white">Evolução e Projeção</h3>
+            <p className="text-xs text-white/30 mt-0.5">3 meses reais + 3 meses projetados (média ponderada + tendência)</p>
+          </div>
           <div className="flex items-center gap-4 text-xs">
-            <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded" style={{ background: '#6b7280' }} />
-              <span className="text-white/50">Cadastrados</span>
-            </span>
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded" style={{ background: '#00d68f' }} />
               <span className="text-white/50">Ativos</span>
@@ -303,24 +302,159 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
               <span className="w-3 h-3 rounded" style={{ background: '#06b6d4' }} />
               <span className="text-white/50">Aguardando</span>
             </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded opacity-50" style={{ background: '#00d68f', border: '1px dashed #00d68f' }} />
+              <span className="text-white/50">Projeção</span>
+            </span>
           </div>
         </div>
 
-        <ResponsiveContainer width="100%" height={280}>
-          <ComposedChart data={evolucao3Meses} barGap={4}>
+        <ResponsiveContainer width="100%" height={300}>
+          <ComposedChart data={projecao6Meses} barGap={4}>
+            <defs>
+              <pattern id="projPattern" patternUnits="userSpaceOnUse" width="6" height="6">
+                <path d="M0,6 L6,0" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
+              </pattern>
+            </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-            <XAxis dataKey="mesLabel" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} axisLine={false} tickLine={false} />
-            <YAxis yAxisId="left" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} axisLine={false} tickLine={false} width={35} allowDecimals={false} />
-            <YAxis yAxisId="right" orientation="right" tick={{ fill: 'rgba(0,214,143,0.6)', fontSize: 10 }} axisLine={false} tickLine={false} width={60} tickFormatter={v => formatBRL(v)} />
+            <XAxis
+              dataKey="mesLabel"
+              tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              yAxisId="left"
+              tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+              width={35}
+              allowDecimals={false}
+            />
+            <YAxis
+              yAxisId="right"
+              orientation="right"
+              tick={{ fill: 'rgba(0,214,143,0.6)', fontSize: 10 }}
+              axisLine={false}
+              tickLine={false}
+              width={70}
+              tickFormatter={v => formatBRL(v)}
+            />
             <Tooltip content={<DarkTooltip />} />
-            <Bar yAxisId="left" dataKey="cadastrados" name="Cadastrados" fill="#6b7280" radius={[4,4,0,0]} />
-            <Bar yAxisId="left" dataKey="ativos" name="Ativos" fill="#00d68f" radius={[4,4,0,0]} />
-            <Bar yAxisId="left" dataKey="aguardando" name="Aguardando" fill="#06b6d4" radius={[4,4,0,0]} />
-            <Line yAxisId="right" type="monotone" dataKey="mrr" name="MRR" stroke="#00d68f" strokeWidth={2} dot={{ fill: '#00d68f', r: 4 }} />
+            <Bar
+              yAxisId="left"
+              dataKey="ativos"
+              name="Ativos"
+              radius={[4,4,0,0]}
+              fill="#00d68f"
+              fillOpacity={1}
+              shape={(props: { x?: number; y?: number; width?: number; height?: number; payload?: { tipo?: string } }) => {
+                const { x = 0, y = 0, width = 0, height = 0, payload } = props
+                const isProj = payload?.tipo === 'projecao'
+                return (
+                  <g>
+                    <rect
+                      x={x}
+                      y={y}
+                      width={width}
+                      height={height}
+                      fill={isProj ? 'rgba(0,214,143,0.35)' : '#00d68f'}
+                      rx={4}
+                      ry={4}
+                      stroke={isProj ? '#00d68f' : 'none'}
+                      strokeWidth={isProj ? 1 : 0}
+                      strokeDasharray={isProj ? '4 2' : 'none'}
+                    />
+                  </g>
+                )
+              }}
+            />
+            <Bar
+              yAxisId="left"
+              dataKey="aguardando"
+              name="Aguardando"
+              radius={[4,4,0,0]}
+              fill="#06b6d4"
+              shape={(props: { x?: number; y?: number; width?: number; height?: number; payload?: { tipo?: string } }) => {
+                const { x = 0, y = 0, width = 0, height = 0, payload } = props
+                const isProj = payload?.tipo === 'projecao'
+                return (
+                  <g>
+                    <rect
+                      x={x}
+                      y={y}
+                      width={width}
+                      height={height}
+                      fill={isProj ? 'rgba(6,182,212,0.35)' : '#06b6d4'}
+                      rx={4}
+                      ry={4}
+                      stroke={isProj ? '#06b6d4' : 'none'}
+                      strokeWidth={isProj ? 1 : 0}
+                      strokeDasharray={isProj ? '4 2' : 'none'}
+                    />
+                  </g>
+                )
+              }}
+            />
+            <Line
+              yAxisId="right"
+              type="monotone"
+              dataKey="mrr"
+              name="MRR"
+              stroke="#00d68f"
+              strokeWidth={2}
+              dot={(props: { cx?: number; cy?: number; payload?: { tipo?: string } }) => {
+                const { cx = 0, cy = 0, payload } = props
+                const isProj = payload?.tipo === 'projecao'
+                return (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={isProj ? 5 : 4}
+                    fill={isProj ? 'transparent' : '#00d68f'}
+                    stroke="#00d68f"
+                    strokeWidth={isProj ? 2 : 0}
+                    strokeDasharray={isProj ? '2 1' : undefined}
+                  />
+                )
+              }}
+            />
           </ComposedChart>
         </ResponsiveContainer>
-        <p className="text-xs text-white/30 text-center mt-2">Linha verde: MRR mensal (escala à direita)</p>
+        <p className="text-xs text-white/30 text-center mt-2">Barras tracejadas = projeção · Linha verde = MRR (escala à direita)</p>
       </GlassCard>
+
+      {/* Cards de Projeção */}
+      {projecao6Meses.filter(p => p.tipo === 'projecao').length > 0 && (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          {projecao6Meses.filter(p => p.tipo === 'projecao').map(proj => (
+            <GlassCard key={`${proj.mes}-${proj.ano}`} className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-white/40">Projeção {proj.mesLabel}</span>
+                <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}>
+                  ±15%
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-white/40 mb-1">Ativos esperados</p>
+                  <p className="text-xl font-bold text-white">{proj.ativos}</p>
+                  <p className="text-xs text-white/30 mt-0.5">
+                    {proj.ativosMin}–{proj.ativosMax}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-white/40 mb-1">MRR esperado</p>
+                  <p className="text-xl font-bold" style={{ color: '#00d68f' }}>{formatBRL(proj.mrr)}</p>
+                  <p className="text-xs text-white/30 mt-0.5">
+                    {formatBRL(proj.mrrMin ?? 0)}–{formatBRL(proj.mrrMax ?? 0)}
+                  </p>
+                </div>
+              </div>
+            </GlassCard>
+          ))}
+        </div>
+      )}
 
       {/* SEÇÃO 3 — Funil de Vendas */}
       <GlassCard className="p-5">

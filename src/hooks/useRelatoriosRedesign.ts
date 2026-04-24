@@ -58,6 +58,21 @@ export interface MrrTendencia {
   porVendedor: { vendedor_id: string; nome: string; mrr: number }[]
 }
 
+export interface ProjecaoMes {
+  mesLabel: string
+  mes: number
+  ano: number
+  tipo: 'real' | 'projecao'
+  cadastrados: number
+  ativos: number
+  aguardando: number
+  mrr: number
+  mrrMin?: number
+  mrrMax?: number
+  ativosMin?: number
+  ativosMax?: number
+}
+
 export interface PerformanceVendedor {
   vendedor_id: string
   nome: string
@@ -94,6 +109,37 @@ function getUltimos3Meses(): { mes: number; ano: number }[] {
     result.push({ mes: m, ano: a })
   }
   return result
+}
+
+function getProximos3Meses(): { mes: number; ano: number }[] {
+  const now = new Date()
+  const result: { mes: number; ano: number }[] = []
+  for (let i = 1; i <= 3; i++) {
+    let m = now.getMonth() + 1 + i
+    let a = now.getFullYear()
+    while (m > 12) { m -= 12; a++ }
+    result.push({ mes: m, ano: a })
+  }
+  return result
+}
+
+function calcMediaPonderada(valores: number[], pesos: number[]): number {
+  if (valores.length === 0) return 0
+  let soma = 0
+  let somaPesos = 0
+  for (let i = 0; i < valores.length; i++) {
+    soma += valores[i] * (pesos[i] ?? 1)
+    somaPesos += pesos[i] ?? 1
+  }
+  return somaPesos > 0 ? soma / somaPesos : 0
+}
+
+function calcFatorTendencia(valores: number[]): number {
+  if (valores.length < 2) return 0
+  const primeiro = valores[0]
+  const ultimo = valores[valores.length - 1]
+  if (primeiro === 0) return ultimo > 0 ? 0.5 : 0
+  return (ultimo - primeiro) / primeiro
 }
 
 // ── Hook principal ───────────────────────────────────────────────────────────
@@ -280,6 +326,83 @@ export function useRelatoriosRedesign(vendedorIdFiltro: string | null) {
       .sort((a, b) => b.ativos - a.ativos)
   }, [contratos])
 
+  // ── Projeção 3 meses com média ponderada e tendência ──────────────────────────
+  const projecao6Meses = useMemo((): ProjecaoMes[] => {
+    const mesesFuturos = getProximos3Meses()
+    const PESOS = [1, 2, 3] // peso 1 para mais antigo, 3 para mais recente
+
+    // Extrair valores dos 3 meses reais
+    const cadastradosArr = evolucao3Meses.map(e => e.cadastrados)
+    const ativosArr = evolucao3Meses.map(e => e.ativos)
+    const aguardandoArr = evolucao3Meses.map(e => e.aguardando)
+    const mrrArr = evolucao3Meses.map(e => e.mrr)
+
+    // Médias ponderadas
+    const mediaCadastrados = calcMediaPonderada(cadastradosArr, PESOS)
+    const mediaAtivos = calcMediaPonderada(ativosArr, PESOS)
+    const mediaAguardando = calcMediaPonderada(aguardandoArr, PESOS)
+    const mediaMrr = calcMediaPonderada(mrrArr, PESOS)
+
+    // Fatores de tendência
+    const tendenciaAtivos = calcFatorTendencia(ativosArr)
+    const tendenciaMrr = calcFatorTendencia(mrrArr)
+
+    // Aplicação da tendência: 50% se crescimento, 70% se queda
+    const aplicacaoAtivos = tendenciaAtivos >= 0 ? 0.5 : 0.7
+    const aplicacaoMrr = tendenciaMrr >= 0 ? 0.5 : 0.7
+
+    // Decaimento da tendência ao longo dos meses projetados
+    const decaimento = [0.5, 0.3, 0.15]
+
+    // Meses reais
+    const resultado: ProjecaoMes[] = evolucao3Meses.map(e => ({
+      mesLabel: e.mesLabel,
+      mes: e.mes,
+      ano: e.ano,
+      tipo: 'real' as const,
+      cadastrados: e.cadastrados,
+      ativos: e.ativos,
+      aguardando: e.aguardando,
+      mrr: e.mrr,
+    }))
+
+    // Meses projetados
+    for (let i = 0; i < mesesFuturos.length; i++) {
+      const { mes, ano } = mesesFuturos[i]
+      const d = decaimento[i]
+
+      // Projeção com tendência decrescente
+      const fatorAtivos = 1 + (tendenciaAtivos * aplicacaoAtivos * d)
+      const fatorMrr = 1 + (tendenciaMrr * aplicacaoMrr * d)
+
+      const ativosProj = Math.round(mediaAtivos * fatorAtivos)
+      const mrrProj = mediaMrr * fatorMrr
+
+      // Intervalo de confiança ±15%
+      const ativosMin = Math.round(ativosProj * 0.85)
+      const ativosMax = Math.round(ativosProj * 1.15)
+      const mrrMin = mrrProj * 0.85
+      const mrrMax = mrrProj * 1.15
+
+      resultado.push({
+        mesLabel: mesLabel(mes, ano),
+        mes,
+        ano,
+        tipo: 'projecao',
+        cadastrados: Math.round(mediaCadastrados),
+        ativos: ativosProj,
+        aguardando: Math.round(mediaAguardando),
+        mrr: mrrProj,
+        ativosMin,
+        ativosMax,
+        mrrMin,
+        mrrMax,
+      })
+    }
+
+    return resultado
+  }, [evolucao3Meses])
+
   // ── KPIs gerais ──────────────────────────────────────────────────────────────
   const kpis = useMemo(() => {
     const ativos = contratos.filter(c => c.status_ixc === 'A')
@@ -316,6 +439,7 @@ export function useRelatoriosRedesign(vendedorIdFiltro: string | null) {
     meses3,
     contratos,
     evolucao3Meses,
+    projecao6Meses,
     funil,
     distribuicaoVendedor,
     mrrTendencia,
