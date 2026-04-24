@@ -75,6 +75,7 @@ export interface VendaRelatorio {
   mrr: boolean | null
   dias_em_aa: number | null
   data_venda: string
+  created_at: string | null
   status_atualizado_em: string | null
   codigo_contrato_ixc: string | null
 }
@@ -115,7 +116,7 @@ export function useRelatorios(inicio: string, fim: string, vendedorId: string | 
     let query = supabase
       .from('vendas')
       .select(
-        'id, cliente_nome, valor_total, status_ixc, mrr, dias_em_aa, data_venda, status_atualizado_em, codigo_contrato_ixc, vendedor:vendedores(id, nome)',
+        'id, cliente_nome, valor_total, status_ixc, mrr, dias_em_aa, data_venda, created_at, status_atualizado_em, codigo_contrato_ixc, vendedor:vendedores(id, nome)',
       )
       .gte('data_venda', inicio)
       .lte('data_venda', fim)
@@ -138,11 +139,11 @@ export function useRelatorios(inicio: string, fim: string, vendedorId: string | 
       : 0
     const ticketMedio = ativos.length > 0 ? faturamentoReal / ativos.length : 0
 
-    // Tempo médio de ativação: para contratos Ativos, dias de data_venda → status_atualizado_em
+    // Tempo médio de ativação: created_at (cadastro) → status_atualizado_em (ativação)
     const activationDays = ativos
-      .filter(v => v.status_atualizado_em)
+      .filter(v => v.status_atualizado_em && v.created_at)
       .map(v =>
-        Math.max(0, Math.floor((new Date(v.status_atualizado_em!).getTime() - new Date(v.data_venda).getTime()) / 86_400_000)),
+        Math.max(0, Math.floor((new Date(v.status_atualizado_em!).getTime() - new Date(v.created_at!).getTime()) / 86_400_000)),
       )
     const tempoMedioAtivacao = activationDays.length > 0
       ? activationDays.reduce((s, d) => s + d, 0) / activationDays.length
@@ -172,8 +173,8 @@ export function useRelatorios(inicio: string, fim: string, vendedorId: string | 
       const taxa = vA.length + vAA.length > 0 ? (vA.length / (vA.length + vAA.length)) * 100 : 0
       const ticket = vA.length > 0 ? fat / vA.length : 0
       const actDays = vA
-        .filter(v => v.status_atualizado_em)
-        .map(v => Math.max(0, Math.floor((new Date(v.status_atualizado_em!).getTime() - new Date(v.data_venda).getTime()) / 86_400_000)))
+        .filter(v => v.status_atualizado_em && v.created_at)
+        .map(v => Math.max(0, Math.floor((new Date(v.status_atualizado_em!).getTime() - new Date(v.created_at!).getTime()) / 86_400_000)))
       const tempo = actDays.length > 0 ? actDays.reduce((s, d) => s + d, 0) / actDays.length : 0
       return {
         id, nome,

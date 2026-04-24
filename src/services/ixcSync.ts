@@ -506,13 +506,13 @@ export async function syncContratosFromIXC(
 
     onProgress?.(`Sync concluído — ${vendasValidas.length} contratos importados`, 100)
 
-    // Sync de histórico de vendedores — não-fatal
+    // Migrar vendas de meses anteriores para vendas_historico — não-fatal
     try {
-      onProgress?.('Sincronizando histórico de vendedores...', 96)
-      await syncHistoricoVendedores()
+      onProgress?.('Migrando histórico de meses anteriores...', 96)
+      await migrarVendasParaHistorico()
       onProgress?.('Histórico atualizado', 98)
     } catch (err) {
-      console.warn('[syncContratosFromIXC] Erro no sync de histórico:', err)
+      console.warn('[syncContratosFromIXC] Erro na migração de histórico:', err)
     }
 
     return {
@@ -729,4 +729,133 @@ export async function syncHistoricoVendedores(
     }
     throw err
   }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MIGRAÇÃO DE VENDAS → HISTORICO (Fase 7 — correção)
+// ══════════════════════════════════════════════════════════════════════════════
+
+export interface MigracaoHistoricoResult {
+  inseridos: number
+  ignorados: number
+  erros: number
+}
+
+/**
+ * Popula vendas_historico com os dados de meses anteriores que já estão em vendas.
+ * Mais confiável que syncHistoricoVendedores() porque:
+ * - Lê dados já validados da tabela vendas (não bate no IXC API)
+ * - Inclui contratos AA (sem data_ativacao no IXC)
+ * - Deduplicação por vendedor+mes+ano: deleta e re-insere
+ */
+export async function migrarVendasParaHistorico(
+  onProgress?: SyncProgressCallback
+): Promise<MigracaoHistoricoResult> {
+  const now = new Date()
+  const mesAtual = now.getMonth() + 1
+  const anoAtual = now.getFullYear()
+
+  onProgress?.('Buscando vendas de meses anteriores...', 0)
+
+  // 1. Mapeamento vendedor_id (UUID) → ixc_id (texto) — obrigatório para vendas_historico
+  const { data: vendedoresData } = await supabase
+    .from('vendedores')
+    .select('id, ixc_id')
+    .not('ixc_id', 'is', null)
+
+  const ixcIdMap = new Map<string, string>()
+  for (const v of (vendedoresData ?? [])) {
+    if (v.ixc_id) ixcIdMap.set(v.id, v.ixc_id)
+  }
+
+  // 2. Buscar vendas de meses anteriores (mes_referencia/ano_referencia < mês atual)
+  const { data: vendasData, error } = await supabase
+    .from('vendas')
+    .select('id, vendedor_id, cliente_nome, codigo_cliente_ixc, codigo_contrato_ixc, valor_unitario, status_ixc, data_venda, mes_referencia, ano_referencia')
+    .or(
+      `ano_referencia.lt.${anoAtual},and(ano_referencia.eq.${anoAtual},mes_referencia.lt.${mesAtual})`
+    )
+
+  if (error) throw new Error(`Erro ao buscar vendas: ${error.message}`)
+
+  const vendas = vendasData ?? []
+  onProgress?.(`${vendas.length} registros de meses anteriores encontrados`, 20)
+
+  if (vendas.length === 0) return { inseridos: 0, ignorados: 0, erros: 0 }
+
+  // 3. Coletar combinações únicas vendedor+mês+ano para limpar antes de reinserir
+  const combinations = new Set<string>()
+  for (const v of vendas) {
+    if (v.vendedor_id && v.mes_referencia !== null && v.ano_referencia !== null) {
+      combinations.add(`${v.vendedor_id}__${v.mes_referencia}__${v.ano_referencia}`)
+    }
+  }
+
+  onProgress?.(`Removendo ${combinations.size} combinações existentes do histórico...`, 30)
+  for (const combo of combinations) {
+    const [vendedorId, mes, ano] = combo.split('__')
+    await supabase
+      .from('vendas_historico')
+      .delete()
+      .eq('vendedor_id', vendedorId)
+      .eq('mes_referencia', Number(mes))
+      .eq('ano_referencia', Number(ano))
+  }
+
+  // 4. Montar registros — ignorar os sem ixc_id (vendedor não mapeado)
+  const registros: VendasHistoricoInsert[] = []
+  let ignorados = 0
+
+  for (const v of vendas) {
+    if (!v.vendedor_id || v.mes_referencia === null || v.ano_referencia === null) {
+      ignorados++
+      continue
+    }
+    const ixcVendedorId = ixcIdMap.get(v.vendedor_id)
+    if (!ixcVendedorId) {
+      ignorados++
+      continue
+    }
+
+    registros.push({
+      vendedor_id: v.vendedor_id,
+      ixc_vendedor_id: ixcVendedorId,
+      cliente_nome: v.cliente_nome ?? '',
+      codigo_cliente_ixc: v.codigo_cliente_ixc ?? null,
+      codigo_contrato_ixc: v.codigo_contrato_ixc ?? null,
+      valor_unitario: v.valor_unitario ?? 0,
+      quantidade: 1,
+      mrr: true,
+      status_ixc: v.status_ixc ?? null,
+      // data_ativacao só para contratos ativos — data_venda = data de ativação no IXC
+      data_ativacao: v.status_ixc === 'A' ? (v.data_venda?.slice(0, 10) ?? null) : null,
+      mes_referencia: v.mes_referencia,
+      ano_referencia: v.ano_referencia,
+    })
+  }
+
+  // 5. Inserir em lotes de 500
+  const BATCH = 500
+  let inseridos = 0
+  let erros = 0
+
+  for (let i = 0; i < registros.length; i += BATCH) {
+    const batch = registros.slice(i, i + BATCH)
+    const pct = Math.round(50 + ((i + batch.length) / registros.length) * 45)
+    onProgress?.(`Inserindo ${i + batch.length}/${registros.length}...`, pct)
+
+    const { error: insertError } = await supabase
+      .from('vendas_historico')
+      .insert(batch)
+
+    if (insertError) {
+      console.warn('[migrarVendasParaHistorico] Erro ao inserir lote:', insertError)
+      erros += batch.length
+    } else {
+      inseridos += batch.length
+    }
+  }
+
+  onProgress?.(`Migração concluída — ${inseridos} inseridos, ${ignorados} ignorados`, 100)
+  return { inseridos, ignorados, erros }
 }
