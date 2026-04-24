@@ -491,8 +491,17 @@ export async function syncContratosFromIXC(
       }
     }
 
-    // 8. Atualizar log
-    onProgress?.('Finalizando...', 95)
+    // 8. Migrar meses anteriores para vendas_historico — antes de fechar o log
+    try {
+      onProgress?.('Migrando histórico de meses anteriores...', 92)
+      const migResult = await migrarVendasParaHistorico()
+      onProgress?.(`Histórico: ${migResult.inseridos} registros migrados`, 96)
+    } catch (err) {
+      console.warn('[syncContratosFromIXC] Erro na migração de histórico:', err)
+    }
+
+    // 9. Atualizar log
+    onProgress?.('Finalizando...', 98)
     if (logId) {
       await atualizarLogSync(logId, {
         status: 'sucesso',
@@ -505,15 +514,6 @@ export async function syncContratosFromIXC(
     }
 
     onProgress?.(`Sync concluído — ${vendasValidas.length} contratos importados`, 100)
-
-    // Migrar vendas de meses anteriores para vendas_historico — não-fatal
-    try {
-      onProgress?.('Migrando histórico de meses anteriores...', 96)
-      await migrarVendasParaHistorico()
-      onProgress?.('Histórico atualizado', 98)
-    } catch (err) {
-      console.warn('[syncContratosFromIXC] Erro na migração de histórico:', err)
-    }
 
     return {
       importados: vendasValidas.length,
