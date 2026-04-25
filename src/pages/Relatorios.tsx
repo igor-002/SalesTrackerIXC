@@ -30,6 +30,7 @@ import {
 } from '@/hooks/useRelatoriosIxc'
 import { formatBRL, formatPercent } from '@/lib/formatters'
 import { useVendasUnicas } from '@/hooks/useVendasUnicas'
+import { useComissoesVendedor } from '@/hooks/useComissoesVendedor'
 
 // ── Constantes ───────────────────────────────────────────────────────────────
 
@@ -43,7 +44,7 @@ const CORES_VENDEDORES = [
   '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16',
 ]
 
-type Aba = 'visao_geral' | 'ranking' | 'por_vendedor' | 'projetos'
+type Aba = 'visao_geral' | 'ranking' | 'por_vendedor' | 'projetos' | 'comissoes'
 
 // ── KPI Card ──────────────────────────────────────────────────────────────────
 
@@ -1479,6 +1480,182 @@ function TabProjetos() {
   )
 }
 
+// ── Aba 5: Comissões ──────────────────────────────────────────────────────────
+
+function TabComissoes({ vendedorIdFiltro, isGestor, vendedores }: {
+  vendedorIdFiltro: string | null
+  isGestor: boolean
+  vendedores: { id: string; nome: string; ativo: boolean | null }[]
+}) {
+  const now = new Date()
+  const [mes, setMes] = useState(now.getMonth() + 1)
+  const [ano, setAno] = useState(now.getFullYear())
+  const [vendedorLocal, setVendedorLocal] = useState<string | null>(null)
+
+  const vendedorEfetivo = isGestor ? vendedorLocal : vendedorIdFiltro
+
+  const { loading, liberadas, aguardando, totalLiberado, totalPendente } =
+    useComissoesVendedor(vendedorEfetivo, mes, ano)
+
+  const qtdComComissao = liberadas.filter(c => (c.comissao_valor ?? 0) > 0).length
+    + aguardando.filter(c => (c.comissao_valor ?? 0) > 0).length
+
+  function TabelaComissoes({ contratos, cor, titulo }: {
+    contratos: ReturnType<typeof useComissoesVendedor>['liberadas']
+    cor: string
+    titulo: string
+  }) {
+    const total = contratos.reduce((s, c) => s + (c.comissao_valor ?? 0), 0)
+    if (contratos.length === 0) return null
+    return (
+      <GlassCard className="overflow-hidden">
+        <div className="px-5 py-3.5 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: cor }} />
+          <h3 className="text-sm font-semibold text-white">{titulo}</h3>
+          <span
+            className="text-xs font-bold px-2 py-0.5 rounded-full ml-1"
+            style={{ background: `${cor}18`, color: cor, border: `1px solid ${cor}30` }}
+          >
+            {contratos.length}
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                {['Cliente', 'Produto', 'Valor Plano', '% Comissão', 'Comissão', 'Status'].map(h => (
+                  <th key={h} className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-widest text-white/30 whitespace-nowrap">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {contratos.map(c => {
+                const statusLabel = c.status_ixc === 'A' ? 'Ativo'
+                  : c.status_ixc === 'AA' ? 'Aguardando'
+                  : c.status_ixc === 'P' ? 'Proposta'
+                  : c.status_ixc ?? '—'
+                const statusColor = c.status_ixc === 'A' ? '#00d68f'
+                  : c.status_ixc === 'AA' || c.status_ixc === 'P' ? '#f59e0b'
+                  : '#6b7280'
+                const semComissao = !c.comissao_pct || c.comissao_pct === 0
+                return (
+                  <tr key={c.id} className="hover:bg-white/3 transition-colors" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <td className="px-4 py-3 font-medium text-white">{c.cliente_nome}</td>
+                    <td className="px-4 py-3 text-white/60 text-xs">{c.produto?.nome ?? '—'}</td>
+                    <td className="px-4 py-3 tabular-nums text-white/70">{formatBRL(c.valor_unitario)}</td>
+                    <td className="px-4 py-3 tabular-nums text-white/60">
+                      {semComissao ? <span className="text-white/20">—</span> : `${c.comissao_pct}%`}
+                    </td>
+                    <td className="px-4 py-3 tabular-nums font-semibold" style={{ color: semComissao ? 'rgba(255,255,255,0.2)' : cor }}>
+                      {semComissao ? '—' : formatBRL(c.comissao_valor ?? 0)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: `${statusColor}18`, color: statusColor, border: `1px solid ${statusColor}30` }}
+                      >
+                        {statusLabel}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: '2px solid rgba(255,255,255,0.08)', background: `${cor}06` }}>
+                <td className="px-4 py-2.5 text-xs font-bold text-white/50 uppercase tracking-wide" colSpan={4}>Total</td>
+                <td className="px-4 py-2.5 tabular-nums font-bold" style={{ color: cor }}>{formatBRL(total)}</td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </GlassCard>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Filtros */}
+      <GlassCard className="p-4">
+        <div className="flex flex-wrap items-end gap-4">
+          <div className="flex flex-col gap-1.5">
+            <p className="text-xs font-semibold uppercase tracking-wide text-white/40">Período</p>
+            <MesAnoSelect mes={mes} ano={ano} onChangeMes={setMes} onChangeAno={setAno} />
+          </div>
+          {isGestor && (
+            <div className="flex flex-col gap-1.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-white/40">Vendedor</p>
+              <select
+                value={vendedorLocal ?? ''}
+                onChange={e => setVendedorLocal(e.target.value || null)}
+                className="px-3 py-1.5 rounded-lg text-xs text-white outline-none cursor-pointer"
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', colorScheme: 'dark' }}
+              >
+                <option value="" style={{ background: '#0f2419', color: '#fff' }}>Todos</option>
+                {vendedores.filter(v => v.ativo).map(v => (
+                  <option key={v.id} value={v.id} style={{ background: '#0f2419', color: '#fff' }}>{v.nome}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      </GlassCard>
+
+      {loading ? (
+        <div className="flex justify-center py-12"><Spinner style={{ color: '#00d68f' }} /></div>
+      ) : (
+        <>
+          {/* KPI Cards */}
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+            <KpiCard
+              label="Comissão Liberada"
+              value={formatBRL(totalLiberado)}
+              icon={<DollarSign size={18} />}
+              accentHex="#00d68f"
+              sub={`${liberadas.length} contratos ativos`}
+            />
+            <KpiCard
+              label="Aguardando Ativação"
+              value={formatBRL(totalPendente)}
+              icon={<Clock size={18} />}
+              accentHex="#f59e0b"
+              sub={`${aguardando.length} contratos AA/P`}
+            />
+            <KpiCard
+              label="Contratos com Comissão"
+              value={String(qtdComComissao)}
+              icon={<Check size={18} />}
+              accentHex="#06b6d4"
+              sub="com % configurado"
+            />
+            <KpiCard
+              label="Comissão Potencial"
+              value={formatBRL(totalLiberado + totalPendente)}
+              icon={<TrendingUp size={18} />}
+              accentHex="#8b5cf6"
+              sub="liberada + pendente"
+            />
+          </div>
+
+          {/* Tabelas */}
+          <TabelaComissoes contratos={liberadas} cor="#00d68f" titulo="Comissões Liberadas" />
+          <TabelaComissoes contratos={aguardando} cor="#f59e0b" titulo="Aguardando Ativação" />
+
+          {liberadas.length === 0 && aguardando.length === 0 && (
+            <GlassCard className="p-10 text-center">
+              <DollarSign size={32} className="mx-auto mb-3 text-white/20" />
+              <p className="text-sm text-white/40">Nenhum contrato encontrado para {MESES_LABELS[mes - 1]} / {ano}.</p>
+            </GlassCard>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 // ── Componente principal ───────────────────────────────────────────────────────
 
 export default function Relatorios() {
@@ -1494,6 +1671,7 @@ export default function Relatorios() {
     { key: 'ranking',       label: 'Ranking de Vendedores', icon: <Users size={15} />,      somenteGestor: true },
     { key: 'por_vendedor',  label: 'Por Vendedor',          icon: <User size={15} /> },
     { key: 'projetos',      label: 'Projetos & Serviços',   icon: <FolderKanban size={15} /> },
+    { key: 'comissoes',     label: 'Comissões',             icon: <DollarSign size={15} /> },
   ]
 
   const abasVisiveis = abas.filter(a => !a.somenteGestor || isGestor)
@@ -1543,6 +1721,13 @@ export default function Relatorios() {
       )}
       {aba === 'projetos' && (
         <TabProjetos />
+      )}
+      {aba === 'comissoes' && (
+        <TabComissoes
+          vendedorIdFiltro={vendedorDbId}
+          isGestor={isGestor}
+          vendedores={vendedores}
+        />
       )}
     </div>
   )
