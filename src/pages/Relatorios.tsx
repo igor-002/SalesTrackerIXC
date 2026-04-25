@@ -140,6 +140,14 @@ function EvolucaoTooltip({ active, payload, label }: {
               MRR potencial: {formatBRL(mrrPendente)}
             </p>
           )}
+          {mrrPendente > 0 && (
+            <p
+              className="font-semibold mt-1.5 pt-1.5"
+              style={{ color: 'rgba(255,255,255,0.75)', borderTop: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              MRR possível: {formatBRL(mrr.value + mrrPendente)}
+            </p>
+          )}
         </div>
       )}
     </div>
