@@ -10,7 +10,7 @@ import {
 } from 'recharts'
 import {
   FileText, Users, User, TrendingUp, DollarSign, Percent,
-  Target, ChevronDown, Check, Edit2, X, Clock, FolderKanban,
+  Target, ChevronDown, ChevronUp, Check, Edit2, X, Clock, FolderKanban,
   CheckCircle2, AlertCircle, Award,
 } from 'lucide-react'
 import { GlassCard } from '@/components/ui/GlassCard'
@@ -106,6 +106,37 @@ function MrrTooltip({ active, payload, label }: {
   )
 }
 
+function EvolucaoTooltip({ active, payload, label }: {
+  active?: boolean
+  payload?: { name: string; value: number; color: string; dataKey?: string }[]
+  label?: string
+}) {
+  if (!active || !payload?.length) return null
+  const ativos = payload.find(p => p.dataKey === 'ativos')
+  const aguardando = payload.find(p => p.dataKey === 'aguardando')
+  const mrr = payload.find(p => p.dataKey === 'mrr')
+  return (
+    <div className="rounded-xl px-3.5 py-3 text-xs shadow-xl" style={{ background: '#0f2419', border: '1px solid rgba(0,214,143,0.2)', minWidth: 200 }}>
+      {label && <p className="text-white/50 mb-2 font-semibold">{label}</p>}
+      {ativos !== undefined && (
+        <p className="font-semibold mb-1" style={{ color: '#00d68f' }}>
+          {ativos.value} contratos ativados neste mês
+        </p>
+      )}
+      {aguardando !== undefined && (
+        <p className="font-semibold mb-1" style={{ color: '#f59e0b' }}>
+          {aguardando.value} contratos aguardando assinatura
+        </p>
+      )}
+      {mrr !== undefined && (
+        <p className="font-semibold mt-1.5 pt-1.5" style={{ color: '#00d68f', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          MRR: {formatBRL(mrr.value)}
+        </p>
+      )}
+    </div>
+  )
+}
+
 // ── Seletor Mês/Ano ───────────────────────────────────────────────────────────
 
 function MesAnoSelect({ mes, ano, onChangeMes, onChangeAno }: {
@@ -192,6 +223,8 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
 
   const [sortCol, setSortCol] = useState<string>('ativos')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [aguardandoExpanded, setAguardandoExpanded] = useState(false)
+  const [aguardandoVerTodos, setAguardandoVerTodos] = useState(false)
 
   const performanceSorted = useMemo(() => {
     const arr = [...performanceVendedor]
@@ -396,14 +429,14 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                 : '3 meses reais + 3 meses projetados (média ponderada + tendência)'}
             </p>
           </div>
-          <div className="flex items-center gap-4 text-xs">
+          <div className="flex items-center gap-4 text-xs flex-wrap">
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded" style={{ background: '#00d68f' }} />
               <span className="text-white/50">Ativos</span>
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded" style={{ background: '#06b6d4' }} />
-              <span className="text-white/50">Aguardando</span>
+              <span className="w-3 h-3 rounded" style={{ background: '#f59e0b' }} />
+              <span className="text-white/50">Aguardando Ativação</span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded opacity-50" style={{ background: '#00d68f', border: '1px dashed #00d68f' }} />
@@ -443,7 +476,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
               width={70}
               tickFormatter={v => formatBRL(v)}
             />
-            <Tooltip content={<DarkTooltip />} />
+            <Tooltip content={<EvolucaoTooltip />} />
             <Bar
               yAxisId="left"
               dataKey="ativos"
@@ -452,9 +485,10 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
               fill="#00d68f"
               fillOpacity={1}
               maxBarSize={60}
-              shape={(props: { x?: number; y?: number; width?: number; height?: number; payload?: { tipo?: string } }) => {
+              shape={(props: { x?: number; y?: number; width?: number; height?: number; value?: number | [number, number]; payload?: { tipo?: string; ativos?: number } }) => {
                 const { x = 0, y = 0, width = 0, height = 0, payload } = props
                 const isProj = payload?.tipo === 'projecao'
+                const displayVal = payload?.ativos
                 return (
                   <g>
                     <rect
@@ -469,6 +503,9 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                       strokeWidth={isProj ? 1 : 0}
                       strokeDasharray={isProj ? '4 2' : 'none'}
                     />
+                    {!isProj && height > 0 && displayVal !== undefined && displayVal > 0 && (
+                      <text x={x + width / 2} y={y - 4} textAnchor="middle" fill="rgba(255,255,255,0.75)" fontSize={11} fontWeight="bold">{displayVal}</text>
+                    )}
                   </g>
                 )
               }}
@@ -476,13 +513,14 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
             <Bar
               yAxisId="left"
               dataKey="aguardando"
-              name="Aguardando"
+              name="Aguardando Ativação"
               radius={[4,4,0,0]}
-              fill="#06b6d4"
+              fill="#f59e0b"
               maxBarSize={60}
-              shape={(props: { x?: number; y?: number; width?: number; height?: number; payload?: { tipo?: string } }) => {
+              shape={(props: { x?: number; y?: number; width?: number; height?: number; value?: number | [number, number]; payload?: { tipo?: string; aguardando?: number } }) => {
                 const { x = 0, y = 0, width = 0, height = 0, payload } = props
                 const isProj = payload?.tipo === 'projecao'
+                const displayVal = payload?.aguardando
                 return (
                   <g>
                     <rect
@@ -490,13 +528,16 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                       y={y}
                       width={width}
                       height={height}
-                      fill={isProj ? 'rgba(6,182,212,0.35)' : '#06b6d4'}
+                      fill={isProj ? 'rgba(245,158,11,0.35)' : '#f59e0b'}
                       rx={4}
                       ry={4}
-                      stroke={isProj ? '#06b6d4' : 'none'}
+                      stroke={isProj ? '#f59e0b' : 'none'}
                       strokeWidth={isProj ? 1 : 0}
                       strokeDasharray={isProj ? '4 2' : 'none'}
                     />
+                    {!isProj && height > 0 && displayVal !== undefined && displayVal > 0 && (
+                      <text x={x + width / 2} y={y - 4} textAnchor="middle" fill="rgba(255,255,255,0.75)" fontSize={11} fontWeight="bold">{displayVal}</text>
+                    )}
                   </g>
                 )
               }}
@@ -609,41 +650,78 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
         </div>
       </GlassCard>
 
-      {/* SEÇÃO 3b — Contratos Aguardando há Mais Tempo */}
+      {/* SEÇÃO 3b — Contratos Aguardando há Mais Tempo (expansível) */}
       {aguardandoAntigos.length > 0 && (
-        <GlassCard className="p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock size={15} className="text-cyan-400" />
+        <GlassCard className="overflow-hidden">
+          {/* Header clicável */}
+          <button
+            onClick={() => { setAguardandoExpanded(v => !v); setAguardandoVerTodos(false) }}
+            className="w-full flex items-center gap-3 px-5 py-4 cursor-pointer transition-colors hover:bg-white/2"
+          >
+            <Clock size={15} className="text-amber-400 shrink-0" />
             <h3 className="text-sm font-semibold text-white">Contratos Aguardando há Mais Tempo</h3>
-            <span className="text-xs text-white/30 ml-auto">Top {aguardandoAntigos.length}</span>
-          </div>
-          <div className="flex flex-col gap-2">
-            {aguardandoAntigos.map((c, i) => {
-              const badge =
-                c.dias_aguardando > 30
-                  ? { bg: 'rgba(239,68,68,0.12)', color: '#ef4444', border: 'rgba(239,68,68,0.3)' }
-                  : c.dias_aguardando >= 8
-                    ? { bg: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' }
-                    : { bg: 'rgba(6,182,212,0.08)', color: '#06b6d4', border: 'rgba(6,182,212,0.25)' }
-              return (
-                <div
-                  key={c.id}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
-                >
-                  <span className="text-xs font-bold text-white/20 w-5 tabular-nums text-right">{i + 1}</span>
-                  <span className="flex-1 text-sm font-medium text-white truncate">{c.cliente_nome}</span>
-                  <span className="text-xs text-white/40 hidden sm:block shrink-0">{c.vendedor_nome}</span>
-                  <span
-                    className="text-xs font-bold px-2 py-0.5 rounded-full shrink-0 tabular-nums"
-                    style={{ background: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}
+            <span
+              className="text-xs font-bold px-2 py-0.5 rounded-full ml-1"
+              style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
+            >
+              {aguardandoAntigos.length}
+            </span>
+            <span className="ml-auto text-white/30 shrink-0">
+              {aguardandoExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            </span>
+          </button>
+
+          {/* Conteúdo expansível */}
+          {aguardandoExpanded && (
+            <div className="px-5 pb-5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 pt-4">
+                {(aguardandoVerTodos ? aguardandoAntigos : aguardandoAntigos.slice(0, 12)).map(c => {
+                  const badge =
+                    c.dias_aguardando > 30
+                      ? { bg: 'rgba(239,68,68,0.12)', color: '#ef4444', border: 'rgba(239,68,68,0.3)' }
+                      : c.dias_aguardando >= 8
+                        ? { bg: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: 'rgba(245,158,11,0.3)' }
+                        : { bg: 'rgba(6,182,212,0.08)', color: '#06b6d4', border: 'rgba(6,182,212,0.25)' }
+                  const dataCadastro = c.data_cadastro
+                    ? new Date(c.data_cadastro).toLocaleDateString('pt-BR')
+                    : null
+                  return (
+                    <div
+                      key={c.id}
+                      className="flex flex-col gap-2 p-3.5 rounded-xl"
+                      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="text-sm font-semibold text-white leading-snug">{c.cliente_nome}</span>
+                        <span
+                          className="text-xs font-bold px-2 py-0.5 rounded-full shrink-0 tabular-nums"
+                          style={{ background: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}
+                        >
+                          {c.dias_aguardando}d
+                        </span>
+                      </div>
+                      <span className="text-xs text-white/50">{c.vendedor_nome}</span>
+                      {dataCadastro && (
+                        <span className="text-xs text-white/30">Cadastrado em {dataCadastro}</span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {aguardandoAntigos.length > 12 && !aguardandoVerTodos && (
+                <div className="flex justify-center mt-4">
+                  <button
+                    onClick={() => setAguardandoVerTodos(true)}
+                    className="px-4 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all"
+                    style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}
                   >
-                    {c.dias_aguardando}d
-                  </span>
+                    Ver todos ({aguardandoAntigos.length})
+                  </button>
                 </div>
-              )
-            })}
-          </div>
+              )}
+            </div>
+          )}
         </GlassCard>
       )}
 

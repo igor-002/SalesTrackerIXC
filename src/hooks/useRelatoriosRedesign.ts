@@ -29,6 +29,7 @@ export interface AguardandoAntigo {
   cliente_nome: string
   vendedor_nome: string
   dias_aguardando: number
+  data_cadastro: string | null
 }
 
 export interface EvolucaoMes {
@@ -264,18 +265,18 @@ export function useRelatoriosRedesign(
     const taxaPerda = cadastrados > 0 ? (cancelados.length / cadastrados) * 100 : 0
 
     const temposAtivacao = ativos
-      .filter(c => c.status_atualizado_em && (c.created_at || c.data_venda))
-      .map(c => {
-        const inicio = c.created_at ?? c.data_venda!
-        return Math.round(
-          (new Date(c.status_atualizado_em!).getTime() - new Date(inicio).getTime()) / 86400000
-        )
-      })
+      .filter(c => c.status_atualizado_em !== null && c.created_at !== null)
+      .map(c => Math.round(
+        (new Date(c.status_atualizado_em!).getTime() - new Date(c.created_at!).getTime()) / 86400000
+      ))
       .filter(d => d >= 0)
 
     const tempoMedioAtivacao = temposAtivacao.length > 0
       ? temposAtivacao.reduce((s, d) => s + d, 0) / temposAtivacao.length
       : null
+
+    const debugComAmbos = ativos.filter(c => c.status_atualizado_em !== null && c.created_at !== null).length
+    console.log(`[tempo-ativacao] ativos=${ativos.length} com_ambos_campos=${debugComAmbos} amostras_validas=${temposAtivacao.length} media=${tempoMedioAtivacao}`)
 
     return {
       cadastrados,
@@ -359,10 +360,9 @@ export function useRelatoriosRedesign(
       if (c.status_ixc === 'A') {
         existing.ativos++
         existing.mrrTotal += c.valor_unitario ?? 0
-        if (c.status_atualizado_em && (c.created_at || c.data_venda)) {
-          const inicio = c.created_at ?? c.data_venda!
+        if (c.status_atualizado_em && c.created_at) {
           const dias = Math.round(
-            (new Date(c.status_atualizado_em).getTime() - new Date(inicio).getTime()) / 86400000
+            (new Date(c.status_atualizado_em).getTime() - new Date(c.created_at).getTime()) / 86400000
           )
           if (dias >= 0) existing.temposAtivacao.push(dias)
         }
@@ -478,17 +478,18 @@ export function useRelatoriosRedesign(
     return resultado
   }, [evolucao3Meses, isCustom])
 
-  // ── Aguardando mais antigos (top 10 por dias_aguardando) ─────────────────────
+  // ── Aguardando mais antigos (top 50 por dias_aguardando; UI controla "Ver todos") ──
   const aguardandoAntigos = useMemo((): AguardandoAntigo[] => {
     return contratos
       .filter(c => (c.status_ixc === 'AA' || c.status_ixc === 'P') && c.dias_aguardando !== null && c.dias_aguardando > 0)
       .sort((a, b) => (b.dias_aguardando ?? 0) - (a.dias_aguardando ?? 0))
-      .slice(0, 10)
+      .slice(0, 50)
       .map(c => ({
         id: c.id,
         cliente_nome: c.cliente_nome,
         vendedor_nome: c.vendedor?.nome ?? 'Sem vendedor',
         dias_aguardando: c.dias_aguardando!,
+        data_cadastro: c.created_at ?? c.data_venda ?? null,
       }))
   }, [contratos])
 
