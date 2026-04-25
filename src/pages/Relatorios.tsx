@@ -1501,7 +1501,7 @@ function TabComissoes({ vendedorIdFiltro, isGestor, vendedores }: {
 
   const vendedorEfetivo = isGestor ? vendedorLocal : vendedorIdFiltro
 
-  const { loading, liberadas, aguardando, totalLiberado, totalPendente } =
+  const { loading, liberadas, aguardando } =
     useComissoesVendedor(vendedorEfetivo, mes, ano)
 
   const {
@@ -1509,11 +1509,27 @@ function TabComissoes({ vendedorIdFiltro, isGestor, vendedores }: {
     vendedoresConfig,
     salvarPadraoGlobal,
     salvarPadraoVendedor,
+    resolverPct,
     loading: loadingConfig,
   } = useComissaoConfig()
 
-  const qtdComComissao = liberadas.filter(c => (c.comissao_valor ?? 0) > 0).length
-    + aguardando.filter(c => (c.comissao_valor ?? 0) > 0).length
+  // Aplica % configurado quando contrato tem comissao_pct = 0 (contratos legados)
+  function comEfetiva(c: typeof liberadas[0]) {
+    const pctSalvo = c.comissao_pct ?? 0
+    if (pctSalvo > 0) return { pct: pctSalvo, valor: c.comissao_valor ?? 0 }
+    const pct = resolverPct(c.vendedor_id ?? '')
+    const valor = pct > 0 ? (c.valor_unitario * pct / 100) : 0
+    return { pct, valor }
+  }
+
+  const liberadasEfetivas = liberadas.map(c => ({ ...c, ...comEfetiva(c) }))
+  const aguardandoEfetivas = aguardando.map(c => ({ ...c, ...comEfetiva(c) }))
+
+  const totalLiberadoEfetivo = liberadasEfetivas.reduce((s, c) => s + c.valor, 0)
+  const totalPendenteEfetivo = aguardandoEfetivas.reduce((s, c) => s + c.valor, 0)
+
+  const qtdComComissao = liberadasEfetivas.filter(c => c.valor > 0).length
+    + aguardandoEfetivas.filter(c => c.valor > 0).length
 
   async function handleSalvarGlobal() {
     setSalvando(true)
@@ -1530,11 +1546,11 @@ function TabComissoes({ vendedorIdFiltro, isGestor, vendedores }: {
   }
 
   function TabelaComissoes({ contratos, cor, titulo }: {
-    contratos: ReturnType<typeof useComissoesVendedor>['liberadas']
+    contratos: (ReturnType<typeof useComissoesVendedor>['liberadas'][0] & { pct: number; valor: number })[]
     cor: string
     titulo: string
   }) {
-    const total = contratos.reduce((s, c) => s + (c.comissao_valor ?? 0), 0)
+    const total = contratos.reduce((s, c) => s + c.valor, 0)
     if (contratos.length === 0) return null
     return (
       <GlassCard className="overflow-hidden">
@@ -1568,17 +1584,17 @@ function TabComissoes({ vendedorIdFiltro, isGestor, vendedores }: {
                 const statusColor = c.status_ixc === 'A' ? '#00d68f'
                   : c.status_ixc === 'AA' || c.status_ixc === 'P' ? '#f59e0b'
                   : '#6b7280'
-                const semComissao = !c.comissao_pct || c.comissao_pct === 0
+                const semComissao = c.pct === 0
                 return (
                   <tr key={c.id} className="hover:bg-white/3 transition-colors" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                     <td className="px-4 py-3 font-medium text-white">{c.cliente_nome}</td>
                     <td className="px-4 py-3 text-white/60 text-xs">{c.produto?.nome ?? '—'}</td>
                     <td className="px-4 py-3 tabular-nums text-white/70">{formatBRL(c.valor_unitario)}</td>
                     <td className="px-4 py-3 tabular-nums text-white/60">
-                      {semComissao ? <span className="text-white/20">—</span> : `${c.comissao_pct}%`}
+                      {semComissao ? <span className="text-white/20">—</span> : `${c.pct}%`}
                     </td>
                     <td className="px-4 py-3 tabular-nums font-semibold" style={{ color: semComissao ? 'rgba(255,255,255,0.2)' : cor }}>
-                      {semComissao ? '—' : formatBRL(c.comissao_valor ?? 0)}
+                      {semComissao ? '—' : formatBRL(c.valor)}
                     </td>
                     <td className="px-4 py-3">
                       <span
@@ -1771,14 +1787,14 @@ function TabComissoes({ vendedorIdFiltro, isGestor, vendedores }: {
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
             <KpiCard
               label="Comissão Liberada"
-              value={formatBRL(totalLiberado)}
+              value={formatBRL(totalLiberadoEfetivo)}
               icon={<DollarSign size={18} />}
               accentHex="#00d68f"
               sub={`${liberadas.length} contratos ativos`}
             />
             <KpiCard
               label="Aguardando Ativação"
-              value={formatBRL(totalPendente)}
+              value={formatBRL(totalPendenteEfetivo)}
               icon={<Clock size={18} />}
               accentHex="#f59e0b"
               sub={`${aguardando.length} contratos AA/P`}
@@ -1792,7 +1808,7 @@ function TabComissoes({ vendedorIdFiltro, isGestor, vendedores }: {
             />
             <KpiCard
               label="Comissão Potencial"
-              value={formatBRL(totalLiberado + totalPendente)}
+              value={formatBRL(totalLiberadoEfetivo + totalPendenteEfetivo)}
               icon={<TrendingUp size={18} />}
               accentHex="#8b5cf6"
               sub="liberada + pendente"
@@ -1800,8 +1816,8 @@ function TabComissoes({ vendedorIdFiltro, isGestor, vendedores }: {
           </div>
 
           {/* Tabelas */}
-          <TabelaComissoes contratos={liberadas} cor="#00d68f" titulo="Comissões Liberadas" />
-          <TabelaComissoes contratos={aguardando} cor="#f59e0b" titulo="Aguardando Ativação" />
+          <TabelaComissoes contratos={liberadasEfetivas} cor="#00d68f" titulo="Comissões Liberadas" />
+          <TabelaComissoes contratos={aguardandoEfetivas} cor="#f59e0b" titulo="Aguardando Ativação" />
 
           {liberadas.length === 0 && aguardando.length === 0 && (
             <GlassCard className="p-10 text-center">

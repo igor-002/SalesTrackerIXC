@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 export interface ComissaoContrato {
   id: string
   cliente_nome: string
+  vendedor_id: string | null
   mes_referencia: number | null
   ano_referencia: number | null
   status_ixc: string | null
@@ -26,7 +27,7 @@ export function useComissoesVendedor(
     queryFn: async () => {
       let q = supabase
         .from('vendas')
-        .select('id, cliente_nome, mes_referencia, ano_referencia, status_ixc, valor_unitario, valor_total, comissao_pct, comissao_valor, data_venda, produto:produtos(id, nome)')
+        .select('id, cliente_nome, vendedor_id, mes_referencia, ano_referencia, status_ixc, valor_unitario, valor_total, comissao_pct, comissao_valor, data_venda, produto:produtos(id, nome)')
         .eq('mes_referencia', mes)
         .eq('ano_referencia', ano)
         .order('comissao_valor', { ascending: false, nullsFirst: false })
