@@ -31,6 +31,7 @@ import {
 import { formatBRL, formatPercent } from '@/lib/formatters'
 import { useVendasUnicas } from '@/hooks/useVendasUnicas'
 import { useComissoesVendedor } from '@/hooks/useComissoesVendedor'
+import { useComissaoConfig } from '@/hooks/useComissaoConfig'
 
 // ── Constantes ───────────────────────────────────────────────────────────────
 
@@ -1491,14 +1492,42 @@ function TabComissoes({ vendedorIdFiltro, isGestor, vendedores }: {
   const [mes, setMes] = useState(now.getMonth() + 1)
   const [ano, setAno] = useState(now.getFullYear())
   const [vendedorLocal, setVendedorLocal] = useState<string | null>(null)
+  const [configExpanded, setConfigExpanded] = useState(false)
+
+  // Estado de edição inline para configuração
+  const [editandoGlobal, setEditandoGlobal] = useState<number | ''>('')
+  const [editandoVendedor, setEditandoVendedor] = useState<{ id: string; valor: number | '' } | null>(null)
+  const [salvando, setSalvando] = useState(false)
 
   const vendedorEfetivo = isGestor ? vendedorLocal : vendedorIdFiltro
 
   const { loading, liberadas, aguardando, totalLiberado, totalPendente } =
     useComissoesVendedor(vendedorEfetivo, mes, ano)
 
+  const {
+    padraoGlobal,
+    vendedoresConfig,
+    salvarPadraoGlobal,
+    salvarPadraoVendedor,
+    loading: loadingConfig,
+  } = useComissaoConfig()
+
   const qtdComComissao = liberadas.filter(c => (c.comissao_valor ?? 0) > 0).length
     + aguardando.filter(c => (c.comissao_valor ?? 0) > 0).length
+
+  async function handleSalvarGlobal() {
+    setSalvando(true)
+    await salvarPadraoGlobal(editandoGlobal === '' ? null : Number(editandoGlobal))
+    setSalvando(false)
+    setEditandoGlobal('')
+  }
+
+  async function handleSalvarVendedor(vendedorId: string, valor: number | '') {
+    setSalvando(true)
+    await salvarPadraoVendedor(vendedorId, valor === '' ? null : Number(valor))
+    setSalvando(false)
+    setEditandoVendedor(null)
+  }
 
   function TabelaComissoes({ contratos, cor, titulo }: {
     contratos: ReturnType<typeof useComissoesVendedor>['liberadas']
@@ -1603,6 +1632,136 @@ function TabComissoes({ vendedorIdFiltro, isGestor, vendedores }: {
           )}
         </div>
       </GlassCard>
+
+      {/* Configuração de Comissões — somente gestor */}
+      {isGestor && (
+        <GlassCard className="overflow-hidden">
+          <button
+            onClick={() => setConfigExpanded(v => !v)}
+            className="w-full flex items-center gap-3 px-5 py-4 cursor-pointer transition-colors hover:bg-white/2"
+          >
+            <Edit2 size={14} className="text-violet-400 shrink-0" />
+            <h3 className="text-sm font-semibold text-white">Configuração de Comissões</h3>
+            <span className="text-xs text-white/30 ml-1">padrões e por vendedor</span>
+            <span className="ml-auto text-white/30 shrink-0">
+              {configExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            </span>
+          </button>
+
+          {configExpanded && (
+            <div className="px-5 pb-5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              {loadingConfig ? (
+                <div className="py-6 flex justify-center"><Spinner style={{ color: '#8b5cf6' }} /></div>
+              ) : (
+                <>
+                  {/* Padrão global */}
+                  <div className="pt-4 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-white/40 mb-3">Padrão Global</p>
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.5}
+                          placeholder={padraoGlobal != null ? String(padraoGlobal) : '0'}
+                          value={editandoGlobal}
+                          onChange={e => setEditandoGlobal(e.target.value === '' ? '' : Number(e.target.value))}
+                          className="w-20 px-3 py-1.5 rounded-lg text-sm text-white outline-none tabular-nums"
+                          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(139,92,246,0.3)' }}
+                        />
+                        <span className="text-sm text-white/50">%</span>
+                      </div>
+                      <button
+                        onClick={handleSalvarGlobal}
+                        disabled={salvando || editandoGlobal === ''}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all disabled:opacity-40"
+                        style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}
+                      >
+                        <Check size={12} />
+                        Salvar
+                      </button>
+                      <span className="text-xs text-white/30">
+                        {padraoGlobal != null ? `Atual: ${padraoGlobal}%` : 'Nenhum padrão definido'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-white/25 mt-2">Aplicado a vendedores sem % individual configurado</p>
+                  </div>
+
+                  {/* Por vendedor */}
+                  <div className="pt-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-white/40 mb-3">Por Vendedor</p>
+                    <div className="flex flex-col gap-2">
+                      {vendedoresConfig.map(v => {
+                        const temOverride = v.comissao_pct_padrao != null
+                        const isEditando = editandoVendedor?.id === v.id
+                        return (
+                          <div key={v.id} className="flex items-center gap-3 py-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                            <span className="text-sm text-white/80 w-40 truncate shrink-0">{v.nome}</span>
+
+                            {isEditando ? (
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  step={0.5}
+                                  value={editandoVendedor.valor}
+                                  onChange={e => setEditandoVendedor({ id: v.id, valor: e.target.value === '' ? '' : Number(e.target.value) })}
+                                  className="w-16 px-2 py-1 rounded-lg text-xs text-white outline-none tabular-nums"
+                                  style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(0,214,143,0.3)' }}
+                                  autoFocus
+                                />
+                                <span className="text-xs text-white/50">%</span>
+                                <button
+                                  onClick={() => handleSalvarVendedor(v.id, editandoVendedor.valor)}
+                                  disabled={salvando}
+                                  className="text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
+                                ><Check size={14} /></button>
+                                <button
+                                  onClick={() => setEditandoVendedor(null)}
+                                  className="text-white/30 hover:text-white/60 transition-colors cursor-pointer"
+                                ><X size={14} /></button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm tabular-nums text-white/60 w-12">
+                                  {temOverride ? `${v.comissao_pct_padrao}%` : '—'}
+                                </span>
+                                <button
+                                  onClick={() => setEditandoVendedor({ id: v.id, valor: v.comissao_pct_padrao ?? '' })}
+                                  className="text-white/20 hover:text-white/60 transition-colors cursor-pointer"
+                                ><Edit2 size={12} /></button>
+                                {temOverride && (
+                                  <button
+                                    onClick={() => handleSalvarVendedor(v.id, '')}
+                                    className="text-white/20 hover:text-red-400 transition-colors cursor-pointer"
+                                    title="Remover override"
+                                  ><X size={12} /></button>
+                                )}
+                              </div>
+                            )}
+
+                            <span
+                              className="text-xs px-2 py-0.5 rounded-full ml-auto"
+                              style={temOverride
+                                ? { background: 'rgba(0,214,143,0.08)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.2)' }
+                                : { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.08)' }
+                              }
+                            >
+                              {temOverride ? 'personalizado' : 'usa padrão'}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </GlassCard>
+      )}
 
       {loading ? (
         <div className="flex justify-center py-12"><Spinner style={{ color: '#00d68f' }} /></div>

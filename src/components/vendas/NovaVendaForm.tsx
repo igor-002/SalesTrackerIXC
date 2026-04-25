@@ -12,6 +12,7 @@ import { UFS } from '@/constants'
 import { useVendedores } from '@/hooks/useVendedores'
 import { useSegmentos } from '@/hooks/useSegmentos'
 import { useProdutos } from '@/hooks/useProdutos'
+import { useComissaoConfig } from '@/hooks/useComissaoConfig'
 import { useIxcFieldLookup } from '@/hooks/useIxcFieldLookup'
 import { ixcBuscarContrato, ixcBuscarCliente, IXC_STATUSES } from '@/lib/ixc'
 import { vendaFormSchema, type VendaFormData } from './vendaFormSchema'
@@ -57,6 +58,7 @@ export function NovaVendaForm({ onSubmit }: NovaVendaFormProps) {
   const { vendedores } = useVendedores()
   const { segmentos } = useSegmentos()
   const { produtos: produtosCatalogo } = useProdutos()
+  const { resolverPct } = useComissaoConfig()
   const today = new Date().toISOString().slice(0, 10)
   const [statusViaIxc, setStatusViaIxc] = useState(false)
   const isRestoring = useRef(true)
@@ -88,6 +90,16 @@ export function NovaVendaForm({ onSubmit }: NovaVendaFormProps) {
     }
     saveRecorrenteData(formValues)
   }, [formValues])
+
+  // Pré-preencher comissão quando vendedor muda (só se campo estiver zerado)
+  const vendedorIdWatch = watch('vendedor_id')
+  useEffect(() => {
+    if (!vendedorIdWatch) return
+    const pctAtual = getValues('comissao_pct')
+    if (pctAtual && pctAtual !== 0) return // não sobrescreve se já tem valor
+    const pct = resolverPct(vendedorIdWatch)
+    if (pct > 0) setValue('comissao_pct', pct)
+  }, [vendedorIdWatch]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const produtosWatch = watch('produtos') ?? []
 
