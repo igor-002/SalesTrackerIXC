@@ -108,30 +108,39 @@ function MrrTooltip({ active, payload, label }: {
 
 function EvolucaoTooltip({ active, payload, label }: {
   active?: boolean
-  payload?: { name: string; value: number; color: string; dataKey?: string }[]
+  payload?: { name: string; value: number; color: string; dataKey?: string; payload?: Record<string, unknown> }[]
   label?: string
 }) {
   if (!active || !payload?.length) return null
   const ativos = payload.find(p => p.dataKey === 'ativos')
   const aguardando = payload.find(p => p.dataKey === 'aguardando')
   const mrr = payload.find(p => p.dataKey === 'mrr')
+  const dataPoint = payload[0]?.payload
+  const mrrPendente = typeof dataPoint?.mrrPendente === 'number' ? dataPoint.mrrPendente : 0
   return (
-    <div className="rounded-xl px-3.5 py-3 text-xs shadow-xl" style={{ background: '#0f2419', border: '1px solid rgba(0,214,143,0.2)', minWidth: 200 }}>
+    <div className="rounded-xl px-3.5 py-3 text-xs shadow-xl" style={{ background: '#0f2419', border: '1px solid rgba(0,214,143,0.2)', minWidth: 220 }}>
       {label && <p className="text-white/50 mb-2 font-semibold">{label}</p>}
       {ativos !== undefined && (
         <p className="font-semibold mb-1" style={{ color: '#00d68f' }}>
-          {ativos.value} contratos ativados neste mês
+          {ativos.value} contratos ativos
         </p>
       )}
       {aguardando !== undefined && (
         <p className="font-semibold mb-1" style={{ color: '#f59e0b' }}>
-          {aguardando.value} contratos aguardando assinatura
+          {aguardando.value} aguardando assinatura
         </p>
       )}
       {mrr !== undefined && (
-        <p className="font-semibold mt-1.5 pt-1.5" style={{ color: '#00d68f', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          MRR: {formatBRL(mrr.value)}
-        </p>
+        <div className="mt-1.5 pt-1.5" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <p className="font-semibold" style={{ color: '#00d68f' }}>
+            MRR confirmado: {formatBRL(mrr.value)}
+          </p>
+          {mrrPendente > 0 && (
+            <p className="font-semibold mt-0.5" style={{ color: '#f59e0b' }}>
+              MRR potencial: {formatBRL(mrrPendente)}
+            </p>
+          )}
+        </div>
       )}
     </div>
   )
@@ -406,11 +415,12 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
       </GlassCard>
 
       {/* SEÇÃO 1 — KPI Cards */}
-      <div className="grid grid-cols-2 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-6 gap-4">
         <KpiCard label="Total Cadastrados" value={String(kpis.total)} icon={<FileText size={18} />} accentHex="#6b7280" />
         <KpiCard label="Aguardando Assinatura" value={String(kpis.aguardando)} icon={<ChevronDown size={18} />} accentHex="#06b6d4" />
         <KpiCard label="Contratos Ativos" value={String(kpis.ativos)} icon={<Check size={18} />} accentHex="#00d68f" />
-        <KpiCard label="Ticket Médio" value={formatBRL(kpis.ticketMedio)} icon={<DollarSign size={18} />} accentHex="#f59e0b" sub="por contrato ativo" />
+        <KpiCard label="MRR Confirmado" value={formatBRL(kpis.mrrAtivo)} icon={<DollarSign size={18} />} accentHex="#00d68f" sub={`ticket médio ${formatBRL(kpis.ticketMedio)}`} />
+        <KpiCard label="MRR Potencial" value={formatBRL(kpis.mrrPendente)} icon={<TrendingUp size={18} />} accentHex="#f59e0b" sub="se todos AA/P ativarem" />
         <KpiCard label="Taxa de Conversão" value={formatPercent(kpis.taxaConversao)} icon={<Percent size={18} />} accentHex="#8b5cf6" sub="ativos ÷ total" />
       </div>
 
@@ -640,11 +650,22 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
               <p className="text-xs text-white/30 mt-1">cancelados ÷ cadastrados</p>
             </div>
             <div className="p-4 rounded-xl col-span-2" style={{ background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.15)' }}>
-              <p className="text-xs text-white/50 mb-1">Tempo Médio para Ativar</p>
+              <div className="flex items-center gap-2 mb-1">
+                <p className="text-xs text-white/50">Tempo Médio para Ativar</p>
+                {funil.tempoMedioAtivacaoIsEstimado && (
+                  <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
+                    espera atual
+                  </span>
+                )}
+              </div>
               <p className="text-2xl font-bold" style={{ color: '#06b6d4' }}>
                 {funil.tempoMedioAtivacao !== null ? `${funil.tempoMedioAtivacao.toFixed(1)} dias` : '—'}
               </p>
-              <p className="text-xs text-white/30 mt-1">do cadastro até ativação</p>
+              <p className="text-xs text-white/30 mt-1">
+                {funil.tempoMedioAtivacaoIsEstimado
+                  ? 'média dos contratos aguardando hoje'
+                  : 'do cadastro até ativação'}
+              </p>
             </div>
           </div>
         </div>

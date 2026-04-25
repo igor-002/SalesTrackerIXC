@@ -40,6 +40,7 @@ export interface EvolucaoMes {
   ativos: number
   aguardando: number
   mrr: number
+  mrrPendente: number
 }
 
 export interface FunilVendas {
@@ -50,6 +51,7 @@ export interface FunilVendas {
   taxaConversao: number
   taxaPerda: number
   tempoMedioAtivacao: number | null
+  tempoMedioAtivacaoIsEstimado: boolean
 }
 
 export interface VendedorDistribuicao {
@@ -76,6 +78,7 @@ export interface ProjecaoMes {
   ativos: number
   aguardando: number
   mrr: number
+  mrrPendente: number
   mrrMin?: number
   mrrMax?: number
   ativosMin?: number
@@ -241,6 +244,7 @@ export function useRelatoriosRedesign(
       const ativos = doMes.filter(c => c.status_ixc === 'A')
       const aguardando = doMes.filter(c => c.status_ixc === 'AA' || c.status_ixc === 'P')
       const mrr = ativos.reduce((s, c) => s + (c.valor_unitario ?? 0), 0)
+      const mrrPendente = aguardando.reduce((s, c) => s + (c.valor_unitario ?? 0), 0)
 
       return {
         mesLabel: mesLabel(mes, ano),
@@ -250,6 +254,7 @@ export function useRelatoriosRedesign(
         ativos: ativos.length,
         aguardando: aguardando.length,
         mrr,
+        mrrPendente,
       }
     })
   }, [contratos, mesesEfetivos])
@@ -269,14 +274,26 @@ export function useRelatoriosRedesign(
       .map(c => Math.round(
         (new Date(c.status_atualizado_em!).getTime() - new Date(c.created_at!).getTime()) / 86400000
       ))
-      .filter(d => d >= 0)
+      .filter(d => d > 0) // d > 0 exclui importações que já entraram como 'A' (diff ≈ 0)
 
-    const tempoMedioAtivacao = temposAtivacao.length > 0
-      ? temposAtivacao.reduce((s, d) => s + d, 0) / temposAtivacao.length
-      : null
+    let tempoMedioAtivacao: number | null = null
+    let tempoMedioAtivacaoIsEstimado = false
+
+    if (temposAtivacao.length > 0) {
+      tempoMedioAtivacao = temposAtivacao.reduce((s, d) => s + d, 0) / temposAtivacao.length
+    } else {
+      // Fallback: média de dias_aguardando dos contratos em AA/P (espera atual)
+      const diasAguardando = aguardando
+        .filter(c => c.dias_aguardando !== null && c.dias_aguardando > 0)
+        .map(c => c.dias_aguardando!)
+      if (diasAguardando.length > 0) {
+        tempoMedioAtivacao = diasAguardando.reduce((s, d) => s + d, 0) / diasAguardando.length
+        tempoMedioAtivacaoIsEstimado = true
+      }
+    }
 
     const debugComAmbos = ativos.filter(c => c.status_atualizado_em !== null && c.created_at !== null).length
-    console.log(`[tempo-ativacao] ativos=${ativos.length} com_ambos_campos=${debugComAmbos} amostras_validas=${temposAtivacao.length} media=${tempoMedioAtivacao}`)
+    console.log(`[tempo-ativacao] ativos=${ativos.length} com_ambos_campos=${debugComAmbos} amostras_validas=${temposAtivacao.length} media=${tempoMedioAtivacao} estimado=${tempoMedioAtivacaoIsEstimado}`)
 
     return {
       cadastrados,
@@ -286,6 +303,7 @@ export function useRelatoriosRedesign(
       taxaConversao,
       taxaPerda,
       tempoMedioAtivacao,
+      tempoMedioAtivacaoIsEstimado,
     }
   }, [contratos])
 
@@ -399,7 +417,7 @@ export function useRelatoriosRedesign(
         mesLabel: e.mesLabel, mes: e.mes, ano: e.ano,
         tipo: 'real' as const,
         cadastrados: e.cadastrados, ativos: e.ativos,
-        aguardando: e.aguardando, mrr: e.mrr,
+        aguardando: e.aguardando, mrr: e.mrr, mrrPendente: e.mrrPendente,
       }))
     }
 
@@ -439,6 +457,7 @@ export function useRelatoriosRedesign(
       ativos: e.ativos,
       aguardando: e.aguardando,
       mrr: e.mrr,
+      mrrPendente: e.mrrPendente,
     }))
 
     // Meses projetados
@@ -468,6 +487,7 @@ export function useRelatoriosRedesign(
         ativos: ativosProj,
         aguardando: Math.round(mediaAguardando),
         mrr: mrrProj,
+        mrrPendente: 0,
         ativosMin,
         ativosMax,
         mrrMin,
@@ -497,14 +517,17 @@ export function useRelatoriosRedesign(
   const kpis = useMemo(() => {
     const ativos = contratos.filter(c => c.status_ixc === 'A')
     const aguardando = contratos.filter(c => c.status_ixc === 'AA' || c.status_ixc === 'P')
-    const somaAtivos = ativos.reduce((s, c) => s + (c.valor_unitario ?? 0), 0)
-    const ticketMedio = ativos.length > 0 ? somaAtivos / ativos.length : 0
+    const mrrAtivo = ativos.reduce((s, c) => s + (c.valor_unitario ?? 0), 0)
+    const mrrPendente = aguardando.reduce((s, c) => s + (c.valor_unitario ?? 0), 0)
+    const ticketMedio = ativos.length > 0 ? mrrAtivo / ativos.length : 0
     const taxaConversao = contratos.length > 0 ? (ativos.length / contratos.length) * 100 : 0
 
     return {
       total: contratos.length,
       ativos: ativos.length,
       aguardando: aguardando.length,
+      mrrAtivo,
+      mrrPendente,
       ticketMedio,
       taxaConversao,
     }
