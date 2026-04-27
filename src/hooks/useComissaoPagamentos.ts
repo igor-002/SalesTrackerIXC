@@ -31,9 +31,12 @@ function calcularPeriodoPagamento(dataAtivacao: string | null, mes: number, ano:
   const d = new Date(dataAtivacao + 'T00:00:00')
   if (isNaN(d.getTime())) return `${ano}-${mesStr}`
 
-  if (d.getDate() <= 20) return `${ano}-${mesStr}`
+  const dAno = d.getFullYear()
+  const dMes = d.getMonth() + 1
 
-  const proximo = new Date(ano, mes - 1, 1)
+  if (d.getDate() <= 20) return `${dAno}-${dMes.toString().padStart(2, '0')}`
+
+  const proximo = new Date(dAno, dMes - 1, 1)
   proximo.setMonth(proximo.getMonth() + 1)
   return `${proximo.getFullYear()}-${(proximo.getMonth() + 1).toString().padStart(2, '0')}`
 }
