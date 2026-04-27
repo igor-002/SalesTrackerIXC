@@ -118,14 +118,33 @@ export function useComissaoPagamentos({
       const { data: empresaData } = await supabase.rpc('get_empresa_id')
       const empresaId = empresaData as string | null
 
-      const { data: historico, error: histErr } = await supabase
-        .from('vendas_historico')
-        .select('id, vendedor_id, codigo_contrato_ixc, cliente_nome, plano, valor_unitario, quantidade, data_ativacao, mes_referencia, ano_referencia')
-        .eq('status_ixc', 'A')
-        .eq('mes_referencia', mes)
-        .eq('ano_referencia', ano)
+      // Mês anterior — para capturar contratos transferidos (ativados após dia 20)
+      const prevDate = new Date(ano, mes - 2, 1)
+      const mesAnterior = prevDate.getMonth() + 1
+      const anoAnterior = prevDate.getFullYear()
 
-      if (histErr) throw histErr
+      const SELECT = 'id, vendedor_id, codigo_contrato_ixc, cliente_nome, plano, valor_unitario, quantidade, data_ativacao, mes_referencia, ano_referencia'
+
+      const [{ data: d1, error: e1 }, { data: d2, error: e2 }] = await Promise.all([
+        supabase
+          .from('vendas_historico')
+          .select(SELECT)
+          .eq('status_ixc', 'A')
+          .eq('ano_referencia', ano)
+          .eq('mes_referencia', mes),
+        supabase
+          .from('vendas_historico')
+          .select(SELECT)
+          .eq('status_ixc', 'A')
+          .eq('ano_referencia', anoAnterior)
+          .eq('mes_referencia', mesAnterior)
+          .not('data_ativacao', 'is', null),
+      ])
+
+      if (e1) throw e1
+      if (e2) throw e2
+
+      const historico = [...(d1 ?? []), ...(d2 ?? [])]
 
       const registros = (historico ?? []).map(h => {
         const pct = resolverPct(h.vendedor_id ?? '')
