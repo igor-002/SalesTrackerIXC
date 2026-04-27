@@ -117,6 +117,8 @@ export function useComissaoPagamentos({
     try {
       const { data: empresaData } = await supabase.rpc('get_empresa_id')
       const empresaId = empresaData as string | null
+      console.log('[CP-DEBUG] iniciando sync', { empresaId, mes, ano, vendedorId })
+      console.log('[CP-DEBUG] empresa raw:', empresaData)
 
       // Mês anterior — para capturar contratos transferidos (ativados após dia 20)
       const prevDate = new Date(ano, mes - 2, 1)
@@ -145,6 +147,7 @@ export function useComissaoPagamentos({
       if (e2) throw e2
 
       const historico = [...(d1 ?? []), ...(d2 ?? [])]
+      console.log('[CP-DEBUG] contratos raw:', historico?.length, JSON.stringify(historico?.[0]))
 
       const registros = (historico ?? []).map(h => {
         const pct = resolverPct(h.vendedor_id ?? '')
@@ -164,6 +167,7 @@ export function useComissaoPagamentos({
           data_ativacao: h.data_ativacao ?? null,
         }
       }).filter(r => r.codigo_contrato_ixc)
+      console.log('[CP-DEBUG] registros para upsert:', registros.length, JSON.stringify(registros[0]))
 
       // Upsert em lotes de 100
       for (let i = 0; i < registros.length; i += 100) {

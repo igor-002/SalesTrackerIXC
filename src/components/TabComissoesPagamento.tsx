@@ -97,6 +97,8 @@ export function TabComissoesPagamento({ vendedorIdFiltro, isGestor, vendedores }
   const { pendentes, pagas, totais, loading, syncing, error, marcarPago, marcarPendente, refetch } =
     useComissaoPagamentos({ mes, ano, vendedorId: vendedorEfetivo, isAdmin })
 
+  console.log('[TAB] TabComissoesPagamento renderizou', { mes, ano, vendedorEfetivo })
+
   async function handleSalvarGlobal() {
     setSalvando(true)
     await salvarPadraoGlobal(editandoGlobal === '' ? null : Number(editandoGlobal))
@@ -146,7 +148,7 @@ export function TabComissoesPagamento({ vendedorIdFiltro, isGestor, vendedores }
             </div>
           )}
           <button
-            onClick={refetch}
+            onClick={() => { console.log('[BTN] sincronizar clicado'); refetch() }}
             disabled={syncing || loading}
             className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all disabled:opacity-40"
             style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.08)' }}
@@ -281,7 +283,7 @@ export function TabComissoesPagamento({ vendedorIdFiltro, isGestor, vendedores }
                 Nenhuma comissão encontrada para {MESES[mes - 1]} / {ano}.
               </p>
               <button
-                onClick={refetch}
+                onClick={() => { console.log('[BTN] sincronizar clicado'); refetch() }}
                 disabled={syncing}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all disabled:opacity-40"
                 style={{ background: 'rgba(0,214,143,0.1)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.2)' }}
