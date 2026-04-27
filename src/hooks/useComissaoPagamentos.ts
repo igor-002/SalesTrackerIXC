@@ -198,7 +198,7 @@ export function useComissaoPagamentos({
       setSyncing(false)
       await fetchComissoes()
     }
-  }, [mes, ano, periodoRef, loadingConfig, resolverPct, fetchComissoes])
+  }, [mes, ano, periodoRef, empresaId, loadingConfig, resolverPct, fetchComissoes])
 
   useEffect(() => {
     syncedRef.current = ''
