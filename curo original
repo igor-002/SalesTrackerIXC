@@ -1,0 +1,10 @@
+[33m2ba1c17[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m fix(design): corrigir background da área de conteúdo para claro
+[33mb499a89[m feat(design): redesign tema misto sidebar escura + conteúdo claro
+[33m6c291a7[m fix(sync-ixc): ignorar produtos com valor zero no cálculo MRR
+[33m8178717[m fix(tipos): corrigir tipo do campo tags como string[]
+[33mdbc5855[m fix(sync): corrigir formato do campo tags como array
+[33m39d7131[m fix(build): corrigir tipos AlertaAA e Badge sem style prop
+[33m18a4d37[m feat(clientes): coluna Mês e filtro por mês de referência
+[33m6b21a6e[m feat(dashboard): seletor de mês na seção Status dos Contratos
+[33mf7a594f[m feat(sync): tag 'antigo' e badge Parado +30d para contratos AA/P
+[33m1bc6716[m feat(queries): ordenar vendas por data_venda desc

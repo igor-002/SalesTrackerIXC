@@ -52,7 +52,9 @@
       "Bash(git checkout *)",
       "Bash(git reset *)",
       "Bash(grep -r \"ixc_id\" C:/www/salestrakerOPENITATT/src/hooks/useProdutos.ts C:/www/salestrakerOPENITATT/src/components/produtos/*.tsx)",
-      "mcp__supabase__list_migrations"
+      "mcp__supabase__list_migrations",
+      "Bash(git revert *)",
+      "Bash(file *)"
     ]
   }
 }
