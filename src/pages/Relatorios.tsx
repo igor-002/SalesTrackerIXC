@@ -14,7 +14,7 @@ import {
 import {
   FileText, Users, User, TrendingUp, DollarSign, Percent,
   Target, ChevronDown, ChevronUp, Check, Edit2, X, Clock, FolderKanban,
-  CheckCircle2, AlertCircle, Award,
+  CheckCircle2, AlertCircle, Award, RotateCcw,
 } from 'lucide-react'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Spinner } from '@/components/ui/Spinner'
@@ -296,6 +296,9 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
   const [cancelSuccessMsg, setCancelSuccessMsg] = useState<string | null>(null)
   const [aguardandoOcultados, setAguardandoOcultados] = useState<Set<string>>(new Set())
   const [canceladosExpanded, setCanceladosExpanded] = useState(false)
+  const [reativarModal, setReativarModal] = useState<{ id: string; cliente_nome: string } | null>(null)
+  const [reativarLoading, setReativarLoading] = useState(false)
+  const [canceladosOcultados, setCanceladosOcultados] = useState<Set<string>>(new Set())
 
   const canceladosQueryKey = useMemo(
     () => ['cancelados-periodo', mesesEfetivos.map(m => `${m.mes}-${m.ano}`).join(','), vendedorEfetivo],
@@ -362,6 +365,29 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
       console.error('Erro ao cancelar contrato:', e)
     } finally {
       setCancelLoading(false)
+    }
+  }
+
+  async function handleReativar() {
+    if (!reativarModal) return
+    setReativarLoading(true)
+    try {
+      await supabase.from('cancelamentos').delete().eq('venda_id', reativarModal.id)
+      await supabase.from('vendas').update({ status_ixc: 'AA' } as never).eq('id', reativarModal.id)
+      setCanceladosOcultados(prev => new Set([...prev, reativarModal.id]))
+      const nome = reativarModal.cliente_nome
+      setReativarModal(null)
+      setCancelSuccessMsg(`Contrato de ${nome} reativado com sucesso`)
+      setTimeout(() => setCancelSuccessMsg(null), 3000)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['relatorios-redesign'] }),
+        queryClient.invalidateQueries({ queryKey: ['cancelamentos-count'] }),
+        queryClient.invalidateQueries({ queryKey: ['cancelados-periodo'] }),
+      ])
+    } catch (e) {
+      console.error('Erro ao reativar contrato:', e)
+    } finally {
+      setReativarLoading(false)
     }
   }
 
@@ -1027,6 +1053,38 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
         </div>
       </Modal>
 
+      {/* Modal de confirmação de reativação */}
+      <Modal
+        open={reativarModal !== null}
+        onClose={() => { if (!reativarLoading) setReativarModal(null) }}
+        title={`Reativar contrato de ${reativarModal?.cliente_nome ?? ''}?`}
+        size="sm"
+      >
+        <div className="flex flex-col gap-5">
+          <p className="text-sm text-white/50">
+            O contrato voltará para <span className="font-semibold text-cyan-400">Aguardando Assinatura</span>.
+          </p>
+          <div className="flex items-center gap-3 justify-end">
+            <button
+              onClick={() => setReativarModal(null)}
+              disabled={reativarLoading}
+              className="px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer transition-all"
+              style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}
+            >
+              Voltar
+            </button>
+            <button
+              onClick={handleReativar}
+              disabled={reativarLoading}
+              className="px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer transition-all"
+              style={{ background: 'rgba(0,214,143,0.15)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.3)' }}
+            >
+              {reativarLoading ? 'Reativando...' : 'Confirmar'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Toast de sucesso */}
       {cancelSuccessMsg && (
         <div
@@ -1059,7 +1117,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
           {canceladosExpanded && (
             <div className="px-5 pb-5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
               <div className="flex flex-col gap-2 pt-4">
-                {canceladosData.map(c => (
+                {canceladosData.filter(c => !canceladosOcultados.has(c.id)).map(c => (
                   <div
                     key={c.id}
                     className="flex flex-col sm:flex-row sm:items-center gap-2 px-4 py-3 rounded-xl"
@@ -1079,6 +1137,17 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                       {c.motivo && (
                         <span className="italic truncate max-w-xs" title={c.motivo}>"{c.motivo}"</span>
                       )}
+                      <button
+                        onClick={() => setReativarModal({ id: c.id, cliente_nome: c.cliente_nome })}
+                        title="Reativar contrato"
+                        className="flex items-center gap-1 px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                        style={{ color: 'rgba(0,214,143,0.6)', background: 'rgba(0,214,143,0.08)', border: '1px solid rgba(0,214,143,0.2)' }}
+                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#00d68f'; (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,214,143,0.15)' }}
+                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(0,214,143,0.6)'; (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,214,143,0.08)' }}
+                      >
+                        <RotateCcw size={12} />
+                        <span>Reativar</span>
+                      </button>
                     </div>
                   </div>
                 ))}
