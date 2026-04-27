@@ -284,6 +284,9 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
   ], [funil])
 
   const dadosMrrLinha = useMemo(() => {
+    const MESES_SHORT = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez']
+    const base6 = ultimosMeses(6)
+
     const vendedoresUnicos = new Set<string>()
     for (const m of mrrTendencia) {
       for (const v of m.porVendedor) {
@@ -291,13 +294,15 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
       }
     }
 
-    return mrrTendencia.map(m => {
+    return base6.map(({ mes, ano }) => {
+      const label = `${MESES_SHORT[mes - 1]}/${String(ano).slice(2)}`
+      const found = mrrTendencia.find(m => m.mes === mes && m.ano === ano)
       const row: Record<string, number | string> = {
-        mesLabel: m.mesLabel,
-        mrrTotal: m.mrrTotal,
+        mesLabel: label,
+        mrrTotal: found?.mrrTotal ?? 0,
       }
       for (const vid of vendedoresUnicos) {
-        const vdata = m.porVendedor.find(v => v.vendedor_id === vid)
+        const vdata = found?.porVendedor.find(v => v.vendedor_id === vid)
         row[vid] = vdata?.mrr ?? 0
       }
       return row
@@ -316,6 +321,17 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
       return { id: vid, nome, cor: CORES_VENDEDORES[i % CORES_VENDEDORES.length] }
     })
   }, [mrrTendencia])
+
+  const distribuicaoAguardando = useMemo(() =>
+    performanceVendedor
+      .filter(p => p.aguardando > 0)
+      .map(p => ({
+        vendedor_id: p.vendedor_id,
+        nome: p.nome,
+        aguardando: p.aguardando,
+        mrrPotencial: Math.round(p.ticketMedio * p.aguardando),
+      }))
+  , [performanceVendedor])
 
   if (loading) {
     return <div className="flex justify-center py-12"><Spinner style={{ color: '#00d68f' }} /></div>
@@ -759,7 +775,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
 
       {/* SEÇÃO 4 — Gráficos de Pizza */}
       {distribuicaoVendedor.length > 0 && (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
           {/* Pizza 1: Contratos Ativos */}
           <GlassCard className="p-5">
             <h3 className="text-sm font-semibold text-white mb-4">Distribuição de Contratos Ativos</h3>
@@ -836,6 +852,57 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
               ))}
             </div>
           </GlassCard>
+
+          {/* Pizza 3: Aguardando Assinatura por Vendedor */}
+          <GlassCard className="p-5">
+            <h3 className="text-sm font-semibold text-white mb-4">Aguardando Assinatura por Vendedor</h3>
+            {distribuicaoAguardando.length === 0 ? (
+              <div className="flex items-center justify-center h-[280px]">
+                <p className="text-xs text-white/30">Nenhum contrato aguardando no período</p>
+              </div>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={280}>
+                  <PieChart>
+                    <Pie
+                      data={distribuicaoAguardando}
+                      dataKey="aguardando"
+                      nameKey="nome"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      innerRadius={50}
+                      paddingAngle={2}
+                      label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
+                      labelLine={{ stroke: 'rgba(255,255,255,0.3)' }}
+                    >
+                      {distribuicaoAguardando.map((_, idx) => (
+                        <Cell key={idx} fill={CORES_VENDEDORES[idx % CORES_VENDEDORES.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value, name, props) => [
+                        `${value} contrato(s) · ${formatBRL((props.payload as typeof distribuicaoAguardando[0]).mrrPotencial)}`,
+                        name,
+                      ]}
+                      contentStyle={{ background: '#0f2419', border: '1px solid rgba(0,214,143,0.2)', borderRadius: 12 }}
+                      itemStyle={{ color: '#fff' }}
+                      labelStyle={{ color: 'rgba(255,255,255,0.5)' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-wrap gap-3 justify-center mt-2">
+                  {distribuicaoAguardando.map((v, i) => (
+                    <span key={v.vendedor_id} className="flex items-center gap-1.5 text-xs text-white/60">
+                      <span className="w-2.5 h-2.5 rounded-full" style={{ background: CORES_VENDEDORES[i % CORES_VENDEDORES.length] }} />
+                      {v.nome}: {formatBRL(v.mrrPotencial)}
+                    </span>
+                  ))}
+                </div>
+              </>
+            )}
+          </GlassCard>
+
         </div>
       )}
 
@@ -862,7 +929,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
               wrapperStyle={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', paddingTop: 10 }}
               formatter={(value) => <span style={{ color: 'rgba(255,255,255,0.6)' }}>{value}</span>}
             />
-            <Line type="monotone" dataKey="mrrTotal" name="Total do Time" stroke="#00d68f" strokeWidth={3} dot={{ fill: '#00d68f', r: 5 }} />
+            <Line type="monotone" dataKey="mrrTotal" name="Total do Time" stroke="#00d68f" strokeWidth={3} dot={{ fill: '#00d68f', r: 4 }} activeDot={{ r: 6 }} connectNulls={true} />
             {vendedoresParaLinha.map(v => (
               <Line
                 key={v.id}
@@ -873,6 +940,8 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                 strokeWidth={1.5}
                 strokeDasharray="4 2"
                 dot={{ fill: v.cor, r: 3 }}
+                activeDot={{ r: 5 }}
+                connectNulls={true}
               />
             ))}
           </LineChart>
