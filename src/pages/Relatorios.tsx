@@ -478,20 +478,24 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
       </GlassCard>
 
       {/* SEÇÃO 1 — KPI Cards */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <KpiCard label="Total Cadastrados" value={String(kpis.total)} icon={<FileText size={18} />} accentHex="#6b7280" />
-        <KpiCard label="Aguardando Assinatura" value={String(kpis.aguardando)} icon={<ChevronDown size={18} />} accentHex="#06b6d4" sub={diasSub} subColor={diasSubColor} />
-        <KpiCard label="Contratos Ativos" value={String(kpis.ativos)} icon={<Check size={18} />} accentHex="#00d68f" />
-        <KpiCard label="MRR Confirmado" value={formatBRL(kpis.mrrAtivo)} icon={<DollarSign size={18} />} accentHex="#00d68f" sub={`ticket médio ${formatBRL(kpis.ticketMedio)}`} />
-        <KpiCard label="MRR Potencial" value={formatBRL(kpis.mrrPendente)} icon={<TrendingUp size={18} />} accentHex="#f59e0b" sub="se todos AA/P ativarem" />
-        <KpiCard label="Taxa de Conversão" value={formatPercent(kpis.taxaConversao)} icon={<Percent size={18} />} accentHex="#8b5cf6" sub="ativos ÷ total" />
-        <KpiCard
-          label="Cancelamentos no Mês"
-          value={cancelCount === 0 ? '0 cancelamentos' : `${cancelCount} (${churnPct.toFixed(1)}%)`}
-          icon={<AlertCircle size={18} />}
-          accentHex={churnHex}
-          sub="cancelados ÷ (ativos + cancelados)"
-        />
+      <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          <KpiCard label="Total Cadastrados" value={String(kpis.total)} icon={<FileText size={18} />} accentHex="#6b7280" />
+          <KpiCard label="Aguardando Assinatura" value={String(kpis.aguardando)} icon={<ChevronDown size={18} />} accentHex="#06b6d4" sub={diasSub} subColor={diasSubColor} />
+          <KpiCard label="Contratos Ativos" value={String(kpis.ativos)} icon={<Check size={18} />} accentHex="#00d68f" />
+          <KpiCard label="MRR Confirmado" value={formatBRL(kpis.mrrAtivo)} icon={<DollarSign size={18} />} accentHex="#00d68f" sub={`ticket médio ${formatBRL(kpis.ticketMedio)}`} />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <KpiCard label="MRR Potencial" value={formatBRL(kpis.mrrPendente)} icon={<TrendingUp size={18} />} accentHex="#f59e0b" sub="se todos AA/P ativarem" />
+          <KpiCard label="Taxa de Conversão" value={formatPercent(kpis.taxaConversao)} icon={<Percent size={18} />} accentHex="#8b5cf6" sub="ativos ÷ total" />
+          <KpiCard
+            label="Cancelamentos no Mês"
+            value={cancelCount === 0 ? '0 cancelamentos' : `${cancelCount} (${churnPct.toFixed(1)}%)`}
+            icon={<AlertCircle size={18} />}
+            accentHex={churnHex}
+            sub="cancelados ÷ (ativos + cancelados)"
+          />
+        </div>
       </div>
 
       {/* SEÇÃO METAS DO TIME */}
