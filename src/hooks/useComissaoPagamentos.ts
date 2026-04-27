@@ -149,6 +149,9 @@ export function useComissaoPagamentos({
           .not('data_ativacao', 'is', null),
       ])
 
+      console.log('[CP-DEBUG] res1 data:', res1.data?.length, 'error:', res1.error?.message)
+      console.log('[CP-DEBUG] res2 data:', res2.data?.length, 'error:', res2.error?.message)
+
       if (res1.error) throw res1.error
       if (res2.error) throw res2.error
 
@@ -237,6 +240,12 @@ export function useComissaoPagamentos({
     total: comissoes.reduce((s, c) => s + (c.comissao_valor ?? 0), 0),
   }
 
+  const refetch = useCallback(async () => {
+    syncedRef.current = ''
+    await syncContratos()
+    await fetchComissoes()
+  }, [syncContratos, fetchComissoes])
+
   return {
     comissoes,
     pendentes,
@@ -247,6 +256,6 @@ export function useComissaoPagamentos({
     error,
     marcarPago,
     marcarPendente,
-    refetch: fetchComissoes,
+    refetch,
   }
 }
