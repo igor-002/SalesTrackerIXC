@@ -3,7 +3,7 @@
  * 4 abas: Visão Geral · Ranking de Vendedores · Por Vendedor · Projetos & Serviços
  */
 import { useState, useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import {
@@ -19,6 +19,7 @@ import {
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Spinner } from '@/components/ui/Spinner'
 import { ProgressBar } from '@/components/ui/ProgressBar'
+import { Modal } from '@/components/ui/Modal'
 import { useAuthStore } from '@/store/authStore'
 import { useVendedores } from '@/hooks/useVendedores'
 import { useMetas } from '@/hooks/useMetas'
@@ -276,6 +277,93 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
     : diasMed <= 15 ? '#f59e0b'
     : '#ef4444'
   const diasSub = diasMed !== null ? `média de ${diasMed} dias aguardando` : undefined
+
+  const userId = useAuthStore(s => s.user?.id)
+  const queryClient = useQueryClient()
+
+  const { data: empresaId } = useQuery({
+    queryKey: ['empresa-id'],
+    queryFn: async () => {
+      const { data } = await supabase.from('empresas').select('id').limit(1).single()
+      return data?.id ?? null
+    },
+    staleTime: Infinity,
+  })
+
+  const [cancelModal, setCancelModal] = useState<{ id: string; cliente_nome: string; dias_aguardando: number } | null>(null)
+  const [cancelMotivo, setCancelMotivo] = useState('')
+  const [cancelLoading, setCancelLoading] = useState(false)
+  const [cancelSuccessMsg, setCancelSuccessMsg] = useState<string | null>(null)
+  const [aguardandoOcultados, setAguardandoOcultados] = useState<Set<string>>(new Set())
+  const [canceladosExpanded, setCanceladosExpanded] = useState(false)
+
+  const canceladosQueryKey = useMemo(
+    () => ['cancelados-periodo', mesesEfetivos.map(m => `${m.mes}-${m.ano}`).join(','), vendedorEfetivo],
+    [mesesEfetivos, vendedorEfetivo],
+  )
+  const { data: canceladosData = [] } = useQuery({
+    queryKey: canceladosQueryKey,
+    queryFn: async () => {
+      const orParts = mesesEfetivos
+        .map(m => `and(mes_referencia.eq.${m.mes},ano_referencia.eq.${m.ano})`)
+        .join(',')
+      let q = supabase
+        .from('vendas')
+        .select('id, cliente_nome, dias_aguardando, cancelamentos(motivo, data_cancel), vendedor:vendedores(nome)')
+        .eq('status_ixc', 'CA')
+        .or(orParts)
+        .order('created_at', { ascending: false })
+      if (vendedorEfetivo) q = q.eq('vendedor_id', vendedorEfetivo)
+      const { data, error } = await q
+      if (error) throw error
+      return (data ?? []).map(r => {
+        const v = r as unknown as {
+          id: string; cliente_nome: string; dias_aguardando: number | null
+          cancelamentos: { motivo: string | null; data_cancel: string | null }[]
+          vendedor: { nome: string } | null
+        }
+        const cancel = v.cancelamentos?.[0]
+        return {
+          id: v.id,
+          cliente_nome: v.cliente_nome,
+          dias_aguardando: v.dias_aguardando ?? 0,
+          vendedor_nome: v.vendedor?.nome ?? 'Sem vendedor',
+          motivo: cancel?.motivo ?? null,
+          data_cancel: cancel?.data_cancel ?? null,
+        }
+      })
+    },
+  })
+
+  async function handleCancelar() {
+    if (!cancelModal || cancelMotivo.trim().length < 10 || !empresaId) return
+    setCancelLoading(true)
+    try {
+      await supabase.from('cancelamentos').insert({
+        venda_id: cancelModal.id,
+        motivo: cancelMotivo.trim(),
+        data_cancel: new Date().toISOString().split('T')[0],
+        empresa_id: empresaId,
+        created_by: userId ?? null,
+      } as never)
+      await supabase.from('vendas').update({ status_ixc: 'CA' } as never).eq('id', cancelModal.id)
+      setAguardandoOcultados(prev => new Set([...prev, cancelModal.id]))
+      const nome = cancelModal.cliente_nome
+      setCancelModal(null)
+      setCancelMotivo('')
+      setCancelSuccessMsg(`Contrato de ${nome} cancelado com sucesso`)
+      setTimeout(() => setCancelSuccessMsg(null), 3000)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['relatorios-redesign'] }),
+        queryClient.invalidateQueries({ queryKey: ['cancelamentos-count'] }),
+        queryClient.invalidateQueries({ queryKey: ['cancelados-periodo'] }),
+      ])
+    } catch (e) {
+      console.error('Erro ao cancelar contrato:', e)
+    } finally {
+      setCancelLoading(false)
+    }
+  }
 
   const [sortCol, setSortCol] = useState<string>('ativos')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
@@ -824,7 +912,9 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
           {aguardandoExpanded && (
             <div className="px-5 pb-5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 pt-4">
-                {(aguardandoVerTodos ? aguardandoAntigos : aguardandoAntigos.slice(0, 12)).map(c => {
+                {(aguardandoVerTodos ? aguardandoAntigos : aguardandoAntigos.slice(0, 12))
+                  .filter(c => !aguardandoOcultados.has(c.id))
+                  .map(c => {
                   const badge =
                     c.dias_aguardando > 30
                       ? { bg: 'rgba(239,68,68,0.12)', color: '#ef4444', border: 'rgba(239,68,68,0.3)' }
@@ -837,17 +927,29 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                   return (
                     <div
                       key={c.id}
-                      className="flex flex-col gap-2 p-3.5 rounded-xl"
+                      className="flex flex-col gap-2 p-3.5 rounded-xl relative group"
                       style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <span className="text-sm font-semibold text-white leading-snug">{c.cliente_nome}</span>
-                        <span
-                          className="text-xs font-bold px-2 py-0.5 rounded-full shrink-0 tabular-nums"
-                          style={{ background: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}
-                        >
-                          {c.dias_aguardando}d
-                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span
+                            className="text-xs font-bold px-2 py-0.5 rounded-full tabular-nums"
+                            style={{ background: badge.bg, color: badge.color, border: `1px solid ${badge.border}` }}
+                          >
+                            {c.dias_aguardando}d
+                          </span>
+                          <button
+                            onClick={() => setCancelModal({ id: c.id, cliente_nome: c.cliente_nome, dias_aguardando: c.dias_aguardando })}
+                            title="Cancelar contrato"
+                            className="p-1 rounded-lg transition-colors cursor-pointer"
+                            style={{ color: 'rgba(255,255,255,0.25)', background: 'transparent' }}
+                            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#ef4444'; (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.1)' }}
+                            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(255,255,255,0.25)'; (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
                       </div>
                       <span className="text-xs text-white/50">{c.vendedor_nome}</span>
                       {dataCadastro && (
@@ -869,6 +971,118 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                   </button>
                 </div>
               )}
+            </div>
+          )}
+        </GlassCard>
+      )}
+
+      {/* Modal de confirmação de cancelamento */}
+      <Modal
+        open={cancelModal !== null}
+        onClose={() => { if (!cancelLoading) { setCancelModal(null); setCancelMotivo('') } }}
+        title={`Cancelar contrato de ${cancelModal?.cliente_nome ?? ''}?`}
+        size="md"
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-white/50">
+            Este contrato está aguardando há <span className="font-semibold text-amber-400">{cancelModal?.dias_aguardando} dias</span>.
+          </p>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-white/60">Motivo do cancelamento <span className="text-red-400">*</span></label>
+            <textarea
+              value={cancelMotivo}
+              onChange={e => setCancelMotivo(e.target.value)}
+              placeholder="Descreva o motivo do cancelamento (mínimo 10 caracteres)"
+              rows={3}
+              className="w-full px-3 py-2.5 rounded-xl text-sm text-white outline-none resize-none"
+              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', colorScheme: 'dark' }}
+            />
+            <p className="text-xs" style={{ color: cancelMotivo.trim().length < 10 ? 'rgba(255,255,255,0.3)' : '#00d68f' }}>
+              {cancelMotivo.trim().length}/10 caracteres mínimos
+            </p>
+          </div>
+          <div className="flex items-center gap-3 justify-end pt-1">
+            <button
+              onClick={() => { setCancelModal(null); setCancelMotivo('') }}
+              disabled={cancelLoading}
+              className="px-4 py-2 rounded-xl text-sm font-semibold cursor-pointer transition-all"
+              style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)' }}
+            >
+              Voltar
+            </button>
+            <button
+              onClick={handleCancelar}
+              disabled={cancelMotivo.trim().length < 10 || cancelLoading}
+              className="px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+              style={{
+                background: cancelMotivo.trim().length < 10 ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.2)',
+                color: cancelMotivo.trim().length < 10 ? 'rgba(239,68,68,0.4)' : '#ef4444',
+                border: '1px solid rgba(239,68,68,0.3)',
+                cursor: cancelMotivo.trim().length < 10 || cancelLoading ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {cancelLoading ? 'Cancelando...' : 'Confirmar Cancelamento'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Toast de sucesso */}
+      {cancelSuccessMsg && (
+        <div
+          className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-semibold shadow-xl"
+          style={{ background: 'rgba(0,214,143,0.15)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.3)' }}
+        >
+          {cancelSuccessMsg}
+        </div>
+      )}
+
+      {/* SEÇÃO 3c — Contratos Cancelados (colapsada) */}
+      {canceladosData.length > 0 && (
+        <GlassCard className="overflow-hidden">
+          <button
+            onClick={() => setCanceladosExpanded(v => !v)}
+            className="w-full flex items-center gap-3 px-5 py-4 cursor-pointer transition-colors hover:bg-white/2"
+          >
+            <X size={15} className="shrink-0" style={{ color: '#ef4444' }} />
+            <h3 className="text-sm font-semibold text-white">Contratos Cancelados</h3>
+            <span
+              className="text-xs font-bold px-2 py-0.5 rounded-full ml-1"
+              style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}
+            >
+              {canceladosData.length}
+            </span>
+            <span className="ml-auto text-white/30 shrink-0">
+              {canceladosExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            </span>
+          </button>
+          {canceladosExpanded && (
+            <div className="px-5 pb-5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="flex flex-col gap-2 pt-4">
+                {canceladosData.map(c => (
+                  <div
+                    key={c.id}
+                    className="flex flex-col sm:flex-row sm:items-center gap-2 px-4 py-3 rounded-xl"
+                    style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', opacity: 0.7 }}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-white/60 line-through truncate">{c.cliente_nome}</p>
+                      <p className="text-xs text-white/30 mt-0.5">{c.vendedor_nome}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-white/30 shrink-0">
+                      {c.dias_aguardando > 0 && (
+                        <span>{c.dias_aguardando}d aguardando</span>
+                      )}
+                      {c.data_cancel && (
+                        <span>Cancelado em {new Date(c.data_cancel).toLocaleDateString('pt-BR')}</span>
+                      )}
+                      {c.motivo && (
+                        <span className="italic truncate max-w-xs" title={c.motivo}>"{c.motivo}"</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </GlassCard>
