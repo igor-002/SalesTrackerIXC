@@ -178,12 +178,22 @@ export function useComissaoPagamentos({
       }).filter(r => r.codigo_contrato_ixc)
       console.log('[CP-DEBUG] registros para upsert:', registros.length, JSON.stringify(registros[0]))
 
-      // Upsert em lotes de 100
+      // Passo 1: insert novos (em lotes de 100)
       for (let i = 0; i < registros.length; i += 100) {
         const lote = registros.slice(i, i + 100)
         await supabase
           .from('comissao_pagamentos')
           .upsert(lote as never, { onConflict: 'codigo_contrato_ixc,periodo_referencia', ignoreDuplicates: true })
+      }
+
+      // Passo 2: corrige periodo_pagamento se mudou (preserva status/data_pagamento/marcado_por)
+      for (const r of registros) {
+        await supabase
+          .from('comissao_pagamentos')
+          .update({ periodo_pagamento: r.periodo_pagamento } as never)
+          .eq('codigo_contrato_ixc', r.codigo_contrato_ixc as string)
+          .eq('periodo_referencia', r.periodo_referencia)
+          .neq('periodo_pagamento', r.periodo_pagamento)
       }
     } catch (e) {
       console.error('[useComissaoPagamentos] sync error:', e)
