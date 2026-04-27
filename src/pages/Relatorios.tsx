@@ -1095,66 +1095,78 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
         </div>
       )}
 
-      {/* SEÇÃO 3c — Contratos Cancelados (colapsada) */}
-      {canceladosData.length > 0 && (
-        <GlassCard className="overflow-hidden">
+      {/* SEÇÃO 3c — Contratos Cancelados (colapsada por padrão) */}
+      {canceladosData.filter(c => !canceladosOcultados.has(c.id)).length > 0 && (
+        <div
+          className="rounded-2xl overflow-hidden"
+          style={{ border: '1px solid rgba(239,68,68,0.3)' }}
+        >
+          {/* Header */}
           <button
             onClick={() => setCanceladosExpanded(v => !v)}
-            className="w-full flex items-center gap-3 px-5 py-4 cursor-pointer transition-colors hover:bg-white/2"
+            className="w-full flex items-center gap-3 px-5 py-4 cursor-pointer transition-colors"
+            style={{ background: 'rgba(239,68,68,0.08)' }}
+            onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.13)' }}
+            onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(239,68,68,0.08)' }}
           >
-            <X size={15} className="shrink-0" style={{ color: '#ef4444' }} />
+            <X size={15} className="shrink-0 text-red-400" />
             <h3 className="text-sm font-semibold text-white">Contratos Cancelados</h3>
-            <span
-              className="text-xs font-bold px-2 py-0.5 rounded-full ml-1"
-              style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}
-            >
-              {canceladosData.length}
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full ml-1 bg-red-500/20 text-red-400">
+              {canceladosData.filter(c => !canceladosOcultados.has(c.id)).length}
             </span>
             <span className="ml-auto text-white/30 shrink-0">
               {canceladosExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
             </span>
           </button>
+
+          {/* Linhas */}
           {canceladosExpanded && (
-            <div className="px-5 pb-5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="flex flex-col gap-2 pt-4">
+            <div className="px-5 pb-5 pt-3" style={{ borderTop: '1px solid rgba(239,68,68,0.15)' }}>
+              <div className="flex flex-col gap-2">
                 {canceladosData.filter(c => !canceladosOcultados.has(c.id)).map(c => (
                   <div
                     key={c.id}
-                    className="flex flex-col sm:flex-row sm:items-center gap-2 px-4 py-3 rounded-xl"
-                    style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', opacity: 0.7 }}
+                    className="flex items-start gap-3 px-4 py-3 rounded-xl"
+                    style={{ background: 'rgba(239,68,68,0.04)', border: '1px solid rgba(239,68,68,0.12)' }}
                   >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-white/60 line-through truncate">{c.cliente_nome}</p>
-                      <p className="text-xs text-white/30 mt-0.5">{c.vendedor_nome}</p>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                      <p className="text-sm font-semibold text-white truncate">{c.cliente_nome}</p>
+                      <p className="text-xs text-white/40">{c.vendedor_nome}</p>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
+                        {c.data_cancel && (
+                          <span className="text-xs text-white/35">
+                            Cancelado em {new Date(c.data_cancel).toLocaleDateString('pt-BR')}
+                          </span>
+                        )}
+                        {c.dias_aguardando > 0 && (
+                          <span className="text-xs text-white/30">{c.dias_aguardando}d aguardando</span>
+                        )}
+                        {c.motivo && (
+                          <span className="text-xs text-white/30 italic" title={c.motivo}>
+                            "{c.motivo.length > 60 ? c.motivo.slice(0, 60) + '…' : c.motivo}"
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-white/30 shrink-0">
-                      {c.dias_aguardando > 0 && (
-                        <span>{c.dias_aguardando}d aguardando</span>
-                      )}
-                      {c.data_cancel && (
-                        <span>Cancelado em {new Date(c.data_cancel).toLocaleDateString('pt-BR')}</span>
-                      )}
-                      {c.motivo && (
-                        <span className="italic truncate max-w-xs" title={c.motivo}>"{c.motivo}"</span>
-                      )}
-                      <button
-                        onClick={() => setReativarModal({ id: c.id, cliente_nome: c.cliente_nome })}
-                        title="Reativar contrato"
-                        className="flex items-center gap-1 px-2 py-1 rounded-lg transition-colors cursor-pointer"
-                        style={{ color: 'rgba(0,214,143,0.6)', background: 'rgba(0,214,143,0.08)', border: '1px solid rgba(0,214,143,0.2)' }}
-                        onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.color = '#00d68f'; (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,214,143,0.15)' }}
-                        onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.color = 'rgba(0,214,143,0.6)'; (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,214,143,0.08)' }}
-                      >
-                        <RotateCcw size={12} />
-                        <span>Reativar</span>
-                      </button>
-                    </div>
+                    {/* Botão reativar */}
+                    <button
+                      onClick={() => setReativarModal({ id: c.id, cliente_nome: c.cliente_nome })}
+                      title="Reativar contrato"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold shrink-0 cursor-pointer transition-colors"
+                      style={{ color: '#00d68f', background: 'rgba(0,214,143,0.1)', border: '1px solid rgba(0,214,143,0.25)' }}
+                      onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,214,143,0.18)' }}
+                      onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,214,143,0.1)' }}
+                    >
+                      <RotateCcw size={12} />
+                      Reativar
+                    </button>
                   </div>
                 ))}
               </div>
             </div>
           )}
-        </GlassCard>
+        </div>
       )}
 
       {/* SEÇÃO 4 — Gráficos de Pizza */}
