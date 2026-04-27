@@ -120,36 +120,42 @@ export function useComissaoPagamentos({
       console.log('[CP-DEBUG] iniciando sync', { empresaId, mes, ano, vendedorId })
       console.log('[CP-DEBUG] empresa raw:', empresaData)
 
-      // Mês anterior — para capturar contratos transferidos (ativados após dia 20)
-      const prevDate = new Date(ano, mes - 2, 1)
-      const mesAnterior = prevDate.getMonth() + 1
-      const anoAnterior = prevDate.getFullYear()
+      if (!empresaId) {
+        console.warn('[CP-DEBUG] empresaId nulo, abortando sync')
+        return
+      }
 
-      const SELECT = 'id, vendedor_id, codigo_contrato_ixc, cliente_nome, plano, valor_unitario, quantidade, data_ativacao, mes_referencia, ano_referencia'
+      const mesAnterior = mes === 1 ? 12 : mes - 1
+      const anoAnterior = mes === 1 ? ano - 1 : ano
 
-      const [{ data: d1, error: e1 }, { data: d2, error: e2 }] = await Promise.all([
+      const SELECT = 'codigo_contrato_ixc, cliente_nome, plano, valor_unitario, quantidade, data_ativacao, status_ixc, vendedor_id, empresa_id, mes_referencia, ano_referencia'
+
+      const [res1, res2] = await Promise.all([
         supabase
           .from('vendas_historico')
           .select(SELECT)
+          .eq('empresa_id', empresaId)
           .eq('status_ixc', 'A')
           .eq('ano_referencia', ano)
-          .eq('mes_referencia', mes),
+          .eq('mes_referencia', mes)
+          .not('data_ativacao', 'is', null),
         supabase
           .from('vendas_historico')
           .select(SELECT)
+          .eq('empresa_id', empresaId)
           .eq('status_ixc', 'A')
           .eq('ano_referencia', anoAnterior)
           .eq('mes_referencia', mesAnterior)
           .not('data_ativacao', 'is', null),
       ])
 
-      if (e1) throw e1
-      if (e2) throw e2
+      if (res1.error) throw res1.error
+      if (res2.error) throw res2.error
 
-      const historico = [...(d1 ?? []), ...(d2 ?? [])]
-      console.log('[CP-DEBUG] contratos raw:', historico?.length, JSON.stringify(historico?.[0]))
+      const contratos = [...(res1.data ?? []), ...(res2.data ?? [])]
+      console.log('[CP-DEBUG] contratos raw:', contratos?.length, JSON.stringify(contratos?.[0]))
 
-      const registros = (historico ?? []).map(h => {
+      const registros = contratos.map(h => {
         const pct = resolverPct(h.vendedor_id ?? '')
         const valorPlano = (h.valor_unitario ?? 0) * (h.quantidade ?? 1)
         const periodoRefRow = `${h.ano_referencia}-${h.mes_referencia.toString().padStart(2, '0')}`
