@@ -465,7 +465,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
         </div>
 
         <ResponsiveContainer width="100%" height={300}>
-          <ComposedChart data={projecao6Meses} barGap={4}>
+          <ComposedChart data={projecao6Meses} barGap={4} margin={{ top: 20, right: 30, left: 10, bottom: 10 }}>
             <defs>
               <pattern id="projPattern" patternUnits="userSpaceOnUse" width="6" height="6">
                 <path d="M0,6 L6,0" stroke="rgba(255,255,255,0.3)" strokeWidth="1" />
@@ -480,6 +480,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
             />
             <YAxis
               yAxisId="left"
+              domain={[0, 'auto']}
               tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }}
               axisLine={false}
               tickLine={false}
@@ -489,6 +490,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
             <YAxis
               yAxisId="right"
               orientation="right"
+              domain={[0, 'auto']}
               tick={{ fill: 'rgba(0,214,143,0.6)', fontSize: 10 }}
               axisLine={false}
               tickLine={false}
