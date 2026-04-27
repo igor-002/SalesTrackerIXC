@@ -50,7 +50,7 @@ export function useComissaoPagamentos({
   isAdmin: boolean
 }) {
   const userId = useAuthStore(s => s.user?.id)
-  const { resolverPct, loading: loadingConfig } = useComissaoConfig()
+  const { resolverPct, empresaId, loading: loadingConfig } = useComissaoConfig()
 
   const [comissoes, setComissoes] = useState<ComissaoPagamento[]>([])
   const [loading, setLoading] = useState(true)
@@ -115,10 +115,7 @@ export function useComissaoPagamentos({
 
     setSyncing(true)
     try {
-      const { data: empresaData } = await supabase.rpc('get_empresa_id')
-      const empresaId = empresaData as string | null
       console.log('[CP-DEBUG] iniciando sync', { empresaId, mes, ano, vendedorId })
-      console.log('[CP-DEBUG] empresa raw:', empresaData)
 
       if (!empresaId) {
         console.warn('[CP-DEBUG] empresaId nulo, abortando sync')

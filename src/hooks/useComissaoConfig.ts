@@ -69,6 +69,7 @@ export function useComissaoConfig() {
 
   return {
     loading: loadingEmpresa || loadingVendedores,
+    empresaId: empresa?.id ?? null,
     padraoGlobal: empresa?.comissao_pct_padrao ?? null,
     vendedoresConfig,
     salvarPadraoGlobal,
