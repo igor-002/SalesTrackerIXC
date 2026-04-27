@@ -522,6 +522,13 @@ export function useRelatoriosRedesign(
     const ticketMedio = ativos.length > 0 ? mrrAtivo / ativos.length : 0
     const taxaConversao = contratos.length > 0 ? (ativos.length / contratos.length) * 100 : 0
 
+    const diasList = aguardando
+      .map(c => c.dias_aguardando)
+      .filter((d): d is number => d !== null && d > 0)
+    const mediaDiasAguardando = diasList.length > 0
+      ? Math.round(diasList.reduce((s, d) => s + d, 0) / diasList.length)
+      : null
+
     return {
       total: contratos.length,
       ativos: ativos.length,
@@ -530,6 +537,7 @@ export function useRelatoriosRedesign(
       mrrPendente,
       ticketMedio,
       taxaConversao,
+      mediaDiasAguardando,
     }
   }, [contratos])
 

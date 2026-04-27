@@ -3,6 +3,8 @@
  * 4 abas: Visão Geral · Ranking de Vendedores · Por Vendedor · Projetos & Serviços
  */
 import { useState, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, PieChart, Pie, Cell,
@@ -48,8 +50,8 @@ type Aba = 'visao_geral' | 'ranking' | 'por_vendedor' | 'projetos' | 'comissoes'
 
 // ── KPI Card ──────────────────────────────────────────────────────────────────
 
-function KpiCard({ label, value, icon, accentHex, sub }: {
-  label: string; value: string; icon: React.ReactNode; accentHex: string; sub?: string
+function KpiCard({ label, value, icon, accentHex, sub, subColor }: {
+  label: string; value: string; icon: React.ReactNode; accentHex: string; sub?: string; subColor?: string
 }) {
   return (
     <div
@@ -66,7 +68,7 @@ function KpiCard({ label, value, icon, accentHex, sub }: {
       <div>
         <p className="text-2xl font-bold text-white tracking-tight">{value}</p>
         <p className="text-xs font-medium text-white/50 mt-0.5">{label}</p>
-        {sub && <p className="text-xs text-white/30 mt-0.5">{sub}</p>}
+        {sub && <p className="text-xs mt-0.5" style={{ color: subColor ?? 'rgba(255,255,255,0.3)' }}>{sub}</p>}
       </div>
       <div className="absolute -right-4 -bottom-4 w-20 h-20 rounded-full opacity-[0.07]" style={{ background: accentHex }} />
     </div>
@@ -237,7 +239,39 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
   const { getMetaAtual } = useMetas()
   const metaAtual = getMetaAtual()
   const metaTime = metaAtual?.meta_mensal ?? 0
-  void metaTime
+
+  const { getMetaVendedor } = useMetasVendedor(now.getMonth() + 1, now.getFullYear())
+  const pctMetaTime = metaTime > 0 ? Math.min(100, (totaisTime.ativos / metaTime) * 100) : 0
+
+  const cancelMes = now.getMonth() + 1
+  const cancelAno = now.getFullYear()
+  const inicioMes = `${cancelAno}-${String(cancelMes).padStart(2, '0')}-01`
+  const inicioProximo = cancelMes === 12
+    ? `${cancelAno + 1}-01-01`
+    : `${cancelAno}-${String(cancelMes + 1).padStart(2, '0')}-01`
+  const { data: cancelData } = useQuery({
+    queryKey: ['cancelamentos-count', cancelAno, cancelMes],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('cancelamentos')
+        .select('id', { count: 'exact', head: true })
+        .gte('data_cancel', inicioMes)
+        .lt('data_cancel', inicioProximo)
+      return count ?? 0
+    },
+    staleTime: 2 * 60 * 1000,
+  })
+  const cancelCount = cancelData ?? 0
+  const churnDenom = kpis.ativos + cancelCount
+  const churnPct = churnDenom > 0 ? (cancelCount / churnDenom) * 100 : 0
+  const churnHex = churnPct < 2 ? '#00d68f' : churnPct < 5 ? '#f59e0b' : '#ef4444'
+
+  const diasMed = kpis.mediaDiasAguardando
+  const diasSubColor = diasMed === null ? undefined
+    : diasMed <= 7 ? '#00d68f'
+    : diasMed <= 15 ? '#f59e0b'
+    : '#ef4444'
+  const diasSub = diasMed !== null ? `média de ${diasMed} dias aguardando` : undefined
 
   const [sortCol, setSortCol] = useState<string>('ativos')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
@@ -440,14 +474,56 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
       </GlassCard>
 
       {/* SEÇÃO 1 — KPI Cards */}
-      <div className="grid grid-cols-2 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         <KpiCard label="Total Cadastrados" value={String(kpis.total)} icon={<FileText size={18} />} accentHex="#6b7280" />
-        <KpiCard label="Aguardando Assinatura" value={String(kpis.aguardando)} icon={<ChevronDown size={18} />} accentHex="#06b6d4" />
+        <KpiCard label="Aguardando Assinatura" value={String(kpis.aguardando)} icon={<ChevronDown size={18} />} accentHex="#06b6d4" sub={diasSub} subColor={diasSubColor} />
         <KpiCard label="Contratos Ativos" value={String(kpis.ativos)} icon={<Check size={18} />} accentHex="#00d68f" />
         <KpiCard label="MRR Confirmado" value={formatBRL(kpis.mrrAtivo)} icon={<DollarSign size={18} />} accentHex="#00d68f" sub={`ticket médio ${formatBRL(kpis.ticketMedio)}`} />
         <KpiCard label="MRR Potencial" value={formatBRL(kpis.mrrPendente)} icon={<TrendingUp size={18} />} accentHex="#f59e0b" sub="se todos AA/P ativarem" />
         <KpiCard label="Taxa de Conversão" value={formatPercent(kpis.taxaConversao)} icon={<Percent size={18} />} accentHex="#8b5cf6" sub="ativos ÷ total" />
+        <KpiCard label="Cancelamentos no Mês" value={`${cancelCount} (${churnPct.toFixed(1)}%)`} icon={<AlertCircle size={18} />} accentHex={churnHex} sub="cancelados ÷ (ativos + cancelados)" />
       </div>
+
+      {/* SEÇÃO METAS DO TIME */}
+      {metaTime > 0 && (
+        <GlassCard className="p-5">
+          <h3 className="text-sm font-semibold text-white mb-4">Painel de Metas do Time</h3>
+          <div className="flex flex-col gap-4">
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs text-white/50">Time — {totaisTime.ativos} de {metaTime} contratos</span>
+                <span className="text-xs font-semibold" style={{ color: '#00d68f' }}>{pctMetaTime.toFixed(0)}%</span>
+              </div>
+              <ProgressBar value={pctMetaTime} color="success" size="md" emptyLabel="Mês iniciando" />
+              {metaTime > totaisTime.ativos && (
+                <p className="text-xs text-white/30 mt-1">Faltam {metaTime - totaisTime.ativos} contratos para a meta</p>
+              )}
+            </div>
+            {performanceSorted.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 pt-2 border-t border-white/5">
+                {performanceSorted.map(v => {
+                  const metaV = getMetaVendedor(v.vendedor_id)
+                  const pctV = metaV > 0 ? Math.min(100, (v.ativos / metaV) * 100) : 0
+                  return (
+                    <div key={v.vendedor_id}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-white/60 truncate">{v.nome}</span>
+                        <span className="text-xs text-white/40 ml-2 shrink-0">
+                          {metaV > 0 ? `${v.ativos}/${metaV}` : `${v.ativos} — sem meta`}
+                        </span>
+                      </div>
+                      {metaV > 0
+                        ? <ProgressBar value={pctV} color="primary" size="sm" emptyLabel="Mês iniciando" />
+                        : <div className="h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }} />
+                      }
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </GlassCard>
+      )}
 
       {/* SEÇÃO 2 — Evolução + Projeção */}
       <GlassCard className="p-5">
