@@ -123,18 +123,82 @@ export type Database = {
           },
         ]
       }
+      comissao_pagamentos: {
+        Row: {
+          id: string
+          empresa_id: string
+          vendedor_id: string | null
+          codigo_contrato_ixc: string | null
+          cliente_nome: string
+          plano: string | null
+          valor_plano: number
+          comissao_pct: number | null
+          comissao_valor: number | null
+          periodo_referencia: string
+          periodo_pagamento: string
+          data_ativacao: string | null
+          status: string
+          data_pagamento: string | null
+          marcado_por: string | null
+          observacao: string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          empresa_id?: string
+          vendedor_id?: string | null
+          codigo_contrato_ixc?: string | null
+          cliente_nome: string
+          plano?: string | null
+          valor_plano: number
+          comissao_pct?: number | null
+          periodo_referencia: string
+          periodo_pagamento: string
+          data_ativacao?: string | null
+          status?: string
+          data_pagamento?: string | null
+          marcado_por?: string | null
+          observacao?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          empresa_id?: string
+          vendedor_id?: string | null
+          codigo_contrato_ixc?: string | null
+          cliente_nome?: string
+          plano?: string | null
+          valor_plano?: number
+          comissao_pct?: number | null
+          periodo_referencia?: string
+          periodo_pagamento?: string
+          data_ativacao?: string | null
+          status?: string
+          data_pagamento?: string | null
+          marcado_por?: string | null
+          observacao?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       empresas: {
         Row: {
+          comissao_pct_padrao: number | null
           created_at: string | null
           id: string
           nome: string
         }
         Insert: {
+          comissao_pct_padrao?: number | null
           created_at?: string | null
           id?: string
           nome: string
         }
         Update: {
+          comissao_pct_padrao?: number | null
           created_at?: string | null
           id?: string
           nome?: string
@@ -730,6 +794,7 @@ export type Database = {
       vendedores: {
         Row: {
           ativo: boolean | null
+          comissao_pct_padrao: number | null
           created_at: string | null
           email: string | null
           empresa_id: string
@@ -742,6 +807,7 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean | null
+          comissao_pct_padrao?: number | null
           created_at?: string | null
           email?: string | null
           empresa_id?: string
@@ -754,6 +820,7 @@ export type Database = {
         }
         Update: {
           ativo?: boolean | null
+          comissao_pct_padrao?: number | null
           created_at?: string | null
           email?: string | null
           empresa_id?: string

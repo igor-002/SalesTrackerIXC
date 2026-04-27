@@ -1,6 +1,6 @@
-/**
- * Página de Relatórios — Redesign completo com gráficos evolutivos e funil.
- * 4 abas: Visão Geral · Ranking de Vendedores · Por Vendedor · Projetos & Serviços
+﻿/**
+ * PÃ¡gina de RelatÃ³rios â€” Redesign completo com grÃ¡ficos evolutivos e funil.
+ * 4 abas: VisÃ£o Geral Â· Ranking de Vendedores Â· Por Vendedor Â· Projetos & ServiÃ§os
  */
 import { useState, useMemo } from 'react'
 import {
@@ -30,13 +30,12 @@ import {
 } from '@/hooks/useRelatoriosIxc'
 import { formatBRL, formatPercent } from '@/lib/formatters'
 import { useVendasUnicas } from '@/hooks/useVendasUnicas'
-import { useComissoesVendedor } from '@/hooks/useComissoesVendedor'
-import { useComissaoConfig } from '@/hooks/useComissaoConfig'
+import { TabComissoesPagamento } from '@/components/TabComissoesPagamento'
 
-// ── Constantes ───────────────────────────────────────────────────────────────
+// â”€â”€ Constantes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const MESES_LABELS = [
-  'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+  'Janeiro','Fevereiro','MarÃ§o','Abril','Maio','Junho',
   'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
 ]
 
@@ -47,7 +46,7 @@ const CORES_VENDEDORES = [
 
 type Aba = 'visao_geral' | 'ranking' | 'por_vendedor' | 'projetos' | 'comissoes'
 
-// ── KPI Card ──────────────────────────────────────────────────────────────────
+// â”€â”€ KPI Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function KpiCard({ label, value, icon, accentHex, sub }: {
   label: string; value: string; icon: React.ReactNode; accentHex: string; sub?: string
@@ -74,7 +73,7 @@ function KpiCard({ label, value, icon, accentHex, sub }: {
   )
 }
 
-// ── Tooltip escuro Recharts ───────────────────────────────────────────────────
+// â”€â”€ Tooltip escuro Recharts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function DarkTooltip({ active, payload, label }: {
   active?: boolean; payload?: { name: string; value: number; color: string; dataKey?: string }[]; label?: string
@@ -147,7 +146,7 @@ function EvolucaoTooltip({ active, payload, label }: {
               className="font-semibold mt-1.5 pt-1.5"
               style={{ color: 'rgba(255,255,255,0.75)', borderTop: '1px solid rgba(255,255,255,0.08)' }}
             >
-              MRR possível: {formatBRL(mrr.value + mrrPendente)}
+              MRR possÃ­vel: {formatBRL(mrr.value + mrrPendente)}
             </p>
           )}
         </div>
@@ -156,7 +155,7 @@ function EvolucaoTooltip({ active, payload, label }: {
   )
 }
 
-// ── Seletor Mês/Ano ───────────────────────────────────────────────────────────
+// â”€â”€ Seletor MÃªs/Ano â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function MesAnoSelect({ mes, ano, onChangeMes, onChangeAno }: {
   mes: number; ano: number; onChangeMes: (m: number) => void; onChangeAno: (a: number) => void
@@ -190,7 +189,7 @@ function MesAnoSelect({ mes, ano, onChangeMes, onChangeAno }: {
   )
 }
 
-// ── Aba 1: Visão Geral (Redesign) ─────────────────────────────────────────────
+// â”€â”€ Aba 1: VisÃ£o Geral (Redesign) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
   vendedorIdFiltro: string | null
@@ -201,7 +200,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
   const [vendedorLocal, setVendedorLocal] = useState<string | null>(null)
   const vendedorEfetivo = isGestor ? vendedorLocal : vendedorIdFiltro
 
-  // Período — modo e valores pendentes (antes do Aplicar) e aplicados
+  // PerÃ­odo â€” modo e valores pendentes (antes do Aplicar) e aplicados
   const [periodoMode, setPeriodoMode] = useState<'ultimos3' | 'custom'>('ultimos3')
   const [pendingMes, setPendingMes] = useState(now.getMonth() + 1)
   const [pendingAno, setPendingAno] = useState(now.getFullYear())
@@ -327,11 +326,11 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
       {/* Filtros */}
       <GlassCard className="p-4">
         <div className="flex flex-wrap items-end gap-4">
-          {/* Seletor de Período */}
+          {/* Seletor de PerÃ­odo */}
           <div className="flex flex-col gap-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-white/40">Período</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-white/40">PerÃ­odo</p>
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Toggle Últimos 3 meses / Específico */}
+              {/* Toggle Ãšltimos 3 meses / EspecÃ­fico */}
               <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
                 <button
                   onClick={handleUltimos3}
@@ -341,7 +340,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                     : { background: 'transparent', color: 'rgba(255,255,255,0.4)' }
                   }
                 >
-                  Últimos 3 meses
+                  Ãšltimos 3 meses
                 </button>
                 <button
                   onClick={() => setPeriodoMode('custom')}
@@ -351,11 +350,11 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                     : { background: 'transparent', color: 'rgba(255,255,255,0.4)' }
                   }
                 >
-                  Período específico
+                  PerÃ­odo especÃ­fico
                 </button>
               </div>
 
-              {/* Dropdowns + Aplicar — só aparece em modo custom */}
+              {/* Dropdowns + Aplicar â€” sÃ³ aparece em modo custom */}
               {periodoMode === 'custom' && (
                 <div className="flex items-center gap-2">
                   <select
@@ -389,7 +388,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
               )}
             </div>
 
-            {/* Indicador do período ativo */}
+            {/* Indicador do perÃ­odo ativo */}
             <div className="flex items-center gap-2">
               <p className="text-xs text-white/50">
                 {isCustom && aplicado
@@ -399,7 +398,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
               </p>
               {isHistorico && (
                 <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
-                  dados do histórico
+                  dados do histÃ³rico
                 </span>
               )}
             </div>
@@ -424,29 +423,29 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
         </div>
       </GlassCard>
 
-      {/* SEÇÃO 1 — KPI Cards */}
+      {/* SEÃ‡ÃƒO 1 â€” KPI Cards */}
       <div className="grid grid-cols-2 xl:grid-cols-6 gap-4">
         <KpiCard label="Total Cadastrados" value={String(kpis.total)} icon={<FileText size={18} />} accentHex="#6b7280" />
         <KpiCard label="Aguardando Assinatura" value={String(kpis.aguardando)} icon={<ChevronDown size={18} />} accentHex="#06b6d4" />
         <KpiCard label="Contratos Ativos" value={String(kpis.ativos)} icon={<Check size={18} />} accentHex="#00d68f" />
-        <KpiCard label="MRR Confirmado" value={formatBRL(kpis.mrrAtivo)} icon={<DollarSign size={18} />} accentHex="#00d68f" sub={`ticket médio ${formatBRL(kpis.ticketMedio)}`} />
+        <KpiCard label="MRR Confirmado" value={formatBRL(kpis.mrrAtivo)} icon={<DollarSign size={18} />} accentHex="#00d68f" sub={`ticket mÃ©dio ${formatBRL(kpis.ticketMedio)}`} />
         <KpiCard label="MRR Potencial" value={formatBRL(kpis.mrrPendente)} icon={<TrendingUp size={18} />} accentHex="#f59e0b" sub="se todos AA/P ativarem" />
-        <KpiCard label="Taxa de Conversão" value={formatPercent(kpis.taxaConversao)} icon={<Percent size={18} />} accentHex="#8b5cf6" sub="ativos ÷ total" />
+        <KpiCard label="Taxa de ConversÃ£o" value={formatPercent(kpis.taxaConversao)} icon={<Percent size={18} />} accentHex="#8b5cf6" sub="ativos Ã· total" />
       </div>
 
-      {/* SEÇÃO 2 — Evolução + Projeção */}
+      {/* SEÃ‡ÃƒO 2 â€” EvoluÃ§Ã£o + ProjeÃ§Ã£o */}
       <GlassCard className="p-5">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-sm font-semibold text-white">
               {isCustom && aplicado
-                ? `Evolução — ${MESES_LABELS[aplicado.mes - 1]} / ${aplicado.ano}`
-                : 'Evolução e Projeção'}
+                ? `EvoluÃ§Ã£o â€” ${MESES_LABELS[aplicado.mes - 1]} / ${aplicado.ano}`
+                : 'EvoluÃ§Ã£o e ProjeÃ§Ã£o'}
             </h3>
             <p className="text-xs text-white/30 mt-0.5">
               {isCustom
-                ? 'Mês selecionado'
-                : '3 meses reais + 3 meses projetados (média ponderada + tendência)'}
+                ? 'MÃªs selecionado'
+                : '3 meses reais + 3 meses projetados (mÃ©dia ponderada + tendÃªncia)'}
             </p>
           </div>
           <div className="flex items-center gap-4 text-xs flex-wrap">
@@ -456,11 +455,11 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded" style={{ background: '#f59e0b' }} />
-              <span className="text-white/50">Aguardando Ativação</span>
+              <span className="text-white/50">Aguardando AtivaÃ§Ã£o</span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded opacity-50" style={{ background: '#00d68f', border: '1px dashed #00d68f' }} />
-              <span className="text-white/50">Projeção</span>
+              <span className="text-white/50">ProjeÃ§Ã£o</span>
             </span>
           </div>
         </div>
@@ -533,7 +532,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
             <Bar
               yAxisId="left"
               dataKey="aguardando"
-              name="Aguardando Ativação"
+              name="Aguardando AtivaÃ§Ã£o"
               radius={[4,4,0,0]}
               fill="#f59e0b"
               maxBarSize={60}
@@ -587,18 +586,18 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
             />
           </ComposedChart>
         </ResponsiveContainer>
-        <p className="text-xs text-white/30 text-center mt-2">Barras tracejadas = projeção · Linha verde = MRR (escala à direita)</p>
+        <p className="text-xs text-white/30 text-center mt-2">Barras tracejadas = projeÃ§Ã£o Â· Linha verde = MRR (escala Ã  direita)</p>
       </GlassCard>
 
-      {/* Cards de Projeção */}
+      {/* Cards de ProjeÃ§Ã£o */}
       {projecao6Meses.filter(p => p.tipo === 'projecao').length > 0 && (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           {projecao6Meses.filter(p => p.tipo === 'projecao').map(proj => (
             <GlassCard key={`${proj.mes}-${proj.ano}`} className="p-4">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-white/40">Projeção {proj.mesLabel}</span>
+                <span className="text-xs font-semibold uppercase tracking-wide text-white/40">ProjeÃ§Ã£o {proj.mesLabel}</span>
                 <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}>
-                  ±15%
+                  Â±15%
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -606,14 +605,14 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                   <p className="text-xs text-white/40 mb-1">Ativos esperados</p>
                   <p className="text-xl font-bold text-white">{proj.ativos}</p>
                   <p className="text-xs text-white/30 mt-0.5">
-                    {proj.ativosMin}–{proj.ativosMax}
+                    {proj.ativosMin}â€“{proj.ativosMax}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-white/40 mb-1">MRR esperado</p>
                   <p className="text-xl font-bold" style={{ color: '#00d68f' }}>{formatBRL(proj.mrr)}</p>
                   <p className="text-xs text-white/30 mt-0.5">
-                    {formatBRL(proj.mrrMin ?? 0)}–{formatBRL(proj.mrrMax ?? 0)}
+                    {formatBRL(proj.mrrMin ?? 0)}â€“{formatBRL(proj.mrrMax ?? 0)}
                   </p>
                 </div>
               </div>
@@ -622,7 +621,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
         </div>
       )}
 
-      {/* SEÇÃO 3 — Funil de Vendas */}
+      {/* SEÃ‡ÃƒO 3 â€” Funil de Vendas */}
       <GlassCard className="p-5">
         <h3 className="text-sm font-semibold text-white mb-4">Funil de Vendas</h3>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
@@ -647,21 +646,21 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
             })}
           </div>
 
-          {/* Métricas do funil */}
+          {/* MÃ©tricas do funil */}
           <div className="grid grid-cols-2 gap-4">
             <div className="p-4 rounded-xl" style={{ background: 'rgba(0,214,143,0.08)', border: '1px solid rgba(0,214,143,0.15)' }}>
-              <p className="text-xs text-white/50 mb-1">Taxa de Conversão</p>
+              <p className="text-xs text-white/50 mb-1">Taxa de ConversÃ£o</p>
               <p className="text-2xl font-bold" style={{ color: '#00d68f' }}>{funil.taxaConversao.toFixed(1)}%</p>
-              <p className="text-xs text-white/30 mt-1">ativos ÷ cadastrados</p>
+              <p className="text-xs text-white/30 mt-1">ativos Ã· cadastrados</p>
             </div>
             <div className="p-4 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)' }}>
               <p className="text-xs text-white/50 mb-1">Taxa de Perda</p>
               <p className="text-2xl font-bold" style={{ color: '#ef4444' }}>{funil.taxaPerda.toFixed(1)}%</p>
-              <p className="text-xs text-white/30 mt-1">cancelados ÷ cadastrados</p>
+              <p className="text-xs text-white/30 mt-1">cancelados Ã· cadastrados</p>
             </div>
             <div className="p-4 rounded-xl col-span-2" style={{ background: 'rgba(6,182,212,0.08)', border: '1px solid rgba(6,182,212,0.15)' }}>
               <div className="flex items-center gap-2 mb-1">
-                <p className="text-xs text-white/50">Tempo Médio para Ativar</p>
+                <p className="text-xs text-white/50">Tempo MÃ©dio para Ativar</p>
                 {funil.tempoMedioAtivacaoIsEstimado && (
                   <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
                     espera atual
@@ -669,28 +668,28 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                 )}
               </div>
               <p className="text-2xl font-bold" style={{ color: '#06b6d4' }}>
-                {funil.tempoMedioAtivacao !== null ? `${funil.tempoMedioAtivacao.toFixed(1)} dias` : '—'}
+                {funil.tempoMedioAtivacao !== null ? `${funil.tempoMedioAtivacao.toFixed(1)} dias` : 'â€”'}
               </p>
               <p className="text-xs text-white/30 mt-1">
                 {funil.tempoMedioAtivacaoIsEstimado
-                  ? 'média dos contratos aguardando hoje'
-                  : 'do cadastro até ativação'}
+                  ? 'mÃ©dia dos contratos aguardando hoje'
+                  : 'do cadastro atÃ© ativaÃ§Ã£o'}
               </p>
             </div>
           </div>
         </div>
       </GlassCard>
 
-      {/* SEÇÃO 3b — Contratos Aguardando há Mais Tempo (expansível) */}
+      {/* SEÃ‡ÃƒO 3b â€” Contratos Aguardando hÃ¡ Mais Tempo (expansÃ­vel) */}
       {aguardandoAntigos.length > 0 && (
         <GlassCard className="overflow-hidden">
-          {/* Header clicável */}
+          {/* Header clicÃ¡vel */}
           <button
             onClick={() => { setAguardandoExpanded(v => !v); setAguardandoVerTodos(false) }}
             className="w-full flex items-center gap-3 px-5 py-4 cursor-pointer transition-colors hover:bg-white/2"
           >
             <Clock size={15} className="text-amber-400 shrink-0" />
-            <h3 className="text-sm font-semibold text-white">Contratos Aguardando há Mais Tempo</h3>
+            <h3 className="text-sm font-semibold text-white">Contratos Aguardando hÃ¡ Mais Tempo</h3>
             <span
               className="text-xs font-bold px-2 py-0.5 rounded-full ml-1"
               style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
@@ -702,7 +701,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
             </span>
           </button>
 
-          {/* Conteúdo expansível */}
+          {/* ConteÃºdo expansÃ­vel */}
           {aguardandoExpanded && (
             <div className="px-5 pb-5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 pt-4">
@@ -756,12 +755,12 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
         </GlassCard>
       )}
 
-      {/* SEÇÃO 4 — Gráficos de Pizza */}
+      {/* SEÃ‡ÃƒO 4 â€” GrÃ¡ficos de Pizza */}
       {distribuicaoVendedor.length > 0 && (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
           {/* Pizza 1: Contratos Ativos */}
           <GlassCard className="p-5">
-            <h3 className="text-sm font-semibold text-white mb-4">Distribuição de Contratos Ativos</h3>
+            <h3 className="text-sm font-semibold text-white mb-4">DistribuiÃ§Ã£o de Contratos Ativos</h3>
             <ResponsiveContainer width="100%" height={280}>
               <PieChart>
                 <Pie
@@ -799,7 +798,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
 
           {/* Pizza 2: MRR */}
           <GlassCard className="p-5">
-            <h3 className="text-sm font-semibold text-white mb-4">Distribuição de MRR</h3>
+            <h3 className="text-sm font-semibold text-white mb-4">DistribuiÃ§Ã£o de MRR</h3>
             <ResponsiveContainer width="100%" height={280}>
               <PieChart>
                 <Pie
@@ -838,10 +837,10 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
         </div>
       )}
 
-      {/* SEÇÃO 5 — Linha de Tendência MRR */}
+      {/* SEÃ‡ÃƒO 5 â€” Linha de TendÃªncia MRR */}
       <GlassCard className="p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-semibold text-white">Tendência de MRR</h3>
+          <h3 className="text-sm font-semibold text-white">TendÃªncia de MRR</h3>
           <div className="flex items-center gap-3 text-xs">
             <span className="flex items-center gap-1.5">
               <span className="w-3 h-1 rounded" style={{ background: '#00d68f' }} />
@@ -878,7 +877,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
         </ResponsiveContainer>
       </GlassCard>
 
-      {/* SEÇÃO 6 — Tabela de Performance por Vendedor */}
+      {/* SEÃ‡ÃƒO 6 â€” Tabela de Performance por Vendedor */}
       <GlassCard className="overflow-hidden">
         <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <h3 className="text-sm font-semibold text-white">Performance por Vendedor</h3>
@@ -896,9 +895,9 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                   { key: 'aguardando', label: 'Aguardando' },
                   { key: 'cancelados', label: 'Cancelados' },
                   { key: 'mrrTotal', label: 'MRR Total' },
-                  { key: 'ticketMedio', label: 'Ticket Médio' },
-                  { key: 'taxaConversao', label: 'Taxa de Conversão' },
-                  { key: 'tempoMedioAtivacao', label: 'Tempo Médio Ativação' },
+                  { key: 'ticketMedio', label: 'Ticket MÃ©dio' },
+                  { key: 'taxaConversao', label: 'Taxa de ConversÃ£o' },
+                  { key: 'tempoMedioAtivacao', label: 'Tempo MÃ©dio AtivaÃ§Ã£o' },
                 ].map(col => (
                   <th
                     key={col.key}
@@ -906,7 +905,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                     className="px-3 py-3 text-left text-xs font-bold uppercase tracking-widest text-white/30 cursor-pointer hover:text-white/50 transition-colors whitespace-nowrap"
                   >
                     {col.label}
-                    {sortCol === col.key && <span className="ml-1">{sortDir === 'asc' ? '↑' : '↓'}</span>}
+                    {sortCol === col.key && <span className="ml-1">{sortDir === 'asc' ? 'â†‘' : 'â†“'}</span>}
                   </th>
                 ))}
               </tr>
@@ -938,7 +937,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                     {melhorPorColuna.taxaConversao === p.vendedor_id && <Award size={12} className="inline ml-1.5 text-amber-400" />}
                   </td>
                   <td className="px-3 py-3 tabular-nums text-white/50">
-                    {p.tempoMedioAtivacao !== null ? `${p.tempoMedioAtivacao.toFixed(1)} dias` : '—'}
+                    {p.tempoMedioAtivacao !== null ? `${p.tempoMedioAtivacao.toFixed(1)} dias` : 'â€”'}
                   </td>
                 </tr>
               ))}
@@ -952,7 +951,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                 <td className="px-3 py-3 tabular-nums text-white">{formatBRL(totaisTime.mrrTotal)}</td>
                 <td className="px-3 py-3 tabular-nums text-white/70">{formatBRL(totaisTime.ticketMedio)}</td>
                 <td className="px-3 py-3 tabular-nums text-white/70">{totaisTime.taxaConversao.toFixed(1)}%</td>
-                <td className="px-3 py-3 tabular-nums text-white/50">—</td>
+                <td className="px-3 py-3 tabular-nums text-white/50">â€”</td>
               </tr>
             </tbody>
           </table>
@@ -962,7 +961,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
   )
 }
 
-// ── Aba 2: Ranking de Vendedores ───────────────────────────────────────────────
+// â”€â”€ Aba 2: Ranking de Vendedores â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function TabRanking({ vendedores }: {
   vendedores: { id: string; nome: string; ativo: boolean | null }[]
@@ -1012,7 +1011,7 @@ function TabRanking({ vendedores }: {
     <div className="flex flex-col gap-5">
       <GlassCard className="p-4">
         <div className="flex flex-col gap-1.5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-white/40">Período</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-white/40">PerÃ­odo</p>
           <MesAnoSelect mes={mes} ano={ano} onChangeMes={setMes} onChangeAno={setAno} />
         </div>
       </GlassCard>
@@ -1020,12 +1019,12 @@ function TabRanking({ vendedores }: {
       <GlassCard className="overflow-hidden">
         <div className="px-5 py-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <h3 className="text-sm font-semibold text-white">Ranking de Vendedores</h3>
-          <p className="text-xs text-white/30 mt-0.5">Clique no ícone para definir a meta individual</p>
+          <p className="text-xs text-white/30 mt-0.5">Clique no Ã­cone para definir a meta individual</p>
         </div>
         {isFetching || loadingMetas ? (
           <div className="flex justify-center py-10"><Spinner style={{ color: '#00d68f' }} /></div>
         ) : ranking.length === 0 ? (
-          <p className="text-sm text-white/30 px-5 py-8 text-center">Nenhum dado no período.</p>
+          <p className="text-sm text-white/30 px-5 py-8 text-center">Nenhum dado no perÃ­odo.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -1069,7 +1068,7 @@ function TabRanking({ vendedores }: {
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
-                          <span className="text-white/60 tabular-nums">{r.meta > 0 ? r.meta : '—'}</span>
+                          <span className="text-white/60 tabular-nums">{r.meta > 0 ? r.meta : 'â€”'}</span>
                           <button
                             onClick={() => setEditando({ vendedorId: r.id, valor: r.meta })}
                             className="text-white/20 hover:text-white/60 transition-colors cursor-pointer"
@@ -1085,7 +1084,7 @@ function TabRanking({ vendedores }: {
                             color={r.pct >= 100 ? 'success' : r.pct >= 60 ? 'primary' : 'warning'}
                             size="sm"
                             className="flex-1"
-                            emptyLabel="Mês iniciando"
+                            emptyLabel="MÃªs iniciando"
                           />
                           <span className="text-xs font-semibold text-white/60 w-10 text-right tabular-nums">{r.pct.toFixed(0)}%</span>
                         </div>
@@ -1104,7 +1103,7 @@ function TabRanking({ vendedores }: {
   )
 }
 
-// ── Aba 3: Por Vendedor ───────────────────────────────────────────────────────
+// â”€â”€ Aba 3: Por Vendedor â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
   vendedorIdFiltro: string | null
@@ -1201,7 +1200,7 @@ function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
             </div>
           )}
           <div className="flex flex-col gap-1.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-white/40">Período</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-white/40">PerÃ­odo</p>
             <MesAnoSelect mes={mes} ano={ano} onChangeMes={setMes} onChangeAno={setAno} />
           </div>
         </div>
@@ -1214,43 +1213,43 @@ function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
             <KpiCard label="Contratos Ativos" value={String(kpis.ativos)} icon={<Check size={18} />} accentHex="#00d68f" />
             <KpiCard label="Aguardando Assinatura" value={String(kpis.aguardando)} icon={<ChevronDown size={18} />} accentHex="#06b6d4" />
-            <KpiCard label="% da Meta" value={meta > 0 ? formatPercent(pctMeta) : '—'} icon={<Target size={18} />} accentHex="#8b5cf6" sub={meta > 0 ? `meta: ${meta}` : 'sem meta definida'} />
-            <KpiCard label="Ticket Médio" value={formatBRL(kpis.ticketMedio)} icon={<DollarSign size={18} />} accentHex="#f59e0b" sub="por contrato ativo" />
+            <KpiCard label="% da Meta" value={meta > 0 ? formatPercent(pctMeta) : 'â€”'} icon={<Target size={18} />} accentHex="#8b5cf6" sub={meta > 0 ? `meta: ${meta}` : 'sem meta definida'} />
+            <KpiCard label="Ticket MÃ©dio" value={formatBRL(kpis.ticketMedio)} icon={<DollarSign size={18} />} accentHex="#f59e0b" sub="por contrato ativo" />
           </div>
 
           <GlassCard className="p-5">
             <div className="flex items-center gap-3 mb-4 flex-wrap">
-              <h3 className="text-sm font-semibold text-white">Perfil de desempenho — {nomeVendedor}</h3>
+              <h3 className="text-sm font-semibold text-white">Perfil de desempenho â€” {nomeVendedor}</h3>
               {badgeDestaque && (
                 <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(0,214,143,0.15)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.3)' }}>
-                  ★ Melhor conversão do time
+                  â˜… Melhor conversÃ£o do time
                 </span>
               )}
               {badgeAtencao && (
                 <span className="text-xs font-bold px-2.5 py-1 rounded-full" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}>
-                  ⚠ Mais cancelamentos do time
+                  âš  Mais cancelamentos do time
                 </span>
               )}
             </div>
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-5">
               <div>
-                <p className="text-xs text-white/40 mb-1">Taxa de conversão</p>
+                <p className="text-xs text-white/40 mb-1">Taxa de conversÃ£o</p>
                 <p className="text-xl font-bold text-white">{formatPercent(taxaConversaoInd)}</p>
-                <p className="text-xs text-white/30 mt-0.5">ativos ÷ total cadastrados</p>
+                <p className="text-xs text-white/30 mt-0.5">ativos Ã· total cadastrados</p>
               </div>
               <div>
-                <p className="text-xs text-white/40 mb-1">Tempo médio de ativação</p>
+                <p className="text-xs text-white/40 mb-1">Tempo mÃ©dio de ativaÃ§Ã£o</p>
                 {tempoAtivInd ? (
                   <>
                     <p className="text-xl font-bold text-white">{tempoAtivInd.mediaDias.toFixed(1)}<span className="text-sm font-normal text-white/40 ml-1">dias</span></p>
-                    <p className="text-xs text-white/30 mt-0.5">melhor {tempoAtivInd.melhorCaso}d · pior {tempoAtivInd.piorCaso}d</p>
+                    <p className="text-xs text-white/30 mt-0.5">melhor {tempoAtivInd.melhorCaso}d Â· pior {tempoAtivInd.piorCaso}d</p>
                   </>
                 ) : (
-                  <p className="text-sm text-white/30">—</p>
+                  <p className="text-sm text-white/30">â€”</p>
                 )}
               </div>
               <div>
-                <p className="text-xs text-white/40 mb-1">Cancelamentos no período</p>
+                <p className="text-xs text-white/40 mb-1">Cancelamentos no perÃ­odo</p>
                 <p className="text-xl font-bold" style={{ color: cancelamentos > 0 ? '#ef4444' : 'rgba(255,255,255,0.7)' }}>{cancelamentos}</p>
                 <p className="text-xs text-white/30 mt-0.5">contratos com status C</p>
               </div>
@@ -1262,7 +1261,7 @@ function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
                     <p className="text-xs text-white/30 mt-0.5">{kpis.ativos} de {metaIndividual} contratos</p>
                   </>
                 ) : (
-                  <p className="text-sm text-white/30">Não definida</p>
+                  <p className="text-sm text-white/30">NÃ£o definida</p>
                 )}
               </div>
             </div>
@@ -1272,7 +1271,7 @@ function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
                   <span className="text-xs text-white/40">Progresso vs. meta individual</span>
                   <span className="text-xs font-semibold" style={{ color: (pctMetaInd ?? 0) >= 100 ? '#00d68f' : '#f59e0b' }}>{kpis.ativos} / {metaIndividual}</span>
                 </div>
-                <ProgressBar value={Math.min(pctMetaInd, 100)} color={(pctMetaInd ?? 0) >= 100 ? 'success' : (pctMetaInd ?? 0) >= 60 ? 'primary' : 'warning'} size="md" emptyLabel="Mês iniciando" />
+                <ProgressBar value={Math.min(pctMetaInd, 100)} color={(pctMetaInd ?? 0) >= 100 ? 'success' : (pctMetaInd ?? 0) >= 60 ? 'primary' : 'warning'} size="md" emptyLabel="MÃªs iniciando" />
               </div>
             )}
           </GlassCard>
@@ -1282,20 +1281,20 @@ function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <Target size={15} className="text-emerald-400" />
-                  <span className="text-sm font-semibold text-white">Meta — {nomeVendedor}</span>
+                  <span className="text-sm font-semibold text-white">Meta â€” {nomeVendedor}</span>
                 </div>
                 <span className="text-sm font-bold" style={{ color: '#00d68f' }}>
                   {kpis.ativos} / {meta} ativos
                 </span>
               </div>
-              <ProgressBar value={Math.min(pctMeta, 100)} color={pctMeta >= 100 ? 'success' : pctMeta >= 60 ? 'primary' : 'warning'} size="lg" emptyLabel="Mês iniciando" />
+              <ProgressBar value={Math.min(pctMeta, 100)} color={pctMeta >= 100 ? 'success' : pctMeta >= 60 ? 'primary' : 'warning'} size="lg" emptyLabel="MÃªs iniciando" />
             </GlassCard>
           )}
 
           <GlassCard className="p-5">
-            <h3 className="text-sm font-semibold text-white mb-4">Evolução — últimos 4 meses · {nomeVendedor}</h3>
+            <h3 className="text-sm font-semibold text-white mb-4">EvoluÃ§Ã£o â€” Ãºltimos 4 meses Â· {nomeVendedor}</h3>
             {chartData.every(d => d.total === 0) ? (
-              <p className="text-sm text-white/30 text-center py-8">Sem dados no período.</p>
+              <p className="text-sm text-white/30 text-center py-8">Sem dados no perÃ­odo.</p>
             ) : (
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={chartData} barGap={4}>
@@ -1316,7 +1315,7 @@ function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
   )
 }
 
-// ── Aba 4: Projetos & Serviços ────────────────────────────────────────────────
+// â”€â”€ Aba 4: Projetos & ServiÃ§os â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type StatusFiltroProjeto = 'todos' | 'pendente' | 'quitado' | 'em_atraso' | 'cancelado'
 
@@ -1373,8 +1372,8 @@ function TabProjetos() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <FolderKanban size={18} className="text-violet-400" />
-            <span className="text-sm font-semibold text-white">Projetos & Serviços</span>
-            <span className="text-xs text-white/40">(Vendas únicas - não contam na meta)</span>
+            <span className="text-sm font-semibold text-white">Projetos & ServiÃ§os</span>
+            <span className="text-xs text-white/40">(Vendas Ãºnicas - nÃ£o contam na meta)</span>
           </div>
           <MesAnoSelect mes={mes} ano={ano} onChangeMes={setMes} onChangeAno={setAno} />
         </div>
@@ -1406,7 +1405,7 @@ function TabProjetos() {
 
       <GlassCard className="p-5">
         <h3 className="text-sm font-semibold text-white mb-4">
-          Projetos do Mês ({projetosFiltrados.length})
+          Projetos do MÃªs ({projetosFiltrados.length})
         </h3>
 
         {projetosFiltrados.length === 0 ? (
@@ -1420,7 +1419,7 @@ function TabProjetos() {
               <thead>
                 <tr className="text-left text-white/40 text-xs uppercase tracking-wider">
                   <th className="pb-3 font-semibold">Cliente</th>
-                  <th className="pb-3 font-semibold">Descrição</th>
+                  <th className="pb-3 font-semibold">DescriÃ§Ã£o</th>
                   <th className="pb-3 font-semibold">Vendedor</th>
                   <th className="pb-3 font-semibold text-right">Valor</th>
                   <th className="pb-3 font-semibold text-right">Recebido</th>
@@ -1439,8 +1438,8 @@ function TabProjetos() {
                   return (
                     <tr key={projeto.id} className="border-t border-white/5">
                       <td className="py-3 text-white font-medium">{projeto.cliente_nome}</td>
-                      <td className="py-3 text-white/60 truncate max-w-[200px]">{projeto.descricao || '—'}</td>
-                      <td className="py-3 text-white/60">{projeto.vendedor?.nome || '—'}</td>
+                      <td className="py-3 text-white/60 truncate max-w-[200px]">{projeto.descricao || 'â€”'}</td>
+                      <td className="py-3 text-white/60">{projeto.vendedor?.nome || 'â€”'}</td>
                       <td className="py-3 text-right text-white tabular-nums">{formatBRL(projeto.valor_total)}</td>
                       <td className="py-3 text-right tabular-nums" style={{ color: '#00d68f99' }}>
                         {formatBRL(projeto.valor_recebido)}
@@ -1481,357 +1480,8 @@ function TabProjetos() {
   )
 }
 
-// ── Aba 5: Comissões ──────────────────────────────────────────────────────────
 
-function TabComissoes({ vendedorIdFiltro, isGestor, vendedores }: {
-  vendedorIdFiltro: string | null
-  isGestor: boolean
-  vendedores: { id: string; nome: string; ativo: boolean | null }[]
-}) {
-  const now = new Date()
-  const [mes, setMes] = useState(now.getMonth() + 1)
-  const [ano, setAno] = useState(now.getFullYear())
-  const [vendedorLocal, setVendedorLocal] = useState<string | null>(null)
-  const [configExpanded, setConfigExpanded] = useState(false)
-
-  // Estado de edição inline para configuração
-  const [editandoGlobal, setEditandoGlobal] = useState<number | ''>('')
-  const [editandoVendedor, setEditandoVendedor] = useState<{ id: string; valor: number | '' } | null>(null)
-  const [salvando, setSalvando] = useState(false)
-
-  const vendedorEfetivo = isGestor ? vendedorLocal : vendedorIdFiltro
-
-  const { loading, liberadas, aguardando } =
-    useComissoesVendedor(vendedorEfetivo, mes, ano)
-
-  const {
-    padraoGlobal,
-    vendedoresConfig,
-    salvarPadraoGlobal,
-    salvarPadraoVendedor,
-    resolverPct,
-    loading: loadingConfig,
-  } = useComissaoConfig()
-
-  // Aplica % configurado quando contrato tem comissao_pct = 0 (contratos legados)
-  function comEfetiva(c: typeof liberadas[0]) {
-    const pctSalvo = c.comissao_pct ?? 0
-    if (pctSalvo > 0) return { pct: pctSalvo, valor: c.comissao_valor ?? 0 }
-    const pct = resolverPct(c.vendedor_id ?? '')
-    const valor = pct > 0 ? (c.valor_unitario * pct / 100) : 0
-    return { pct, valor }
-  }
-
-  const liberadasEfetivas = liberadas.map(c => ({ ...c, ...comEfetiva(c) }))
-  const aguardandoEfetivas = aguardando.map(c => ({ ...c, ...comEfetiva(c) }))
-
-  const totalLiberadoEfetivo = liberadasEfetivas.reduce((s, c) => s + c.valor, 0)
-  const totalPendenteEfetivo = aguardandoEfetivas.reduce((s, c) => s + c.valor, 0)
-
-  const qtdComComissao = liberadasEfetivas.filter(c => c.valor > 0).length
-    + aguardandoEfetivas.filter(c => c.valor > 0).length
-
-  async function handleSalvarGlobal() {
-    setSalvando(true)
-    await salvarPadraoGlobal(editandoGlobal === '' ? null : Number(editandoGlobal))
-    setSalvando(false)
-    setEditandoGlobal('')
-  }
-
-  async function handleSalvarVendedor(vendedorId: string, valor: number | '') {
-    setSalvando(true)
-    await salvarPadraoVendedor(vendedorId, valor === '' ? null : Number(valor))
-    setSalvando(false)
-    setEditandoVendedor(null)
-  }
-
-  function TabelaComissoes({ contratos, cor, titulo }: {
-    contratos: (ReturnType<typeof useComissoesVendedor>['liberadas'][0] & { pct: number; valor: number })[]
-    cor: string
-    titulo: string
-  }) {
-    const total = contratos.reduce((s, c) => s + c.valor, 0)
-    if (contratos.length === 0) return null
-    return (
-      <GlassCard className="overflow-hidden">
-        <div className="px-5 py-3.5 flex items-center gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: cor }} />
-          <h3 className="text-sm font-semibold text-white">{titulo}</h3>
-          <span
-            className="text-xs font-bold px-2 py-0.5 rounded-full ml-1"
-            style={{ background: `${cor}18`, color: cor, border: `1px solid ${cor}30` }}
-          >
-            {contratos.length}
-          </span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                {['Cliente', 'Produto', 'Valor Plano', '% Comissão', 'Comissão', 'Status'].map(h => (
-                  <th key={h} className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-widest text-white/30 whitespace-nowrap">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {contratos.map(c => {
-                const statusLabel = c.status_ixc === 'A' ? 'Ativo'
-                  : c.status_ixc === 'AA' ? 'Aguardando'
-                  : c.status_ixc === 'P' ? 'Proposta'
-                  : c.status_ixc ?? '—'
-                const statusColor = c.status_ixc === 'A' ? '#00d68f'
-                  : c.status_ixc === 'AA' || c.status_ixc === 'P' ? '#f59e0b'
-                  : '#6b7280'
-                const semComissao = c.pct === 0
-                return (
-                  <tr key={c.id} className="hover:bg-white/3 transition-colors" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                    <td className="px-4 py-3 font-medium text-white">{c.cliente_nome}</td>
-                    <td className="px-4 py-3 text-white/60 text-xs">{c.produto?.nome ?? '—'}</td>
-                    <td className="px-4 py-3 tabular-nums text-white/70">{formatBRL(c.valor_unitario)}</td>
-                    <td className="px-4 py-3 tabular-nums text-white/60">
-                      {semComissao ? <span className="text-white/20">—</span> : `${c.pct}%`}
-                    </td>
-                    <td className="px-4 py-3 tabular-nums font-semibold" style={{ color: semComissao ? 'rgba(255,255,255,0.2)' : cor }}>
-                      {semComissao ? '—' : formatBRL(c.valor)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                        style={{ background: `${statusColor}18`, color: statusColor, border: `1px solid ${statusColor}30` }}
-                      >
-                        {statusLabel}
-                      </span>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-            <tfoot>
-              <tr style={{ borderTop: '2px solid rgba(255,255,255,0.08)', background: `${cor}06` }}>
-                <td className="px-4 py-2.5 text-xs font-bold text-white/50 uppercase tracking-wide" colSpan={4}>Total</td>
-                <td className="px-4 py-2.5 tabular-nums font-bold" style={{ color: cor }}>{formatBRL(total)}</td>
-                <td />
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </GlassCard>
-    )
-  }
-
-  return (
-    <div className="flex flex-col gap-6">
-      {/* Filtros */}
-      <GlassCard className="p-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <div className="flex flex-col gap-1.5">
-            <p className="text-xs font-semibold uppercase tracking-wide text-white/40">Período</p>
-            <MesAnoSelect mes={mes} ano={ano} onChangeMes={setMes} onChangeAno={setAno} />
-          </div>
-          {isGestor && (
-            <div className="flex flex-col gap-1.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-white/40">Vendedor</p>
-              <select
-                value={vendedorLocal ?? ''}
-                onChange={e => setVendedorLocal(e.target.value || null)}
-                className="px-3 py-1.5 rounded-lg text-xs text-white outline-none cursor-pointer"
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', colorScheme: 'dark' }}
-              >
-                <option value="" style={{ background: '#0f2419', color: '#fff' }}>Todos</option>
-                {vendedores.filter(v => v.ativo).map(v => (
-                  <option key={v.id} value={v.id} style={{ background: '#0f2419', color: '#fff' }}>{v.nome}</option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-      </GlassCard>
-
-      {/* Configuração de Comissões — somente gestor */}
-      {isGestor && (
-        <GlassCard className="overflow-hidden">
-          <button
-            onClick={() => setConfigExpanded(v => !v)}
-            className="w-full flex items-center gap-3 px-5 py-4 cursor-pointer transition-colors hover:bg-white/2"
-          >
-            <Edit2 size={14} className="text-violet-400 shrink-0" />
-            <h3 className="text-sm font-semibold text-white">Configuração de Comissões</h3>
-            <span className="text-xs text-white/30 ml-1">padrões e por vendedor</span>
-            <span className="ml-auto text-white/30 shrink-0">
-              {configExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-            </span>
-          </button>
-
-          {configExpanded && (
-            <div className="px-5 pb-5" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-              {loadingConfig ? (
-                <div className="py-6 flex justify-center"><Spinner style={{ color: '#8b5cf6' }} /></div>
-              ) : (
-                <>
-                  {/* Padrão global */}
-                  <div className="pt-4 pb-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-white/40 mb-3">Padrão Global</p>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="number"
-                          min={0}
-                          max={100}
-                          step={0.5}
-                          placeholder={padraoGlobal != null ? String(padraoGlobal) : '0'}
-                          value={editandoGlobal}
-                          onChange={e => setEditandoGlobal(e.target.value === '' ? '' : Number(e.target.value))}
-                          className="w-20 px-3 py-1.5 rounded-lg text-sm text-white outline-none tabular-nums"
-                          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(139,92,246,0.3)' }}
-                        />
-                        <span className="text-sm text-white/50">%</span>
-                      </div>
-                      <button
-                        onClick={handleSalvarGlobal}
-                        disabled={salvando || editandoGlobal === ''}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all disabled:opacity-40"
-                        style={{ background: 'rgba(139,92,246,0.15)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}
-                      >
-                        <Check size={12} />
-                        Salvar
-                      </button>
-                      <span className="text-xs text-white/30">
-                        {padraoGlobal != null ? `Atual: ${padraoGlobal}%` : 'Nenhum padrão definido'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-white/25 mt-2">Aplicado a vendedores sem % individual configurado</p>
-                  </div>
-
-                  {/* Por vendedor */}
-                  <div className="pt-4">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-white/40 mb-3">Por Vendedor</p>
-                    <div className="flex flex-col gap-2">
-                      {vendedoresConfig.map(v => {
-                        const temOverride = v.comissao_pct_padrao != null
-                        const isEditando = editandoVendedor?.id === v.id
-                        return (
-                          <div key={v.id} className="flex items-center gap-3 py-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                            <span className="text-sm text-white/80 w-40 truncate shrink-0">{v.nome}</span>
-
-                            {isEditando ? (
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  max={100}
-                                  step={0.5}
-                                  value={editandoVendedor.valor}
-                                  onChange={e => setEditandoVendedor({ id: v.id, valor: e.target.value === '' ? '' : Number(e.target.value) })}
-                                  className="w-16 px-2 py-1 rounded-lg text-xs text-white outline-none tabular-nums"
-                                  style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(0,214,143,0.3)' }}
-                                  autoFocus
-                                />
-                                <span className="text-xs text-white/50">%</span>
-                                <button
-                                  onClick={() => handleSalvarVendedor(v.id, editandoVendedor.valor)}
-                                  disabled={salvando}
-                                  className="text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
-                                ><Check size={14} /></button>
-                                <button
-                                  onClick={() => setEditandoVendedor(null)}
-                                  className="text-white/30 hover:text-white/60 transition-colors cursor-pointer"
-                                ><X size={14} /></button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm tabular-nums text-white/60 w-12">
-                                  {temOverride ? `${v.comissao_pct_padrao}%` : '—'}
-                                </span>
-                                <button
-                                  onClick={() => setEditandoVendedor({ id: v.id, valor: v.comissao_pct_padrao ?? '' })}
-                                  className="text-white/20 hover:text-white/60 transition-colors cursor-pointer"
-                                ><Edit2 size={12} /></button>
-                                {temOverride && (
-                                  <button
-                                    onClick={() => handleSalvarVendedor(v.id, '')}
-                                    className="text-white/20 hover:text-red-400 transition-colors cursor-pointer"
-                                    title="Remover override"
-                                  ><X size={12} /></button>
-                                )}
-                              </div>
-                            )}
-
-                            <span
-                              className="text-xs px-2 py-0.5 rounded-full ml-auto"
-                              style={temOverride
-                                ? { background: 'rgba(0,214,143,0.08)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.2)' }
-                                : { background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.25)', border: '1px solid rgba(255,255,255,0.08)' }
-                              }
-                            >
-                              {temOverride ? 'personalizado' : 'usa padrão'}
-                            </span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </GlassCard>
-      )}
-
-      {loading ? (
-        <div className="flex justify-center py-12"><Spinner style={{ color: '#00d68f' }} /></div>
-      ) : (
-        <>
-          {/* KPI Cards */}
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-            <KpiCard
-              label="Comissão Liberada"
-              value={formatBRL(totalLiberadoEfetivo)}
-              icon={<DollarSign size={18} />}
-              accentHex="#00d68f"
-              sub={`${liberadas.length} contratos ativos`}
-            />
-            <KpiCard
-              label="Aguardando Ativação"
-              value={formatBRL(totalPendenteEfetivo)}
-              icon={<Clock size={18} />}
-              accentHex="#f59e0b"
-              sub={`${aguardando.length} contratos AA/P`}
-            />
-            <KpiCard
-              label="Contratos com Comissão"
-              value={String(qtdComComissao)}
-              icon={<Check size={18} />}
-              accentHex="#06b6d4"
-              sub="com % configurado"
-            />
-            <KpiCard
-              label="Comissão Potencial"
-              value={formatBRL(totalLiberadoEfetivo + totalPendenteEfetivo)}
-              icon={<TrendingUp size={18} />}
-              accentHex="#8b5cf6"
-              sub="liberada + pendente"
-            />
-          </div>
-
-          {/* Tabelas */}
-          <TabelaComissoes contratos={liberadasEfetivas} cor="#00d68f" titulo="Comissões Liberadas" />
-          <TabelaComissoes contratos={aguardandoEfetivas} cor="#f59e0b" titulo="Aguardando Ativação" />
-
-          {liberadas.length === 0 && aguardando.length === 0 && (
-            <GlassCard className="p-10 text-center">
-              <DollarSign size={32} className="mx-auto mb-3 text-white/20" />
-              <p className="text-sm text-white/40">Nenhum contrato encontrado para {MESES_LABELS[mes - 1]} / {ano}.</p>
-            </GlassCard>
-          )}
-        </>
-      )}
-    </div>
-  )
-}
-
-// ── Componente principal ───────────────────────────────────────────────────────
+// â”€â”€ Componente principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function Relatorios() {
   const { permissoes, vendedorDbId } = useAuthStore()
@@ -1842,11 +1492,11 @@ export default function Relatorios() {
   const [aba, setAba] = useState<Aba>('visao_geral')
 
   const abas: { key: Aba; label: string; icon: React.ReactNode; somenteGestor?: boolean }[] = [
-    { key: 'visao_geral',   label: 'Visão Geral',          icon: <TrendingUp size={15} /> },
+    { key: 'visao_geral',   label: 'VisÃ£o Geral',          icon: <TrendingUp size={15} /> },
     { key: 'ranking',       label: 'Ranking de Vendedores', icon: <Users size={15} />,      somenteGestor: true },
     { key: 'por_vendedor',  label: 'Por Vendedor',          icon: <User size={15} /> },
-    { key: 'projetos',      label: 'Projetos & Serviços',   icon: <FolderKanban size={15} /> },
-    { key: 'comissoes',     label: 'Comissões',             icon: <DollarSign size={15} /> },
+    { key: 'projetos',      label: 'Projetos & ServiÃ§os',   icon: <FolderKanban size={15} /> },
+    { key: 'comissoes',     label: 'ComissÃµes',             icon: <DollarSign size={15} /> },
   ]
 
   const abasVisiveis = abas.filter(a => !a.somenteGestor || isGestor)
@@ -1854,9 +1504,9 @@ export default function Relatorios() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h2 className="text-xl font-bold text-white">Relatórios Gerenciais</h2>
+        <h2 className="text-xl font-bold text-white">RelatÃ³rios Gerenciais</h2>
         <p className="text-sm text-white/40 font-medium mt-0.5">
-          {isGestor ? 'Visão completa do time' : 'Seu desempenho'}
+          {isGestor ? 'VisÃ£o completa do time' : 'Seu desempenho'}
         </p>
       </div>
 
@@ -1898,7 +1548,7 @@ export default function Relatorios() {
         <TabProjetos />
       )}
       {aba === 'comissoes' && (
-        <TabComissoes
+        <TabComissoesPagamento
           vendedorIdFiltro={vendedorDbId}
           isGestor={isGestor}
           vendedores={vendedores}
