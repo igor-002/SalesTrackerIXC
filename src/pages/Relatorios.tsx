@@ -4,6 +4,7 @@
  */
 import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -266,7 +267,10 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
   const churnPct = churnDenom > 0 ? (cancelCount / churnDenom) * 100 : 0
   const churnHex = churnPct < 2 ? '#00d68f' : churnPct < 5 ? '#f59e0b' : '#ef4444'
 
+  const navigate = useNavigate()
+
   const diasMed = kpis.mediaDiasAguardando
+  console.log('[VisaoGeral] mediaDiasAguardando:', diasMed, '| aguardando:', kpis.aguardando)
   const diasSubColor = diasMed === null ? undefined
     : diasMed <= 7 ? '#00d68f'
     : diasMed <= 15 ? '#f59e0b'
@@ -481,13 +485,30 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
         <KpiCard label="MRR Confirmado" value={formatBRL(kpis.mrrAtivo)} icon={<DollarSign size={18} />} accentHex="#00d68f" sub={`ticket médio ${formatBRL(kpis.ticketMedio)}`} />
         <KpiCard label="MRR Potencial" value={formatBRL(kpis.mrrPendente)} icon={<TrendingUp size={18} />} accentHex="#f59e0b" sub="se todos AA/P ativarem" />
         <KpiCard label="Taxa de Conversão" value={formatPercent(kpis.taxaConversao)} icon={<Percent size={18} />} accentHex="#8b5cf6" sub="ativos ÷ total" />
-        <KpiCard label="Cancelamentos no Mês" value={`${cancelCount} (${churnPct.toFixed(1)}%)`} icon={<AlertCircle size={18} />} accentHex={churnHex} sub="cancelados ÷ (ativos + cancelados)" />
+        <KpiCard
+          label="Cancelamentos no Mês"
+          value={cancelCount === 0 ? '0 cancelamentos' : `${cancelCount} (${churnPct.toFixed(1)}%)`}
+          icon={<AlertCircle size={18} />}
+          accentHex={churnHex}
+          sub="cancelados ÷ (ativos + cancelados)"
+        />
       </div>
 
       {/* SEÇÃO METAS DO TIME */}
-      {metaTime > 0 && (
-        <GlassCard className="p-5">
-          <h3 className="text-sm font-semibold text-white mb-4">Painel de Metas do Time</h3>
+      <GlassCard className="p-5">
+        <h3 className="text-sm font-semibold text-white mb-4">Painel de Metas do Time</h3>
+        {metaTime === 0 ? (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-white/40">Nenhuma meta cadastrada para este mês</p>
+            <button
+              onClick={() => navigate('/metas')}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all"
+              style={{ background: 'rgba(0,214,143,0.15)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.3)' }}
+            >
+              Cadastrar Meta
+            </button>
+          </div>
+        ) : (
           <div className="flex flex-col gap-4">
             <div>
               <div className="flex items-center justify-between mb-1.5">
@@ -522,8 +543,8 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
               </div>
             )}
           </div>
-        </GlassCard>
-      )}
+        )}
+      </GlassCard>
 
       {/* SEÇÃO 2 — Evolução + Projeção */}
       <GlassCard className="p-5">
