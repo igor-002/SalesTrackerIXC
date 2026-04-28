@@ -15,9 +15,10 @@ export interface ContratoRelatorio {
   status_ixc: string | null
   mrr: boolean | null
   data_venda: string
+  mes_referencia: number | null
+  ano_referencia: number | null
   dias_em_aa: number | null
   vendedor: { id: string; nome: string } | null
-  // campos adicionados na Fase 3
   created_at: string | null
   status_atualizado_em: string | null
   segmento: { id: string; nome: string } | null
@@ -79,15 +80,6 @@ function mesLabel(mes: number, ano: number): string {
   return `${MESES[mes - 1]}/${String(ano).slice(2)}`
 }
 
-function firstDay(mes: number, ano: number): string {
-  return `${ano}-${String(mes).padStart(2, '0')}-01`
-}
-
-function lastDay(mes: number, ano: number): string {
-  const d = new Date(ano, mes, 0)
-  return d.toISOString().slice(0, 10)
-}
-
 /** Retorna os últimos N meses inclusive o atual, em ordem cronológica */
 export function ultimosMeses(n: number, refMes?: number, refAno?: number): { mes: number; ano: number }[] {
   const now = new Date()
@@ -105,7 +97,7 @@ export function ultimosMeses(n: number, refMes?: number, refAno?: number): { mes
 
 // ── Função de busca ──────────────────────────────────────────────────────────
 
-const CONTRATOS_SELECT = 'id, cliente_nome, valor_total, status_ixc, mrr, data_venda, dias_em_aa, created_at, status_atualizado_em, vendedor:vendedores(id, nome), segmento:segmentos(id, nome)'
+const CONTRATOS_SELECT = 'id, cliente_nome, valor_total, status_ixc, mrr, data_venda, mes_referencia, ano_referencia, dias_em_aa, created_at, status_atualizado_em, vendedor:vendedores(id, nome), segmento:segmentos(id, nome)'
 
 async function fetchContratos(
   mes: number,
@@ -115,9 +107,8 @@ async function fetchContratos(
   let query = supabase
     .from('vendas')
     .select(CONTRATOS_SELECT)
-    .gte('data_venda', firstDay(mes, ano))
-    .lte('data_venda', lastDay(mes, ano))
-    .order('data_venda', { ascending: false })
+    .eq('mes_referencia', mes)
+    .eq('ano_referencia', ano)
 
   if (vendedorId) query = query.eq('vendedor_id', vendedorId)
 
@@ -126,18 +117,17 @@ async function fetchContratos(
   return (data ?? []) as ContratoRelatorio[]
 }
 
-/** Busca um intervalo amplo para os gráficos de evolução */
+/** Busca um intervalo de meses usando mes_referencia + ano_referencia */
 async function fetchContratosRange(
-  inicio: string,
-  fim: string,
+  meses: { mes: number; ano: number }[],
   vendedorId: string | null,
 ): Promise<ContratoRelatorio[]> {
+  if (meses.length === 0) return []
+  const orParts = meses.map(m => `and(mes_referencia.eq.${m.mes},ano_referencia.eq.${m.ano})`).join(',')
   let query = supabase
     .from('vendas')
     .select(CONTRATOS_SELECT)
-    .gte('data_venda', inicio)
-    .lte('data_venda', fim)
-    .order('data_venda', { ascending: false })
+    .or(orParts)
 
   if (vendedorId) query = query.eq('vendedor_id', vendedorId)
 
@@ -150,7 +140,7 @@ async function fetchContratosRange(
 
 export function calcKpis(contratos: ContratoRelatorio[]): KpisRelatorio {
   const ativos     = contratos.filter(c => c.status_ixc === 'A')
-  const aguardando = contratos.filter(c => c.status_ixc === 'AA')
+  const aguardando = contratos.filter(c => c.status_ixc === 'AA' || c.status_ixc === 'P')
   const total      = contratos.length
   const somaAtivos = ativos.reduce((s, c) => s + (c.valor_total ?? 0), 0)
   const ticketMedio   = ativos.length > 0 ? somaAtivos / ativos.length : 0
@@ -163,16 +153,14 @@ export function agruparPorMes(
   meses: { mes: number; ano: number }[],
 ): MesChartRow[] {
   return meses.map(({ mes, ano }) => {
-    const inicio = firstDay(mes, ano)
-    const fim    = lastDay(mes, ano)
-    const grupo  = contratos.filter(c => c.data_venda >= inicio && c.data_venda <= fim)
+    const grupo = contratos.filter(c => c.mes_referencia === mes && c.ano_referencia === ano)
     return {
       mesLabel: mesLabel(mes, ano),
       mes,
       ano,
-      total:     grupo.length,
-      ativos:    grupo.filter(c => c.status_ixc === 'A').length,
-      aguardando: grupo.filter(c => c.status_ixc === 'AA').length,
+      total:      grupo.length,
+      ativos:     grupo.filter(c => c.status_ixc === 'A').length,
+      aguardando: grupo.filter(c => c.status_ixc === 'AA' || c.status_ixc === 'P').length,
     }
   })
 }
@@ -282,14 +270,12 @@ export function useRelatoriosRange(
   meses: { mes: number; ano: number }[],
   vendedorId: string | null,
 ) {
-  const inicio = meses.length > 0 ? firstDay(meses[0].mes, meses[0].ano) : ''
-  const fim    = meses.length > 0 ? lastDay(meses[meses.length - 1].mes, meses[meses.length - 1].ano) : ''
-
+  const queryKeyStr = meses.map(m => `${m.mes}-${m.ano}`).join(',')
   return useQuery({
-    queryKey: ['relatorios-range', inicio, fim, vendedorId],
-    queryFn: () => fetchContratosRange(inicio, fim, vendedorId),
+    queryKey: ['relatorios-range', queryKeyStr, vendedorId],
+    queryFn: () => fetchContratosRange(meses, vendedorId),
     staleTime: 30 * 60 * 1000,
     gcTime: 35 * 60 * 1000,
-    enabled: Boolean(inicio && fim),
+    enabled: meses.length > 0,
   })
 }

@@ -29,7 +29,7 @@ export interface DashboardStats {
   mrrPorDiaMes: { dia: string; valor: number }[]
 
   // Status IXC
-  countPorStatus: { A: number; AA: number; CM: number; FA: number; CN: number; N: number }
+  countPorStatus: { A: number; AA: number; P: number; CM: number; FA: number; C: number; CN: number; CA: number; N: number }
   faturamentoAtivos: number
   faturamentoAguardando: number
   alertasAA: AlertaAA[]
@@ -76,7 +76,7 @@ const EMPTY_STATS: DashboardStats = {
   vendasPorDiaSemana: [],
   faturamentoPorDiaMes: [],
   mrrPorDiaMes: [],
-  countPorStatus: { A: 0, AA: 0, CM: 0, FA: 0, CN: 0, N: 0 },
+  countPorStatus: { A: 0, AA: 0, P: 0, CM: 0, FA: 0, C: 0, CN: 0, CA: 0, N: 0 },
   faturamentoAtivos: 0,
   faturamentoAguardando: 0,
   alertasAA: [],
@@ -105,7 +105,7 @@ export function useDashboardStats() {
     const [vendasMesRes, vendasSemanaRes, cancelamentosRes, ultimasRes, vendasHistoricoRes] = await Promise.all([
       supabase
         .from('vendas')
-        .select('id, cliente_nome, valor_total, comissao_valor, mrr, data_venda, status_ixc, dias_em_aa, dias_aguardando, tags, codigo_contrato_ixc, vendedor:vendedores(nome)')
+        .select('id, cliente_nome, valor_unitario, valor_total, comissao_valor, mrr, data_venda, status_ixc, dias_em_aa, dias_aguardando, tags, codigo_contrato_ixc, vendedor:vendedores(nome)')
         .gte('data_venda', inicioMes),
       supabase
         .from('vendas')
@@ -142,26 +142,29 @@ export function useDashboardStats() {
     const faturamentoMes = vendasMes.reduce((s, v) => s + (v.valor_total ?? 0), 0)
     const comissoesMes = vendasMes.reduce((s, v) => s + (v.comissao_valor ?? 0), 0)
     const vendasUnicasMes = vendasMes.filter((v) => !v.mrr).length
-    const vendasMrrMes = vendasMes.filter((v) => v.mrr).reduce((s, v) => s + (v.valor_total ?? 0), 0)
+    const vendasMrrMes = vendasMes.filter((v) => v.mrr).reduce((s, v) => s + ((v as { valor_unitario?: number | null }).valor_unitario ?? 0), 0)
     const faturamentoSemRecorrencia = faturamentoMes - vendasMrrMes
 
-    // MRR: soma das vendas recorrentes do mês atual
+    // MRR: soma do valor_unitario das vendas recorrentes (preço unitário do plano)
     const mrrTotal = vendasMrrMes
     const ticketMedio = vendasMes.length > 0 ? faturamentoMes / vendasMes.length : 0
     const turnOverPct = vendasMes.length > 0 ? (cancelamentosMes / vendasMes.length) * 100 : 0
 
     // Status IXC
-    const countPorStatus = { A: 0, AA: 0, CM: 0, FA: 0, CN: 0, N: 0 }
+    const countPorStatus = { A: 0, AA: 0, P: 0, CM: 0, FA: 0, C: 0, CN: 0, CA: 0, N: 0 }
     let faturamentoAtivos = 0
     let faturamentoAguardando = 0
     for (const v of vendasMes) {
       const code = ((v as { status_ixc?: string | null }).status_ixc ?? '') as keyof typeof countPorStatus
       if (code in countPorStatus) countPorStatus[code]++
       if (code === 'A') faturamentoAtivos += v.valor_total ?? 0
-      if (code === 'AA') faturamentoAguardando += v.valor_total ?? 0
+      if (code === 'AA' || code === 'P') faturamentoAguardando += v.valor_total ?? 0
     }
     const alertasAA = (vendasMes as AlertaAA[])
-      .filter((v) => (v as { status_ixc?: string | null }).status_ixc === 'AA' && ((v as { dias_em_aa?: number | null }).dias_em_aa ?? 0) > 7)
+      .filter((v) => {
+        const s = (v as { status_ixc?: string | null }).status_ixc
+        return (s === 'AA' || s === 'P') && ((v as { dias_em_aa?: number | null }).dias_em_aa ?? 0) > 7
+      })
       .sort((a, b) => (b.dias_em_aa ?? 0) - (a.dias_em_aa ?? 0))
       .slice(0, 5)
 
@@ -170,7 +173,13 @@ export function useDashboardStats() {
     const faturamento12Meses = buildMonthsArray(vendasHistorico)
     const vendasPorDiaSemana = buildWeekArray(vendasSemanaData)
     const faturamentoPorDiaMes = buildDailyArray(vendasMes, anoAtual, mesAtual)
-    const mrrPorDiaMes = buildDailyArray(vendasMes.filter((v) => v.mrr), anoAtual, mesAtual)
+    const mrrPorDiaMes = buildDailyArray(
+      vendasMes.filter((v) => v.mrr).map(v => ({
+        data_venda: v.data_venda,
+        valor_total: (v as { valor_unitario?: number | null }).valor_unitario ?? 0,
+      })),
+      anoAtual, mesAtual
+    )
 
     setStats({
       faturamentoHoje,
