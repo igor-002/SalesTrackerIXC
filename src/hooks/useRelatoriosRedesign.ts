@@ -22,6 +22,7 @@ export interface ContratoRedesign {
   created_at: string | null
   status_atualizado_em: string | null
   data_venda: string | null
+  cliente_cpf_cnpj: string | null
 }
 
 export interface AguardandoAntigo {
@@ -182,7 +183,7 @@ export function useRelatoriosRedesign(
 
       let q = supabase
         .from('vendas')
-        .select('id, cliente_nome, valor_unitario, valor_total, status_ixc, vendedor_id, mes_referencia, ano_referencia, dias_aguardando, created_at, status_atualizado_em, data_venda, vendedor:vendedores(id, nome)')
+        .select('id, cliente_nome, valor_unitario, valor_total, status_ixc, vendedor_id, mes_referencia, ano_referencia, dias_aguardando, created_at, status_atualizado_em, data_venda, cliente_cpf_cnpj, vendedor:vendedores(id, nome)')
         .or(orParts)
         .order('mes_referencia', { ascending: true })
         .order('ano_referencia', { ascending: true })
@@ -224,6 +225,7 @@ export function useRelatoriosRedesign(
             created_at: null,
             status_atualizado_em: null,
             data_venda: null,
+            cliente_cpf_cnpj: null,
           }))
         }
       }

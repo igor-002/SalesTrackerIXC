@@ -228,6 +228,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
     mesesEfetivos,
     isCustom,
     isHistorico,
+    contratos,
     projecao6Meses,
     funil,
     distribuicaoVendedor,
@@ -484,6 +485,33 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
         mrrPotencial: Math.round(p.ticketMedio * p.aguardando),
       }))
   , [performanceVendedor])
+
+  const tipoPessoaData = useMemo(() => {
+    const ativos = contratos.filter(c => c.status_ixc === 'A')
+    let pf = 0, pj = 0
+    for (const c of ativos) {
+      const digits = c.cliente_cpf_cnpj?.replace(/\D/g, '') ?? ''
+      if (digits.length === 14) pj++
+      else pf++
+    }
+    return [
+      { name: 'Pessoa Física', value: pf },
+      { name: 'Pessoa Jurídica', value: pj },
+    ]
+  }, [contratos])
+
+  const tipoPessoaPorVendedor = useMemo(() => {
+    const map = new Map<string, { nome: string; pf: number; pj: number }>()
+    for (const c of contratos.filter(c => c.status_ixc === 'A')) {
+      const vid = c.vendedor_id ?? 'sem-vendedor'
+      const nome = c.vendedor?.nome ?? 'Sem vendedor'
+      if (!map.has(vid)) map.set(vid, { nome, pf: 0, pj: 0 })
+      const digits = c.cliente_cpf_cnpj?.replace(/\D/g, '') ?? ''
+      if (digits.length === 14) map.get(vid)!.pj++
+      else map.get(vid)!.pf++
+    }
+    return Array.from(map.values())
+  }, [contratos])
 
   if (loading) {
     return <div className="flex justify-center py-12"><Spinner style={{ color: '#00d68f' }} /></div>
@@ -1297,6 +1325,92 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                 </div>
               </>
             )}
+          </GlassCard>
+
+        </div>
+      )}
+
+      {/* SEÇÃO 4b — Pessoa Física vs Pessoa Jurídica */}
+      {(tipoPessoaData[0].value + tipoPessoaData[1].value) > 0 && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+
+          {/* Pizza PF vs PJ */}
+          <GlassCard className="p-5">
+            <h3 className="text-sm font-semibold text-white mb-4">Pessoa Física vs Pessoa Jurídica</h3>
+            <ResponsiveContainer width="100%" height={280}>
+              <PieChart>
+                <Pie
+                  data={tipoPessoaData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  innerRadius={50}
+                  paddingAngle={2}
+                  label={({ name, percent }) => `${name}: ${((percent ?? 0) * 100).toFixed(0)}%`}
+                  labelLine={{ stroke: 'rgba(255,255,255,0.3)' }}
+                >
+                  <Cell fill="#06b6d4" />
+                  <Cell fill="#00d68f" />
+                </Pie>
+                <Tooltip
+                  contentStyle={{ background: '#0f2419', border: '1px solid rgba(0,214,143,0.2)', borderRadius: 12 }}
+                  itemStyle={{ color: '#fff' }}
+                  labelStyle={{ color: 'rgba(255,255,255,0.5)' }}
+                />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="flex flex-wrap gap-4 justify-center mt-2">
+              {tipoPessoaData.map((item, i) => {
+                const total = tipoPessoaData[0].value + tipoPessoaData[1].value
+                const pct = total > 0 ? ((item.value / total) * 100).toFixed(0) : '0'
+                const cor = i === 0 ? '#06b6d4' : '#00d68f'
+                return (
+                  <span key={item.name} className="flex items-center gap-1.5 text-xs text-white/60">
+                    <span className="w-2.5 h-2.5 rounded-full" style={{ background: cor }} />
+                    {item.name} — {item.value} ({pct}%)
+                  </span>
+                )
+              })}
+            </div>
+          </GlassCard>
+
+          {/* Barras empilhadas PF/PJ por Vendedor */}
+          <GlassCard className="p-5">
+            <h3 className="text-sm font-semibold text-white mb-4">Tipo de Cliente por Vendedor</h3>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={tipoPessoaPorVendedor} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                <XAxis
+                  dataKey="nome"
+                  tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <Tooltip
+                  contentStyle={{ background: '#0f2419', border: '1px solid rgba(0,214,143,0.2)', borderRadius: 12 }}
+                  itemStyle={{ color: '#fff' }}
+                  labelStyle={{ color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}
+                  formatter={(value, name, props) => {
+                    const total = (props.payload as { pf: number; pj: number }).pf + (props.payload as { pf: number; pj: number }).pj
+                    return [`${value} (total: ${total})`, name]
+                  }}
+                />
+                <Legend
+                  wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
+                  formatter={(value) => <span style={{ color: 'rgba(255,255,255,0.6)' }}>{value}</span>}
+                />
+                <Bar dataKey="pf" name="Pessoa Física" stackId="a" fill="#06b6d4" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="pj" name="Pessoa Jurídica" stackId="a" fill="#00d68f" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </GlassCard>
 
         </div>
