@@ -201,7 +201,7 @@ export function useRelatoriosRedesign(
         const { mes, ano } = periodoCustom
         let histQ = supabase
           .from('vendas_historico')
-          .select('id, cliente_nome, valor_unitario, status_ixc, vendedor_id, mes_referencia, ano_referencia, vendedor:vendedores(id, nome)')
+          .select('id, cliente_nome, valor_unitario, status_ixc, vendedor_id, mes_referencia, ano_referencia, cliente_cpf_cnpj, vendedor:vendedores(id, nome)')
           .eq('mes_referencia', mes)
           .eq('ano_referencia', ano)
 
@@ -225,7 +225,7 @@ export function useRelatoriosRedesign(
             created_at: null,
             status_atualizado_em: null,
             data_venda: null,
-            cliente_cpf_cnpj: null,
+            cliente_cpf_cnpj: (h.cliente_cpf_cnpj as string | null) ?? null,
           }))
         }
       }
