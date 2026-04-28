@@ -1,7 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
-  PlusCircle,
   UserCog,
   Target,
   Monitor,
@@ -18,7 +17,7 @@ import type { Permissoes } from '@/types/permissoes'
 
 const navItems = [
   { to: '/',           icon: LayoutDashboard, label: 'Dashboard',    permissao: 'dashboard'    as keyof Permissoes, exact: true },
-  { to: '/nova-venda', icon: PlusCircle,       label: 'Nova Venda',   permissao: 'nova_venda'   as keyof Permissoes },
+  // { to: '/nova-venda', icon: PlusCircle, label: 'Nova Venda', permissao: 'nova_venda' as keyof Permissoes }, // oculto — cadastro manual desativado
   { to: '/clientes',   icon: UserCheck,        label: 'Clientes',     permissao: 'clientes'     as keyof Permissoes },
   { to: '/vendedores', icon: UserCog,          label: 'Vendedores',   permissao: 'vendedores'   as keyof Permissoes },
   { to: '/metas',      icon: Target,           label: 'Metas',        permissao: 'metas'        as keyof Permissoes },

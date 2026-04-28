@@ -498,13 +498,7 @@ export default function Dashboard() {
             <h3 className="text-sm font-semibold text-white">Últimas Vendas</h3>
             <p className="text-xs text-white/40 mt-0.5">Registros mais recentes</p>
           </div>
-          <Link
-            to="/nova-venda"
-            className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-            style={{ background: 'rgba(0,214,143,0.12)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.2)' }}
-          >
-            + Nova venda
-          </Link>
+          {/* botão Nova Venda oculto — cadastro manual desativado */}
         </div>
         {loading ? (
           <div className="flex justify-center py-8"><Spinner style={{ color: '#00d68f' }} /></div>
@@ -523,13 +517,7 @@ export default function Dashboard() {
               <p className="text-xs text-white/40 mt-0.5">Vendas únicas do mês (não contam na meta)</p>
             </div>
           </div>
-          <Link
-            to="/nova-venda"
-            className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
-            style={{ background: 'rgba(139,92,246,0.12)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.2)' }}
-          >
-            + Novo projeto
-          </Link>
+          {/* botão Novo Projeto oculto — cadastro manual desativado */}
         </div>
 
         {loadingProjetos ? (
