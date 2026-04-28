@@ -243,8 +243,9 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
   const metaAtual = getMetaAtual()
   const metaTime = metaAtual?.meta_mensal ?? 0
 
-  const { getMetaVendedor } = useMetasVendedor(now.getMonth() + 1, now.getFullYear())
-  const pctMetaTime = metaTime > 0 ? Math.min(100, (totaisTime.ativos / metaTime) * 100) : 0
+  const { getMetaVendedor, metas: metasVendedor } = useMetasVendedor(now.getMonth() + 1, now.getFullYear())
+  const metaTimeContratos = metasVendedor.reduce((s, m) => s + (m.meta_contratos ?? 0), 0)
+  const pctMetaTime = metaTimeContratos > 0 ? Math.min(100, (totaisTime.ativos / metaTimeContratos) * 100) : 0
 
   const cancelMes = now.getMonth() + 1
   const cancelAno = now.getFullYear()
@@ -643,7 +644,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
       {/* SEÇÃO METAS DO TIME */}
       <GlassCard className="p-5">
         <h3 className="text-sm font-semibold text-white mb-4">Painel de Metas do Time</h3>
-        {metaTime === 0 ? (
+        {metaTimeContratos === 0 && metaTime === 0 ? (
           <div className="flex items-center justify-between">
             <p className="text-sm text-white/40">Nenhuma meta cadastrada para este mês</p>
             <button
@@ -656,16 +657,32 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs text-white/50">Time — {totaisTime.ativos} de {metaTime} contratos</span>
-                <span className="text-xs font-semibold" style={{ color: '#00d68f' }}>{pctMetaTime.toFixed(0)}%</span>
+            {metaTimeContratos > 0 ? (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs text-white/50">Time — {totaisTime.ativos} de {metaTimeContratos} contratos</span>
+                  <span className="text-xs font-semibold" style={{ color: '#00d68f' }}>{pctMetaTime.toFixed(0)}%</span>
+                </div>
+                <ProgressBar value={pctMetaTime} color="success" size="md" emptyLabel="Mês iniciando" />
+                {metaTimeContratos > totaisTime.ativos && (
+                  <p className="text-xs text-white/30 mt-1">Faltam {metaTimeContratos - totaisTime.ativos} contratos para a meta</p>
+                )}
               </div>
-              <ProgressBar value={pctMetaTime} color="success" size="md" emptyLabel="Mês iniciando" />
-              {metaTime > totaisTime.ativos && (
-                <p className="text-xs text-white/30 mt-1">Faltam {metaTime - totaisTime.ativos} contratos para a meta</p>
-              )}
-            </div>
+            ) : (
+              <div className="flex items-center justify-between px-3 py-2.5 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div>
+                  <p className="text-xs text-white/60">Meta do time: <span className="font-semibold text-white/80">{formatBRL(metaTime)}/mês</span></p>
+                  <p className="text-xs text-white/30 mt-0.5">Defina metas por vendedor para ver o progresso de contratos</p>
+                </div>
+                <button
+                  onClick={() => navigate('/metas')}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-lg cursor-pointer transition-all shrink-0 ml-3"
+                  style={{ background: 'rgba(0,214,143,0.12)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.2)' }}
+                >
+                  Definir metas
+                </button>
+              </div>
+            )}
             {performanceSorted.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 pt-2 border-t border-white/5">
                 {performanceSorted.map(v => {
