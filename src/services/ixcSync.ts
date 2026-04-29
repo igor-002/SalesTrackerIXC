@@ -814,15 +814,15 @@ export async function syncVendasAvulsasFromIXC(
     const pct = Math.round(30 + ((i + 1) / Math.max(total, 1)) * 60)
     onProgress?.(`Venda avulsa ${i + 1}/${total}...`, pct)
 
-    // Só importar se houver vendedor comissionado cadastrado
-    const vendedorId = venda.id_comissionado ? ixcToVendedor.get(venda.id_comissionado) : undefined
-    if (!vendedorId) continue
+    // Importar independente de vendedor mapeado (vendedor_id permite null)
+    const vendedorId = venda.id_comissionado ? (ixcToVendedor.get(venda.id_comissionado) ?? null) : null
 
     try {
       // Buscar dados do cliente
       const cliente = await ixcBuscarCliente(venda.id_cliente)
       const statusLocal = mapStatusVdSaida(venda.status)
       const dataVenda = venda.data_saida ?? new Date().toISOString().slice(0, 10)
+      const descricao = (venda.raw?.obs as string | undefined) || 'Venda avulsa IXC'
 
       // Verificar se já existe pelo id_venda_ixc
       const { data: existing } = await supabase
@@ -852,6 +852,7 @@ export async function syncVendasAvulsasFromIXC(
             vendedor_id: vendedorId,
             cliente_nome: cliente.razao,
             codigo_cliente_ixc: venda.id_cliente,
+            descricao,
             valor_total: venda.valor_total,
             data_venda: dataVenda,
             status: statusLocal,
