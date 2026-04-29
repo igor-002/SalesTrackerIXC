@@ -59,6 +59,7 @@ export interface TVStats {
   mrrProjetado: number
   funilCounts: FunilCounts
   taxaConversao: number
+  aguardandoMesAtual: number
   alertasAA: AlertaAATv[]
   rankingVendedores: VendedorRanking[]
   vendasPorDiaSemana: { dia: string; qtd: number }[]
@@ -78,6 +79,7 @@ const EMPTY: TVStats = {
   mrrProjetado: 0,
   funilCounts: { A: 0, AA: 0, CM: 0, FA: 0, CN: 0, N: 0 },
   taxaConversao: 0,
+  aguardandoMesAtual: 0,
   alertasAA: [],
   rankingVendedores: [],
   vendasPorDiaSemana: [],
@@ -333,6 +335,7 @@ export function useTVStats() {
       mrrProjetado,
       funilCounts,
       taxaConversao,
+      aguardandoMesAtual: aguardandoDoMes,
       alertasAA,
       rankingVendedores,
       vendasPorDiaSemana,

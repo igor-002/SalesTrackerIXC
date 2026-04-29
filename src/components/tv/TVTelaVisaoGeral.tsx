@@ -8,6 +8,7 @@ interface TVTelaVisaoGeralProps {
   mrrReal: number
   totalAtivos: number
   totalAguardando: number
+  totalAguardandoMes: number
   taxaConversao: number
   metaMensal: number
   t: TVThemeColors
@@ -19,6 +20,7 @@ export function TVTelaVisaoGeral({
   mrrReal,
   totalAtivos,
   totalAguardando,
+  totalAguardandoMes,
   taxaConversao,
   metaMensal,
   t,
@@ -153,7 +155,7 @@ export function TVTelaVisaoGeral({
             {formatPercent(taxaConversao)}
           </p>
           <p className="text-sm text-white/40 mt-3">
-            {totalAtivos} de {totalAtivos + totalAguardando} propostas convertidas
+            {totalAtivos} de {totalAtivos + totalAguardandoMes} propostas do mês
           </p>
         </div>
         <div

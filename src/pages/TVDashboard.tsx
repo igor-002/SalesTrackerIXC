@@ -173,6 +173,7 @@ export default function TVDashboard() {
             mrrReal={tvStats.mrrReal}
             totalAtivos={tvStats.funilCounts.A}
             totalAguardando={tvStats.funilCounts.AA}
+            totalAguardandoMes={tvStats.aguardandoMesAtual}
             taxaConversao={tvStats.taxaConversao}
             metaMensal={metaMensal}
             t={t}
