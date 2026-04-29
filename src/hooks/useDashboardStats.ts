@@ -106,7 +106,8 @@ export function useDashboardStats() {
       supabase
         .from('vendas')
         .select('id, cliente_nome, valor_unitario, valor_total, comissao_valor, mrr, data_venda, status_ixc, dias_em_aa, dias_aguardando, tags, codigo_contrato_ixc, vendedor:vendedores(nome)')
-        .gte('data_venda', inicioMes),
+        .eq('mes_referencia', mesAtual)
+        .eq('ano_referencia', anoAtual),
       supabase
         .from('vendas')
         .select('id, valor_total, data_venda')
@@ -138,11 +139,12 @@ export function useDashboardStats() {
     const faturamentoSemana = vendasSemanaData.reduce((s, v) => s + (v.valor_total ?? 0), 0)
     const vendasSemana = vendasSemanaData.length
 
-    // Mês
-    const faturamentoMes = vendasMes.reduce((s, v) => s + (v.valor_total ?? 0), 0)
+    // Mês — apenas contratos ativos (A) para faturamento e MRR confirmado
+    const vendasAtivas = vendasMes.filter((v) => v.status_ixc === 'A')
+    const faturamentoMes = vendasAtivas.reduce((s, v) => s + (v.valor_total ?? 0), 0)
     const comissoesMes = vendasMes.reduce((s, v) => s + (v.comissao_valor ?? 0), 0)
     const vendasUnicasMes = vendasMes.filter((v) => !v.mrr).length
-    const vendasMrrMes = vendasMes.filter((v) => v.mrr).reduce((s, v) => s + ((v as { valor_unitario?: number | null }).valor_unitario ?? 0), 0)
+    const vendasMrrMes = vendasAtivas.filter((v) => v.mrr).reduce((s, v) => s + ((v as { valor_unitario?: number | null }).valor_unitario ?? 0), 0)
     const faturamentoSemRecorrencia = faturamentoMes - vendasMrrMes
 
     // MRR: soma do valor_unitario das vendas recorrentes (preço unitário do plano)

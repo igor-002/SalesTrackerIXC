@@ -191,7 +191,9 @@ export function useTVStats() {
     // AA vem de todos os meses — contratos ainda aguardando não são do mês corrente necessariamente
     funilCounts.AA = vendasAguardando.filter((v) => v.status_ixc === 'AA').length
 
-    const denom = funilCounts.A + funilCounts.AA
+    // Taxa de conversão usa só o mês corrente no denominador (não distorce com AA antigos)
+    const aguardandoDoMes = vendasMes.filter((v) => v.status_ixc === 'AA' || v.status_ixc === 'P').length
+    const denom = funilCounts.A + aguardandoDoMes
     const taxaConversao = denom > 0 ? (funilCounts.A / denom) * 100 : 0
 
     const alertasAA = (vendasAguardando
