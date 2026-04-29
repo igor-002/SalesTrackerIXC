@@ -113,7 +113,7 @@ export function useTVStats() {
     inicio12Meses.setDate(1)
     const inicio12MesesStr = inicio12Meses.toISOString().slice(0, 10)
 
-    const [mesRes, semanaRes, mrr12Res, mrrPotencial12Res, churnMesRes, churnAnteriorRes] = await Promise.all([
+    const [mesRes, semanaRes, mrr12Res, mrrPotencial12Res, churnMesRes, churnAnteriorRes, aguardandoRes] = await Promise.all([
       supabase
         .from('vendas')
         .select('id, status_ixc, mrr, valor_total, valor_unitario, dias_em_aa, cliente_nome, data_venda, codigo_contrato_ixc, created_at, status_atualizado_em, vendedor:vendedores(id, nome), segmento:segmentos(id, nome)')
@@ -150,6 +150,12 @@ export function useTVStats() {
         .in('status_ixc', ['B', 'C', 'CN', 'CA'])
         .eq('mes_referencia', mesAnterior)
         .eq('ano_referencia', anoMesAnterior),
+      // Todos os contratos aguardando/proposta — sem filtro de mês porque AA pode
+      // ter sido cadastrado em qualquer mês e ainda não ter ativado
+      supabase
+        .from('vendas')
+        .select('id, status_ixc, mrr, valor_total, dias_em_aa, cliente_nome, codigo_contrato_ixc, vendedor:vendedores(id, nome)')
+        .in('status_ixc', ['AA', 'P']),
     ])
 
     const vendasMes = mesRes.data ?? []
@@ -158,13 +164,14 @@ export function useTVStats() {
     const vendasMrrPotencial12 = mrrPotencial12Res.data ?? []
     const churnMes = churnMesRes.data ?? []
     const churnAnterior = churnAnteriorRes.data ?? []
+    const vendasAguardando = aguardandoRes.data ?? []
 
     const faturamentoReal = vendasMes
       .filter((v) => v.status_ixc === 'A')
       .reduce((s, v) => s + (v.valor_total ?? 0), 0)
 
-    const faturamentoPrometido = vendasMes
-      .filter((v) => v.status_ixc === 'AA')
+    // Todos os AA/P ativos (de qualquer mês) — não apenas os do mês corrente
+    const faturamentoPrometido = vendasAguardando
       .reduce((s, v) => s + (v.valor_total ?? 0), 0)
 
     const mrrReal = vendasMes
@@ -178,14 +185,17 @@ export function useTVStats() {
     const funilCounts: FunilCounts = { A: 0, AA: 0, CM: 0, FA: 0, CN: 0, N: 0 }
     for (const v of vendasMes) {
       const code = (v.status_ixc ?? '') as keyof FunilCounts
-      if (code in funilCounts) funilCounts[code]++
+      // AA é contado separadamente abaixo (via vendasAguardando) para incluir todos os meses
+      if (code in funilCounts && code !== 'AA') funilCounts[code]++
     }
+    // AA vem de todos os meses — contratos ainda aguardando não são do mês corrente necessariamente
+    funilCounts.AA = vendasAguardando.filter((v) => v.status_ixc === 'AA').length
 
     const denom = funilCounts.A + funilCounts.AA
     const taxaConversao = denom > 0 ? (funilCounts.A / denom) * 100 : 0
 
-    const alertasAA = (vendasMes as AlertaAATv[])
-      .filter((v) => (v as { status_ixc?: string | null }).status_ixc === 'AA')
+    const alertasAA = (vendasAguardando
+      .filter((v) => v.status_ixc === 'AA') as unknown as AlertaAATv[])
       .sort((a, b) => (b.dias_em_aa ?? 0) - (a.dias_em_aa ?? 0))
 
     // Ranking: contratos ativos (A) para faturamento + todos os status para conversão
