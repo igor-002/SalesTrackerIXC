@@ -798,6 +798,12 @@ export async function syncVendasAvulsasFromIXC(
   const vendasIXC: IxcVendaSaida[] = await ixcListarVendasAvulsas(inicio, fim)
   onProgress?.(`${vendasIXC.length} vendas avulsas encontradas`, 30)
 
+  console.log('[avulsas] total bruto do IXC:', vendasIXC.length)
+  console.log('[avulsas] primeiras 3:', JSON.stringify(vendasIXC.slice(0, 3)))
+  console.log('[avulsas] com id_contrato=0:', vendasIXC.length)
+  console.log('[avulsas] mapa vendedores:', JSON.stringify([...ixcToVendedor.entries()]))
+  console.log('[avulsas] id_comissionado das vendas:', vendasIXC.map(v => v.id_comissionado))
+
   let inseridas = 0
   let atualizadas = 0
   let erros = 0
