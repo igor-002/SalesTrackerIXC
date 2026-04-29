@@ -50,18 +50,14 @@ export function TVTelaEvolucao({ mrr6Meses, mrrPotencial6Meses, t }: TVTelaEvolu
   }
 
   // Merge confirmado + potencial por posição (mesmos meses, mesma ordem)
-  const allData = mrr6Meses.map((d, i) => ({
+  // slice(-6) já foi aplicado no Dashboard — aqui apenas exibimos todos os 6
+  const chartData = mrr6Meses.map((d, i) => ({
     mes: d.mes,
     confirmado: d.valor,
     potencial: mrrPotencial6Meses[i]?.valor ?? 0,
   }))
 
-  // Remover meses iniciais sem dados em nenhuma das duas linhas
-  const firstWithData = allData.findIndex(d => d.confirmado > 0 || d.potencial > 0)
-  const chartData = firstWithData >= 0 ? allData.slice(firstWithData) : allData
-
   const ultimo = chartData[chartData.length - 1]
-  const nMeses = chartData.length
 
   return (
     <div className="min-w-full h-full flex flex-col gap-4">
@@ -74,7 +70,7 @@ export function TVTelaEvolucao({ mrr6Meses, mrrPotencial6Meses, t }: TVTelaEvolu
           className="text-xs font-bold px-3 py-1.5 rounded-full"
           style={{ background: `${t.primary}12`, color: `${t.primary}cc`, border: `1px solid ${t.primary}20` }}
         >
-          Últimos {nMeses} {nMeses === 1 ? 'mês' : 'meses'}
+          Últimos 6 meses
         </span>
       </div>
 
