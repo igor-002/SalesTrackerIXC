@@ -6,10 +6,13 @@ import {
   ixcBuscarAreceberPorContrato,
   ixcBuscarProdutosContrato,
   ixcListarContratosPorVendedor,
+  ixcListarVendasAvulsas,
+  getMesAtualRange,
   type IxcContratoFull,
+  type IxcVendaSaida,
 } from '@/lib/ixc'
 import { runReconciliacao } from '@/services/reconciliacao'
-import { syncAllVendasUnicas } from '@/hooks/useVendasUnicas'
+import { syncAllVendasUnicas, syncParcelasFromIxc } from '@/hooks/useVendasUnicas'
 import type { Database } from '@/types/database.types'
 
 type VendasHistoricoInsert = Database['public']['Tables']['vendas_historico']['Insert']
@@ -517,6 +520,14 @@ export async function syncContratosFromIXC(
 
     onProgress?.(`Sync concluído — ${vendasValidas.length} contratos importados`, 100)
 
+    // 10. Sync de vendas avulsas — não-fatal
+    try {
+      onProgress?.('Sincronizando vendas avulsas...', 100)
+      await syncVendasAvulsasFromIXC(onProgress)
+    } catch (err) {
+      console.warn('[syncContratosFromIXC] Erro no sync de vendas avulsas:', err)
+    }
+
     return {
       importados: vendasValidas.length,
       erros,
@@ -740,6 +751,125 @@ export async function syncHistoricoVendedores(
     }
     throw err
   }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SYNC DE VENDAS AVULSAS IXC → SUPABASE
+// ══════════════════════════════════════════════════════════════════════════════
+
+export interface SyncVendasAvulsasResult {
+  inseridas: number
+  atualizadas: number
+  erros: number
+}
+
+function mapStatusVdSaida(statusIxc: string): string {
+  if (statusIxc === 'C') return 'cancelado'
+  return 'ativo'
+}
+
+/**
+ * Importa vendas avulsas (vd_saida, id_contrato = 0) do IXC para vendas_unicas.
+ * Apenas vendas comissionadas a vendedores cadastrados com ixc_id são importadas.
+ * Upsert por id_venda_ixc: insere novas, atualiza status/valor nas existentes.
+ */
+export async function syncVendasAvulsasFromIXC(
+  onProgress?: SyncProgressCallback
+): Promise<SyncVendasAvulsasResult> {
+  onProgress?.('Buscando vendedores para vendas avulsas...', 5)
+
+  // 1. Carregar vendedores com ixc_id para mapear id_comissionado
+  const { data: vendedoresData, error: vendedoresError } = await supabase
+    .from('vendedores')
+    .select('id, nome, ixc_id')
+    .not('ixc_id', 'is', null)
+
+  if (vendedoresError) throw new Error(`Erro ao buscar vendedores: ${vendedoresError.message}`)
+
+  const ixcToVendedor = new Map<string, string>()
+  for (const v of (vendedoresData ?? []) as { id: string; ixc_id: string | null }[]) {
+    if (v.ixc_id) ixcToVendedor.set(v.ixc_id, v.id)
+  }
+
+  // 2. Buscar período do mês atual
+  const { inicio, fim } = getMesAtualRange()
+  onProgress?.(`Buscando vendas avulsas de ${inicio} a ${fim}...`, 15)
+
+  const vendasIXC: IxcVendaSaida[] = await ixcListarVendasAvulsas(inicio, fim)
+  onProgress?.(`${vendasIXC.length} vendas avulsas encontradas`, 30)
+
+  let inseridas = 0
+  let atualizadas = 0
+  let erros = 0
+  const total = vendasIXC.length
+
+  for (let i = 0; i < total; i++) {
+    const venda = vendasIXC[i]
+    const pct = Math.round(30 + ((i + 1) / Math.max(total, 1)) * 60)
+    onProgress?.(`Venda avulsa ${i + 1}/${total}...`, pct)
+
+    // Só importar se houver vendedor comissionado cadastrado
+    const vendedorId = venda.id_comissionado ? ixcToVendedor.get(venda.id_comissionado) : undefined
+    if (!vendedorId) continue
+
+    try {
+      // Buscar dados do cliente
+      const cliente = await ixcBuscarCliente(venda.id_cliente)
+      const statusLocal = mapStatusVdSaida(venda.status)
+      const dataVenda = venda.data_saida ?? new Date().toISOString().slice(0, 10)
+
+      // Verificar se já existe pelo id_venda_ixc
+      const { data: existing } = await supabase
+        .from('vendas_unicas')
+        .select('id')
+        .eq('id_venda_ixc', venda.id)
+        .maybeSingle()
+
+      if (existing) {
+        // Atualizar apenas campos que refletem estado IXC (não sobrescreve edições manuais)
+        await supabase
+          .from('vendas_unicas')
+          .update({
+            status: statusLocal,
+            valor_total: venda.valor_total,
+            ids_areceber: venda.ids_areceber,
+          })
+          .eq('id', existing.id)
+
+        await syncParcelasFromIxc(existing.id).catch(() => undefined)
+        atualizadas++
+      } else {
+        // Inserir nova venda avulsa
+        const { data: inserted, error: insertError } = await supabase
+          .from('vendas_unicas')
+          .insert({
+            vendedor_id: vendedorId,
+            cliente_nome: cliente.razao,
+            codigo_cliente_ixc: venda.id_cliente,
+            valor_total: venda.valor_total,
+            data_venda: dataVenda,
+            status: statusLocal,
+            id_venda_ixc: venda.id,
+            ids_areceber: venda.ids_areceber,
+          })
+          .select('id')
+          .single()
+
+        if (insertError) throw insertError
+
+        if (inserted) {
+          await syncParcelasFromIxc(inserted.id).catch(() => undefined)
+        }
+        inseridas++
+      }
+    } catch (err) {
+      console.warn(`[syncVendasAvulsas] Erro na venda IXC ${venda.id}:`, err)
+      erros++
+    }
+  }
+
+  onProgress?.(`Avulsas: ${inseridas} inseridas, ${atualizadas} atualizadas, ${erros} erros`, 100)
+  return { inseridas, atualizadas, erros }
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

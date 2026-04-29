@@ -1,11 +1,11 @@
 import { useState, useMemo } from 'react'
-import { Search, RefreshCw, Wrench, Eye, ChevronDown, ChevronUp, X, AlertTriangle, Calendar } from 'lucide-react'
+import { Search, RefreshCw, Wrench, Eye, ChevronDown, ChevronUp, X, AlertTriangle, Calendar, Package } from 'lucide-react'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Select } from '@/components/ui/Select'
 import { Spinner } from '@/components/ui/Spinner'
 import { toast } from '@/components/ui/Toast'
 import { useDiagnosticoIXC, useVendedoresAutorizados, type ContratoComVendedor } from '@/hooks/useDiagnosticoIXC'
-import { syncContratosFromIXC, syncHistoricoVendedores } from '@/services/ixcSync'
+import { syncContratosFromIXC, syncHistoricoVendedores, syncVendasAvulsasFromIXC } from '@/services/ixcSync'
 import { ixcBuscarProdutosPorVdContrato, ixcBuscarStatusContrato, type IxcContratoProduto } from '@/lib/ixc'
 import { formatBRL, formatDate } from '@/lib/formatters'
 
@@ -56,6 +56,9 @@ export default function DiagnosticoIXC() {
   const [anoHistorico, setAnoHistorico] = useState(anoPadrao)
   const [syncingHistorico, setSyncingHistorico] = useState(false)
   const [syncHistoricoProgress, setSyncHistoricoProgress] = useState({ msg: '', pct: 0 })
+
+  const [syncingAvulsas, setSyncingAvulsas] = useState(false)
+  const [syncAvulsasProgress, setSyncAvulsasProgress] = useState({ msg: '', pct: 0 })
   const ANOS = Array.from({ length: anoAtualNum - 2023 }, (_, i) => 2024 + i)
   const isMesAtualOuFuturo = anoHistorico > anoAtualNum || (anoHistorico === anoAtualNum && mesHistorico >= mesAtualNum)
 
@@ -160,6 +163,22 @@ export default function DiagnosticoIXC() {
     } finally {
       setSyncingHistorico(false)
       setSyncHistoricoProgress({ msg: '', pct: 0 })
+    }
+  }
+
+  async function handleSyncAvulsas() {
+    setSyncingAvulsas(true)
+    setSyncAvulsasProgress({ msg: 'Iniciando...', pct: 0 })
+    try {
+      const result = await syncVendasAvulsasFromIXC((msg, pct) => {
+        setSyncAvulsasProgress({ msg, pct: pct ?? 0 })
+      })
+      toast('success', `Avulsas: ${result.inseridas} inseridas, ${result.atualizadas} atualizadas`)
+    } catch (err) {
+      toast('error', err instanceof Error ? err.message : 'Erro no sync de vendas avulsas')
+    } finally {
+      setSyncingAvulsas(false)
+      setSyncAvulsasProgress({ msg: '', pct: 0 })
     }
   }
 
@@ -472,6 +491,44 @@ export default function DiagnosticoIXC() {
               />
             </div>
             <p className="text-xs text-white/40 mt-2">{syncHistoricoProgress.msg}</p>
+          </div>
+        )}
+      </GlassCard>
+
+      {/* Seção: Sincronizar Vendas Avulsas */}
+      <GlassCard className="p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Package size={16} className="text-amber-400" />
+          <span className="text-sm font-bold text-white">Sincronizar Vendas Avulsas</span>
+        </div>
+        <p className="text-xs text-white/40 mb-4">
+          Importa vendas avulsas (vd_saida) do mês atual do IXC para a tabela Vendas Únicas.
+          Apenas vendas comissionadas a vendedores cadastrados são importadas.
+        </p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleSyncAvulsas}
+            disabled={syncingAvulsas}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}
+          >
+            {syncingAvulsas ? <Spinner size="sm" /> : <RefreshCw size={12} />}
+            {syncingAvulsas ? 'Sincronizando...' : 'Importar do IXC'}
+          </button>
+        </div>
+        {syncingAvulsas && (
+          <div className="mt-4">
+            <div className="flex items-center gap-3 mb-2">
+              <Spinner size="sm" style={{ color: '#f59e0b' }} />
+              <span className="text-sm text-white font-medium">Sincronizando vendas avulsas...</span>
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{ width: `${syncAvulsasProgress.pct}%`, background: '#f59e0b' }}
+              />
+            </div>
+            <p className="text-xs text-white/40 mt-2">{syncAvulsasProgress.msg}</p>
           </div>
         )}
       </GlassCard>

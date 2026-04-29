@@ -893,3 +893,68 @@ export async function ixcListarContratosPorVendedor(
 
   return allContratos
 }
+
+/**
+ * Lista todas as vendas avulsas (vd_saida com id_contrato = 0) do IXC em um período.
+ * Filtra por data_saida >= inicio no IXC e aplica filtros adicionais em JS.
+ */
+export async function ixcListarVendasAvulsas(inicio: string, fim: string): Promise<IxcVendaSaida[]> {
+  const rp = 200
+  const allVendas: IxcVendaSaida[] = []
+  let page = 1
+  let total = 0
+
+  do {
+    const resp = await fetch(ixcUrl('vd_saida'), {
+      method: 'POST',
+      headers: { ...ixcHeaders(), ixcsoft: 'listar' },
+      body: JSON.stringify({
+        qtype: 'vd_saida.data_saida',
+        query: inicio,
+        oper: '>=',
+        page: String(page),
+        rp: String(rp),
+        sortname: 'vd_saida.data_saida',
+        sortorder: 'asc',
+      }),
+    })
+
+    if (!resp.ok) throw new Error(`IXC API erro ${resp.status}: ${resp.statusText}`)
+
+    const data = (await resp.json()) as IxcListResponse
+    total = parseInt(data.total ?? '0', 10)
+    const registros = normalizeRegistros(data)
+
+    for (const r of registros) {
+      const dataSaida = (r.data_saida as string | undefined) ?? null
+      if (!dataSaida || dataSaida > fim) continue
+
+      // Considera avulsa: id_contrato = 0, "", null ou ausente
+      const idContrato = r.id_contrato
+      const isAvulsa =
+        idContrato === null ||
+        idContrato === undefined ||
+        String(idContrato).trim() === '' ||
+        String(idContrato).trim() === '0'
+      if (!isAvulsa) continue
+
+      allVendas.push({
+        id: String(r.id ?? ''),
+        id_cliente: String(r.id_cliente ?? ''),
+        valor_total: parseFloat(String(r.valor_total ?? '0')),
+        status: String(r.status ?? ''),
+        ids_areceber: (r.ids_areceber as string | undefined) ?? null,
+        data_vencimento_areceber: (r.data_vencimento_areceber as string | undefined) ?? null,
+        data_emissao: (r.data_emissao as string | undefined) ?? null,
+        data_saida: dataSaida,
+        id_contrato: String(r.id_contrato ?? ''),
+        id_comissionado: (r.id_comissionado as string | undefined) ?? null,
+        raw: r,
+      })
+    }
+
+    page++
+  } while ((page - 1) * rp < total)
+
+  return allVendas
+}
