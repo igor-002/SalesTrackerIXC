@@ -99,7 +99,8 @@ export function useTVStats() {
     const now = new Date()
     const anoAtual = now.getFullYear()
     const mesAtual = now.getMonth() + 1
-    const inicioMes = `${anoAtual}-${String(mesAtual).padStart(2, '0')}-01`
+    const mesAnterior = mesAtual === 1 ? 12 : mesAtual - 1
+    const anoMesAnterior = mesAtual === 1 ? anoAtual - 1 : anoAtual
 
     const dayOfWeek = now.getDay()
     const inicioSemana = new Date(now)
@@ -112,14 +113,12 @@ export function useTVStats() {
     inicio12Meses.setDate(1)
     const inicio12MesesStr = inicio12Meses.toISOString().slice(0, 10)
 
-    // Mês anterior para comparativo de churn
-    const inicioMesAnterior = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10)
-
     const [mesRes, semanaRes, mrr12Res, mrrPotencial12Res, churnMesRes, churnAnteriorRes] = await Promise.all([
       supabase
         .from('vendas')
         .select('id, status_ixc, mrr, valor_total, dias_em_aa, cliente_nome, data_venda, codigo_contrato_ixc, created_at, status_atualizado_em, vendedor:vendedores(id, nome), segmento:segmentos(id, nome)')
-        .gte('data_venda', inicioMes),
+        .eq('mes_referencia', mesAtual)
+        .eq('ano_referencia', anoAtual),
       supabase
         .from('vendas')
         .select('data_venda')
@@ -137,19 +136,20 @@ export function useTVStats() {
         .eq('mrr', true)
         .in('status_ixc', ['AA', 'P'])
         .gte('data_venda', inicio12MesesStr),
-      // Churn mês corrente: contratos que tiveram status atualizado para B ou C neste mês
+      // Churn mês corrente: cancelados/bloqueados do mês de referência atual
       supabase
         .from('vendas')
         .select('id, status_ixc')
-        .in('status_ixc', ['B', 'C'])
-        .gte('status_atualizado_em', inicioMes),
-      // Churn mês anterior: contratos que tiveram status B ou C no mês passado
+        .in('status_ixc', ['B', 'C', 'CN', 'CA'])
+        .eq('mes_referencia', mesAtual)
+        .eq('ano_referencia', anoAtual),
+      // Churn mês anterior: cancelados/bloqueados do mês de referência anterior
       supabase
         .from('vendas')
         .select('id, status_ixc')
-        .in('status_ixc', ['B', 'C'])
-        .gte('status_atualizado_em', inicioMesAnterior)
-        .lt('status_atualizado_em', inicioMes),
+        .in('status_ixc', ['B', 'C', 'CN', 'CA'])
+        .eq('mes_referencia', mesAnterior)
+        .eq('ano_referencia', anoMesAnterior),
     ])
 
     const vendasMes = mesRes.data ?? []
