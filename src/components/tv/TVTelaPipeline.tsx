@@ -1,41 +1,32 @@
-/**
- * Tela Pipeline - Funil de Vendas Visual
- * Design moderno com funil 3D e métricas destacadas
- */
-import { CheckCircle2, Clock, XCircle, TrendingDown, TrendingUp, ArrowDown } from 'lucide-react'
+import { CheckCircle2, Clock, ArrowDown } from 'lucide-react'
 import type { TVThemeColors } from './TVCard'
-import type { FunilCounts, ChurnStats } from '@/hooks/useTVStats'
+import type { FunilCounts, AlertaAATv } from '@/hooks/useTVStats'
 import { formatBRL, formatNumber, formatPercent } from '@/lib/formatters'
 
 interface TVTelaPipelineProps {
   funilCounts: FunilCounts
-  churn: ChurnStats
   taxaConversao: number
   faturamentoReal: number
   faturamentoPrometido: number
+  alertasAA: AlertaAATv[]
   t: TVThemeColors
 }
 
 export function TVTelaPipeline({
   funilCounts,
-  churn,
   taxaConversao,
   faturamentoReal,
   faturamentoPrometido,
+  alertasAA,
   t,
 }: TVTelaPipelineProps) {
-  const cancelamentosAumentaram = churn.canceladosMes > churn.canceladosMesAnterior
-  const diffCancel = churn.canceladosMes - churn.canceladosMesAnterior
-  const diffBloq = churn.bloqueadosMes - churn.bloqueadosMesAnterior
-
-  // Calcular totais para proporções do funil
   const totalPipeline = funilCounts.A + funilCounts.AA
   const pctAtivos = totalPipeline > 0 ? (funilCounts.A / totalPipeline) * 100 : 50
+  const top3 = alertasAA.slice(0, 3)
 
   return (
     <div className="min-w-full h-full flex flex-col gap-4">
 
-      {/* Header */}
       <div className="flex items-center justify-between flex-shrink-0">
         <p className="text-xs font-black uppercase tracking-[0.2em]" style={{ color: `${t.primary}99` }}>
           Funil de Vendas
@@ -48,10 +39,9 @@ export function TVTelaPipeline({
         </span>
       </div>
 
-      {/* Layout principal */}
       <div className="flex-1 grid gap-5 min-h-0" style={{ gridTemplateColumns: '1fr 1.4fr' }}>
 
-        {/* Esquerda: Funil Visual 3D */}
+        {/* Esquerda: Funil Visual */}
         <div
           className="rounded-3xl p-6 flex flex-col relative overflow-hidden"
           style={{
@@ -63,10 +53,9 @@ export function TVTelaPipeline({
             Pipeline Atual
           </p>
 
-          {/* Funil com formato trapezóide */}
           <div className="flex-1 flex flex-col items-center justify-center gap-1 py-4">
 
-            {/* Topo do funil - Aguardando (mais largo) */}
+            {/* Topo — Aguardando */}
             <div className="relative w-full flex flex-col items-center">
               <div
                 className="relative flex items-center justify-center py-6 transition-all duration-500"
@@ -84,13 +73,8 @@ export function TVTelaPipeline({
                   </p>
                   <p className="text-xs text-white/40 mt-0.5">{formatBRL(faturamentoPrometido)}</p>
                 </div>
-                {/* Glow effect */}
-                <div
-                  className="absolute inset-0 opacity-30 blur-xl"
-                  style={{ background: t.secondary }}
-                />
+                <div className="absolute inset-0 opacity-30 blur-xl" style={{ background: t.secondary }} />
               </div>
-              {/* Seta indicando fluxo */}
               <div className="py-2 flex flex-col items-center">
                 <ArrowDown size={16} className="text-white/20 animate-pulse" />
                 <span className="text-[10px] font-bold mt-1" style={{ color: t.primary }}>
@@ -99,7 +83,7 @@ export function TVTelaPipeline({
               </div>
             </div>
 
-            {/* Base do funil - Ativos (mais estreito) */}
+            {/* Base — Ativos */}
             <div className="relative w-full flex flex-col items-center">
               <div
                 className="relative flex items-center justify-center py-8 transition-all duration-500"
@@ -117,28 +101,19 @@ export function TVTelaPipeline({
                   </p>
                   <p className="text-sm text-white/50 mt-0.5 font-semibold">{formatBRL(faturamentoReal)}</p>
                 </div>
-                {/* Glow pulsante */}
                 <div
                   className="absolute inset-0 opacity-20 blur-2xl animate-pulse"
                   style={{ background: t.primary, animationDuration: '3s' }}
                 />
               </div>
             </div>
-
-            {/* Saída - Perdidos */}
-            <div className="flex items-center gap-3 mt-4 px-4 py-2 rounded-xl" style={{ background: 'rgba(239,68,68,0.08)' }}>
-              <XCircle size={14} className="text-red-400/60" />
-              <span className="text-xs text-white/40">Saídas:</span>
-              <span className="text-sm font-black text-red-400">{funilCounts.CN}</span>
-              <span className="text-xs text-white/30">cancelados</span>
-            </div>
           </div>
         </div>
 
-        {/* Direita: Métricas detalhadas */}
+        {/* Direita: Taxa Conversão + Top 3 mais antigos */}
         <div className="flex flex-col gap-4">
 
-          {/* Cards principais - Conversão destacada */}
+          {/* Taxa de Conversão */}
           <div
             className="rounded-3xl p-6 relative overflow-hidden"
             style={{
@@ -160,17 +135,15 @@ export function TVTelaPipeline({
                   {formatNumber(funilCounts.A)} de {formatNumber(totalPipeline)} propostas convertidas
                 </p>
               </div>
-              <div className="flex flex-col items-end gap-2">
+              <div
+                className="w-24 h-24 rounded-full flex items-center justify-center relative"
+                style={{ background: `conic-gradient(${t.primary} ${pctAtivos}%, transparent ${pctAtivos}%)` }}
+              >
                 <div
-                  className="w-24 h-24 rounded-full flex items-center justify-center relative"
-                  style={{ background: `conic-gradient(${t.primary} ${pctAtivos}%, transparent ${pctAtivos}%)` }}
+                  className="w-20 h-20 rounded-full flex items-center justify-center"
+                  style={{ background: 'rgba(0,0,0,0.6)' }}
                 >
-                  <div
-                    className="w-20 h-20 rounded-full flex items-center justify-center"
-                    style={{ background: 'rgba(0,0,0,0.6)' }}
-                  >
-                    <CheckCircle2 size={28} style={{ color: t.primary }} />
-                  </div>
+                  <CheckCircle2 size={28} style={{ color: t.primary }} />
                 </div>
               </div>
             </div>
@@ -180,101 +153,52 @@ export function TVTelaPipeline({
             />
           </div>
 
-          {/* Grid Cancelados + Bloqueados */}
-          <div className="flex-1 grid grid-cols-2 gap-4">
-
-            {/* Cancelados */}
+          {/* Top 3 mais tempo aguardando */}
+          <div
+            className="flex-1 rounded-3xl overflow-hidden flex flex-col"
+            style={{
+              background: 'rgba(255,255,255,0.025)',
+              border: `1px solid ${t.secondary}22`,
+              borderTop: `2px solid ${t.secondary}`,
+            }}
+          >
             <div
-              className="rounded-3xl p-5 flex flex-col justify-between relative overflow-hidden"
-              style={{
-                background: 'linear-gradient(145deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.05) 100%)',
-                border: '1px solid rgba(239,68,68,0.25)',
-              }}
+              className="flex items-center gap-2 px-6 py-3 flex-shrink-0"
+              style={{ background: 'rgba(0,0,0,0.3)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase tracking-widest text-red-400/70">Cancelados</span>
-                <XCircle size={18} className="text-red-400/50" />
-              </div>
-              <div>
-                <p className="text-5xl font-black text-red-400 tracking-tighter leading-none">
-                  {churn.canceladosMes}
-                </p>
-                <div className="flex items-center gap-2 mt-2">
-                  {diffCancel !== 0 ? (
-                    <>
-                      {cancelamentosAumentaram ? (
-                        <TrendingUp size={14} className="text-red-400" />
-                      ) : (
-                        <TrendingDown size={14} className="text-emerald-400" />
-                      )}
-                      <span className={`text-sm font-bold ${cancelamentosAumentaram ? 'text-red-400' : 'text-emerald-400'}`}>
-                        {diffCancel > 0 ? '+' : ''}{diffCancel} vs mês anterior
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-xs text-white/30">= igual ao mês anterior</span>
-                  )}
-                </div>
-              </div>
-              <div className="absolute -right-4 -bottom-4 w-24 h-24 rounded-full blur-2xl bg-red-500/20 pointer-events-none" />
-            </div>
-
-            {/* Bloqueados */}
-            <div
-              className="rounded-3xl p-5 flex flex-col justify-between relative overflow-hidden"
-              style={{
-                background: 'linear-gradient(145deg, rgba(245,158,11,0.12) 0%, rgba(245,158,11,0.04) 100%)',
-                border: '1px solid rgba(245,158,11,0.22)',
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase tracking-widest text-amber-400/70">Bloqueados</span>
-                <Clock size={18} className="text-amber-400/50" />
-              </div>
-              <div>
-                <p className="text-5xl font-black text-amber-400 tracking-tighter leading-none">
-                  {churn.bloqueadosMes}
-                </p>
-                <div className="flex items-center gap-2 mt-2">
-                  {diffBloq !== 0 ? (
-                    <>
-                      {diffBloq > 0 ? (
-                        <TrendingUp size={14} className="text-amber-400" />
-                      ) : (
-                        <TrendingDown size={14} className="text-emerald-400" />
-                      )}
-                      <span className={`text-sm font-bold ${diffBloq > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                        {diffBloq > 0 ? '+' : ''}{diffBloq} vs mês anterior
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-xs text-white/30">= igual ao mês anterior</span>
-                  )}
-                </div>
-              </div>
-              <div className="absolute -right-4 -bottom-4 w-24 h-24 rounded-full blur-2xl bg-amber-500/15 pointer-events-none" />
-            </div>
-          </div>
-
-          {/* Alerta visual se cancelamentos aumentaram */}
-          {cancelamentosAumentaram && (
-            <div
-              className="rounded-xl px-5 py-3 flex items-center gap-3"
-              style={{
-                background: 'linear-gradient(90deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.05) 100%)',
-                border: '1px solid rgba(239,68,68,0.3)',
-                boxShadow: '0 0 20px rgba(239,68,68,0.1)',
-              }}
-            >
-              <div
-                className="w-2 h-2 rounded-full animate-pulse"
-                style={{ background: '#ef4444', boxShadow: '0 0 10px #ef4444' }}
-              />
-              <span className="text-sm font-bold text-red-400">
-                Atenção: cancelamentos em alta este mês
+              <Clock size={14} style={{ color: t.secondary }} />
+              <span className="text-xs font-black uppercase tracking-widest text-white/40">
+                Mais tempo aguardando
               </span>
             </div>
-          )}
+
+            {top3.length === 0 ? (
+              <div className="flex-1 flex items-center justify-center">
+                <p className="text-sm text-white/25">Nenhum contrato aguardando</p>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col justify-around px-6 py-4">
+                {top3.map((v) => {
+                  const dias = v.dias_em_aa ?? 0
+                  const diasColor = dias > 7 ? '#ef4444' : dias >= 4 ? '#f59e0b' : '#00d68f'
+                  return (
+                    <div key={v.id} className="flex items-center justify-between gap-4 py-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-lg font-bold text-white truncate">{v.cliente_nome}</p>
+                        <p className="text-sm text-white/40 truncate">{v.vendedor?.nome ?? '—'}</p>
+                      </div>
+                      <span
+                        className="text-3xl font-black tabular-nums flex-shrink-0"
+                        style={{ color: diasColor }}
+                      >
+                        {dias}d
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

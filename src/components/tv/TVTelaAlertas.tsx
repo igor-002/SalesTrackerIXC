@@ -67,7 +67,7 @@ export function TVTelaAlertas({ alertasAA, t }: TVTelaAlertasProps) {
         </div>
 
         <div className="h-full overflow-y-auto">
-          {alertasAA.map((v, idx) => {
+          {alertasAA.slice(0, 8).map((v, idx) => {
             const dias = v.dias_em_aa ?? 0
             const urgente = dias > 7
             const atencao = dias >= 4 && dias <= 7
@@ -108,7 +108,7 @@ export function TVTelaAlertas({ alertasAA, t }: TVTelaAlertasProps) {
             return (
               <div
                 key={v.id}
-                className="grid items-center px-8 py-5 border-b transition-colors"
+                className="grid items-center px-8 py-6 border-b transition-colors"
                 style={{
                   gridTemplateColumns: '1fr 220px 100px 130px',
                   gap: '1.5rem',
@@ -118,14 +118,14 @@ export function TVTelaAlertas({ alertasAA, t }: TVTelaAlertasProps) {
                   animationDelay: `${idx * 50}ms`,
                 }}
               >
-                <span className="text-xl font-bold text-white truncate">{v.cliente_nome}</span>
+                <span className="text-2xl font-bold text-white truncate">{v.cliente_nome}</span>
 
-                <span className="text-base text-white/45 truncate">
+                <span className="text-lg text-white/45 truncate">
                   {v.vendedor?.nome ?? '—'}
                 </span>
 
                 <span
-                  className="text-2xl font-black text-right tabular-nums"
+                  className="text-3xl font-black text-right tabular-nums"
                   style={{ color: diasColor }}
                 >
                   {dias}d

@@ -4,14 +4,15 @@ import { TVClock } from '@/components/tv/TVClock'
 import { TVLogo } from '@/components/tv/TVLogo'
 import { Spinner } from '@/components/ui/Spinner'
 import { TVTelaVisaoGeral } from '@/components/tv/TVTelaVisaoGeral'
+import { TVTelaEvolucao } from '@/components/tv/TVTelaEvolucao'
 import { TVTelaPipeline } from '@/components/tv/TVTelaPipeline'
 import { TVTelaVendedores } from '@/components/tv/TVTelaVendedores'
 import { TVTelaAlertas } from '@/components/tv/TVTelaAlertas'
-import { TVTelaProdutos } from '@/components/tv/TVTelaProdutos'
 import { TVSyncIndicator } from '@/components/tv/TVSyncIndicator'
 import { useDashboardStats } from '@/hooks/useDashboardStats'
 import { useTVStats } from '@/hooks/useTVStats'
-import { useVendasUnicasMes } from '@/hooks/useVendasUnicas'
+import { useMetas } from '@/hooks/useMetas'
+import { useMetasVendedor } from '@/hooks/useMetasVendedor'
 import { useRealtime } from '@/hooks/useRealtime'
 import type { TVThemeColors } from '@/components/tv/TVCard'
 
@@ -42,12 +43,17 @@ const THEMES: Record<TVTheme, TVThemeColors> = {
 
 const THEME_KEY = 'tv_theme'
 const SLIDE_INTERVAL = 15000
-const TELA_LABELS = ['Visão Geral', 'Pipeline', 'Vendedores', 'Alertas', 'Produtos']
+const TELA_LABELS = ['Visão Geral', 'Evolução', 'Pipeline', 'Ranking', 'Alertas']
 
 export default function TVDashboard() {
-  const { stats: dashStats, loading: dashLoading, refetch: refetchDash } = useDashboardStats()
+  const { loading: dashLoading, refetch: refetchDash } = useDashboardStats()
   const tvStats = useTVStats()
-  const { data: projetosData, isLoading: loadingProjetos, refetch: refetchProjetos } = useVendasUnicasMes()
+  const now = new Date()
+  const { getMetaAtual, refetch: refetchMetas } = useMetas()
+  const { metas: metasVendedor, refetch: refetchMetasVendedor } = useMetasVendedor(
+    now.getMonth() + 1,
+    now.getFullYear(),
+  )
 
   const [theme, setTheme] = useState<TVTheme>(() => {
     return (localStorage.getItem(THEME_KEY) as TVTheme) ?? 'blue'
@@ -77,12 +83,20 @@ export default function TVDashboard() {
   const handleChange = useCallback(() => {
     refetchDash()
     tvStats.refetch()
-    refetchProjetos()
-  }, [refetchDash, tvStats, refetchProjetos])
+    refetchMetas()
+    refetchMetasVendedor()
+  }, [refetchDash, tvStats, refetchMetas, refetchMetasVendedor])
   useRealtime({ onVenda: handleChange, onCancelamento: handleChange })
 
   const t = THEMES[theme]
-  const loading = dashLoading || tvStats.loading || loadingProjetos
+  const loading = dashLoading || tvStats.loading
+
+  // Dados derivados
+  const metaMensal = getMetaAtual()?.meta_mensal ?? 0
+  const mrr6Meses = tvStats.mrr12Meses.slice(-6)
+  const metasVendedorMap: Record<string, number> = Object.fromEntries(
+    metasVendedor.map((m) => [m.vendedor_id, m.meta_contratos]),
+  )
 
   if (loading) {
     return (
@@ -134,7 +148,6 @@ export default function TVDashboard() {
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Label tela atual */}
           <span
             className="text-xs font-black uppercase tracking-[0.2em] px-3 py-1.5 rounded-full transition-all duration-500"
             style={{ background: `${t.primary}15`, color: `${t.primary}99`, border: `1px solid ${t.primary}20` }}
@@ -145,7 +158,7 @@ export default function TVDashboard() {
         </div>
       </header>
 
-      {/* ── TELAS (fade + scale) ── */}
+      {/* ── TELAS ── */}
       <div className="relative z-10 flex-1 min-h-0">
 
         {/* Tela 0 — Visão Geral */}
@@ -155,82 +168,64 @@ export default function TVDashboard() {
         >
           <TVTelaVisaoGeral
             faturamentoReal={tvStats.faturamentoReal}
-            faturamentoPrometido={tvStats.faturamentoPrometido}
             mrrReal={tvStats.mrrReal}
-            mrrProjetado={tvStats.mrrProjetado}
-            faturamento12Meses={dashStats.faturamento12Meses}
-            mrr12Meses={tvStats.mrr12Meses}
+            totalAtivos={tvStats.funilCounts.A}
+            totalAguardando={tvStats.funilCounts.AA}
+            taxaConversao={tvStats.taxaConversao}
+            metaMensal={metaMensal}
             t={t}
           />
         </div>
 
-        {/* Tela 1 — Pipeline (Funil + Churn) */}
+        {/* Tela 1 — Evolução MRR */}
         <div
           className="absolute inset-0 transition-all duration-700 ease-in-out"
           style={{ opacity: tela === 1 ? 1 : 0, transform: tela === 1 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 1 ? 'auto' : 'none' }}
         >
-          <TVTelaPipeline
-            funilCounts={tvStats.funilCounts}
-            churn={tvStats.churn}
-            taxaConversao={tvStats.taxaConversao}
-            faturamentoReal={tvStats.faturamentoReal}
-            faturamentoPrometido={tvStats.faturamentoPrometido}
-            t={t}
-          />
+          <TVTelaEvolucao mrr6Meses={mrr6Meses} t={t} />
         </div>
 
-        {/* Tela 2 — Vendedores (Ranking + Velocidade) */}
+        {/* Tela 2 — Pipeline */}
         <div
           className="absolute inset-0 transition-all duration-700 ease-in-out"
           style={{ opacity: tela === 2 ? 1 : 0, transform: tela === 2 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 2 ? 'auto' : 'none' }}
         >
-          <TVTelaVendedores
-            rankingVendedores={tvStats.rankingVendedores}
-            velocidadeVendedores={tvStats.velocidadeVendedores}
-            mediaVelocidadeTime={tvStats.mediaVelocidadeTime}
+          <TVTelaPipeline
+            funilCounts={tvStats.funilCounts}
+            taxaConversao={tvStats.taxaConversao}
+            faturamentoReal={tvStats.faturamentoReal}
+            faturamentoPrometido={tvStats.faturamentoPrometido}
+            alertasAA={tvStats.alertasAA}
             t={t}
           />
         </div>
 
-        {/* Tela 3 — Alertas */}
+        {/* Tela 3 — Ranking */}
         <div
           className="absolute inset-0 transition-all duration-700 ease-in-out"
           style={{ opacity: tela === 3 ? 1 : 0, transform: tela === 3 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 3 ? 'auto' : 'none' }}
         >
-          <TVTelaAlertas alertasAA={tvStats.alertasAA} t={t} />
+          <TVTelaVendedores
+            rankingVendedores={tvStats.rankingVendedores}
+            metasVendedorMap={metasVendedorMap}
+            t={t}
+          />
         </div>
 
-        {/* Tela 4 — Produtos (Planos + Projetos) */}
+        {/* Tela 4 — Alertas */}
         <div
           className="absolute inset-0 transition-all duration-700 ease-in-out"
           style={{ opacity: tela === 4 ? 1 : 0, transform: tela === 4 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 4 ? 'auto' : 'none' }}
         >
-          <TVTelaProdutos
-            planosMes={tvStats.planosMes}
-            projetos={(projetosData?.vendas ?? []).map(v => ({
-              id: v.id,
-              cliente_nome: v.cliente_nome,
-              valor_total: v.valor_total,
-              progresso_pct: v.progresso_pct,
-              status_geral: v.status_geral,
-            }))}
-            projetosStats={{
-              total_projetos: projetosData?.stats.total_projetos ?? 0,
-              valor_vendido: projetosData?.stats.valor_vendido ?? 0,
-              valor_recebido: projetosData?.stats.valor_recebido ?? 0,
-            }}
-            t={t}
-          />
+          <TVTelaAlertas alertasAA={tvStats.alertasAA} t={t} />
         </div>
 
       </div>
 
       {/* ── FOOTER: dots + pause + sync indicator ── */}
       <div className="relative z-10 flex-shrink-0 flex items-center justify-between pb-1">
-        {/* Esquerda — indicador de sync */}
         <TVSyncIndicator />
 
-        {/* Centro — dots de navegação */}
         <div className="flex items-center gap-2">
           {TELA_LABELS.map((label, i) => (
             <button
@@ -251,7 +246,6 @@ export default function TVDashboard() {
           ))}
         </div>
 
-        {/* Direita — botão pause */}
         <button
           onClick={() => setPausado((p) => !p)}
           className="flex items-center justify-center w-7 h-7 rounded-full transition-colors cursor-pointer"
