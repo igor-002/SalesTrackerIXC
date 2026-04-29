@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { Search, RefreshCw, Wrench, Eye, ChevronDown, ChevronUp, X, AlertTriangle, Calendar } from 'lucide-react'
 import { GlassCard } from '@/components/ui/GlassCard'
+import { Select } from '@/components/ui/Select'
 import { Spinner } from '@/components/ui/Spinner'
 import { toast } from '@/components/ui/Toast'
 import { useDiagnosticoIXC, useVendedoresAutorizados, type ContratoComVendedor } from '@/hooks/useDiagnosticoIXC'
@@ -431,30 +432,18 @@ export default function DiagnosticoIXC() {
           Não afeta os contratos do mês atual.
         </p>
         <div className="flex items-center gap-3 flex-wrap">
-          <select
-            value={mesHistorico}
+          <Select
+            value={String(mesHistorico)}
             onChange={(e) => setMesHistorico(Number(e.target.value))}
             disabled={syncingHistorico}
-            style={selectStyle}
-          >
-            {MESES.map((nome, i) => (
-              <option key={i + 1} value={i + 1} style={{ background: '#0f2419' }}>
-                {nome}
-              </option>
-            ))}
-          </select>
-          <select
-            value={anoHistorico}
+            options={MESES.map((nome, i) => ({ value: String(i + 1), label: nome }))}
+          />
+          <Select
+            value={String(anoHistorico)}
             onChange={(e) => setAnoHistorico(Number(e.target.value))}
             disabled={syncingHistorico}
-            style={selectStyle}
-          >
-            {ANOS.map((ano) => (
-              <option key={ano} value={ano} style={{ background: '#0f2419' }}>
-                {ano}
-              </option>
-            ))}
-          </select>
+            options={ANOS.map((ano) => ({ value: String(ano), label: String(ano) }))}
+          />
           <button
             onClick={handleSyncHistorico}
             disabled={syncingHistorico || isMesAtualOuFuturo}
