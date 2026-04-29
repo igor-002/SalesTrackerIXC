@@ -63,6 +63,7 @@ export interface TVStats {
   rankingVendedores: VendedorRanking[]
   vendasPorDiaSemana: { dia: string; qtd: number }[]
   mrr12Meses: { mes: string; valor: number }[]
+  mrrPotencial12Meses: { mes: string; valor: number }[]
   planosMes: PlanoStat[]
   churn: ChurnStats
   velocidadeVendedores: VelocidadeVendedor[]
@@ -81,6 +82,7 @@ const EMPTY: TVStats = {
   rankingVendedores: [],
   vendasPorDiaSemana: [],
   mrr12Meses: [],
+  mrrPotencial12Meses: [],
   planosMes: [],
   churn: { canceladosMes: 0, canceladosMesAnterior: 0, bloqueadosMes: 0, bloqueadosMesAnterior: 0 },
   velocidadeVendedores: [],
@@ -113,7 +115,7 @@ export function useTVStats() {
     // Mês anterior para comparativo de churn
     const inicioMesAnterior = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().slice(0, 10)
 
-    const [mesRes, semanaRes, mrr12Res, churnMesRes, churnAnteriorRes] = await Promise.all([
+    const [mesRes, semanaRes, mrr12Res, mrrPotencial12Res, churnMesRes, churnAnteriorRes] = await Promise.all([
       supabase
         .from('vendas')
         .select('id, status_ixc, mrr, valor_total, dias_em_aa, cliente_nome, data_venda, codigo_contrato_ixc, created_at, status_atualizado_em, vendedor:vendedores(id, nome), segmento:segmentos(id, nome)')
@@ -127,6 +129,13 @@ export function useTVStats() {
         .select('data_venda, valor_total')
         .eq('mrr', true)
         .eq('status_ixc', 'A')
+        .gte('data_venda', inicio12MesesStr),
+      // MRR potencial: contratos MRR ainda aguardando ativação (AA/P) por mês
+      supabase
+        .from('vendas')
+        .select('data_venda, valor_total')
+        .eq('mrr', true)
+        .in('status_ixc', ['AA', 'P'])
         .gte('data_venda', inicio12MesesStr),
       // Churn mês corrente: contratos que tiveram status atualizado para B ou C neste mês
       supabase
@@ -146,6 +155,7 @@ export function useTVStats() {
     const vendasMes = mesRes.data ?? []
     const vendasSemana = semanaRes.data ?? []
     const vendasMrr12 = mrr12Res.data ?? []
+    const vendasMrrPotencial12 = mrrPotencial12Res.data ?? []
     const churnMes = churnMesRes.data ?? []
     const churnAnterior = churnAnteriorRes.data ?? []
 
@@ -285,6 +295,23 @@ export function useTVStats() {
       return { mes: label, valor }
     })
 
+    // Agrupar MRR potencial (AA/P) dos últimos 12 meses por mês
+    const mrrPotencialMap = new Map<string, number>()
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      mrrPotencialMap.set(key, 0)
+    }
+    for (const v of vendasMrrPotencial12) {
+      const key = v.data_venda.slice(0, 7)
+      if (mrrPotencialMap.has(key)) mrrPotencialMap.set(key, (mrrPotencialMap.get(key) ?? 0) + (v.valor_total ?? 0))
+    }
+    const mrrPotencial12Meses = Array.from(mrrPotencialMap.entries()).map(([key, valor]) => {
+      const [ano, mes] = key.split('-')
+      const label = new Date(Number(ano), Number(mes) - 1, 1).toLocaleString('pt-BR', { month: 'short' })
+      return { mes: label, valor }
+    })
+
     setStats({
       faturamentoReal,
       faturamentoPrometido,
@@ -296,6 +323,7 @@ export function useTVStats() {
       rankingVendedores,
       vendasPorDiaSemana,
       mrr12Meses,
+      mrrPotencial12Meses,
       planosMes,
       churn,
       velocidadeVendedores,

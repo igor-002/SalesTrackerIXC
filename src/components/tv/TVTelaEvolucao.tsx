@@ -4,17 +4,20 @@ import { formatBRL } from '@/lib/formatters'
 
 interface TVTelaEvolucaoProps {
   mrr6Meses: { mes: string; valor: number }[]
+  mrrPotencial6Meses: { mes: string; valor: number }[]
   t: TVThemeColors
 }
 
 function formatCompact(v: number): string {
+  if (v === 0) return ''
   if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1)}M`
   if (v >= 1_000) return `R$ ${(v / 1_000).toFixed(1)}k`
   return `R$ ${v.toFixed(0)}`
 }
 
-export function TVTelaEvolucao({ mrr6Meses, t }: TVTelaEvolucaoProps) {
-  const ultimo = mrr6Meses[mrr6Meses.length - 1]
+const AMBER = '#f59e0b'
+
+export function TVTelaEvolucao({ mrr6Meses, mrrPotencial6Meses, t }: TVTelaEvolucaoProps) {
   const mesAtualLabel = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
 
   if (mrr6Meses.length === 0) {
@@ -24,6 +27,15 @@ export function TVTelaEvolucao({ mrr6Meses, t }: TVTelaEvolucaoProps) {
       </div>
     )
   }
+
+  // Merge confirmado + potencial por posição (mesmos meses, mesma ordem)
+  const chartData = mrr6Meses.map((d, i) => ({
+    mes: d.mes,
+    confirmado: d.valor,
+    potencial: mrrPotencial6Meses[i]?.valor ?? 0,
+  }))
+
+  const ultimo = chartData[chartData.length - 1]
 
   return (
     <div className="min-w-full h-full flex flex-col gap-4">
@@ -52,7 +64,7 @@ export function TVTelaEvolucao({ mrr6Meses, t }: TVTelaEvolucaoProps) {
         {/* Gráfico */}
         <div className="flex-1 min-h-0">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={mrr6Meses} margin={{ top: 52, right: 30, left: 10, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 56, right: 30, left: 10, bottom: 0 }}>
               <defs>
                 <linearGradient id="mrrGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={t.primary} stopOpacity={0.35} />
@@ -73,9 +85,11 @@ export function TVTelaEvolucao({ mrr6Meses, t }: TVTelaEvolucaoProps) {
                 tickLine={false}
                 width={50}
               />
+
+              {/* Linha confirmada (área preenchida) */}
               <Area
                 type="monotone"
-                dataKey="valor"
+                dataKey="confirmado"
                 stroke={t.primary}
                 strokeWidth={3}
                 fill="url(#mrrGrad)"
@@ -83,32 +97,84 @@ export function TVTelaEvolucao({ mrr6Meses, t }: TVTelaEvolucaoProps) {
                 activeDot={{ r: 10, fill: t.primary, strokeWidth: 2, stroke: 'rgba(255,255,255,0.3)' }}
               >
                 <LabelList
-                  dataKey="valor"
+                  dataKey="confirmado"
                   position="top"
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   formatter={(v: any) => formatCompact(Number(v))}
-                  style={{ fill: 'rgba(255,255,255,0.9)', fontSize: 15, fontWeight: 700 }}
+                  style={{ fill: '#ffffff', fontSize: 16, fontWeight: 700 }}
+                />
+              </Area>
+
+              {/* Linha potencial (tracejada, sem área) */}
+              <Area
+                type="monotone"
+                dataKey="potencial"
+                stroke={AMBER}
+                strokeWidth={2.5}
+                strokeDasharray="5 5"
+                fill="none"
+                dot={{ fill: AMBER, r: 8, strokeWidth: 2, stroke: 'rgba(255,255,255,0.15)' }}
+                activeDot={{ r: 10, fill: AMBER, strokeWidth: 2, stroke: 'rgba(255,255,255,0.25)' }}
+              >
+                <LabelList
+                  dataKey="potencial"
+                  position="top"
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  formatter={(v: any) => formatCompact(Number(v))}
+                  style={{ fill: AMBER, fontSize: 15, fontWeight: 700 }}
                 />
               </Area>
             </AreaChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Rodapé: valor do mês mais recente em destaque */}
+        {/* Legenda */}
+        <div className="flex-shrink-0 flex items-center justify-center gap-6 py-3">
+          <div className="flex items-center gap-2">
+            <span
+              className="w-3 h-3 rounded-full flex-shrink-0"
+              style={{ background: t.primary, boxShadow: `0 0 8px ${t.primary}` }}
+            />
+            <span className="text-sm font-semibold text-white/55">MRR Confirmado</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className="w-3 h-3 rounded-full flex-shrink-0"
+              style={{ background: AMBER, boxShadow: `0 0 8px ${AMBER}80` }}
+            />
+            <span className="text-sm font-semibold text-white/55">MRR Potencial (aguardando)</span>
+          </div>
+        </div>
+
+        {/* Rodapé: valores do mês mais recente */}
         {ultimo && (
           <div
-            className="flex-shrink-0 pt-5 mt-2 text-center"
-            style={{ borderTop: `1px solid ${t.primary}20` }}
+            className="flex-shrink-0 pt-4 mt-1 flex items-center justify-center gap-6"
+            style={{ borderTop: `1px solid ${t.primary}18` }}
           >
-            <p className="text-sm text-white/35 uppercase tracking-widest font-bold mb-1 capitalize">
-              {mesAtualLabel}
-            </p>
-            <p
-              className="text-3xl font-black"
-              style={{ color: t.primary, textShadow: `0 0 30px ${t.primary}60` }}
-            >
-              {formatBRL(ultimo.valor)}
-            </p>
+            <div className="text-center">
+              <p className="text-xs text-white/35 uppercase tracking-widest font-bold mb-1 capitalize">
+                {mesAtualLabel} — Confirmado
+              </p>
+              <p
+                className="text-2xl font-black"
+                style={{ color: t.primary, textShadow: `0 0 20px ${t.primary}60` }}
+              >
+                {formatBRL(ultimo.confirmado)}
+              </p>
+            </div>
+            <div className="w-px h-10 bg-white/10 flex-shrink-0" />
+            <div className="text-center">
+              <p className="text-xs text-white/35 uppercase tracking-widest font-bold mb-1">
+                Potencial
+              </p>
+              <p
+                className="text-2xl font-black"
+                style={{ color: AMBER }}
+              >
+                {formatBRL(ultimo.potencial)}
+              </p>
+            </div>
           </div>
         )}
       </div>

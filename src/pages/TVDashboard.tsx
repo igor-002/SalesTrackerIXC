@@ -94,6 +94,7 @@ export default function TVDashboard() {
   // Dados derivados
   const metaMensal = getMetaAtual()?.meta_mensal ?? 0
   const mrr6Meses = tvStats.mrr12Meses.slice(-6)
+  const mrrPotencial6Meses = tvStats.mrrPotencial12Meses.slice(-6)
   const metasVendedorMap: Record<string, number> = Object.fromEntries(
     metasVendedor.map((m) => [m.vendedor_id, m.meta_contratos]),
   )
@@ -182,7 +183,7 @@ export default function TVDashboard() {
           className="absolute inset-0 transition-all duration-700 ease-in-out"
           style={{ opacity: tela === 1 ? 1 : 0, transform: tela === 1 ? 'scale(1)' : 'scale(0.97)', pointerEvents: tela === 1 ? 'auto' : 'none' }}
         >
-          <TVTelaEvolucao mrr6Meses={mrr6Meses} t={t} />
+          <TVTelaEvolucao mrr6Meses={mrr6Meses} mrrPotencial6Meses={mrrPotencial6Meses} t={t} />
         </div>
 
         {/* Tela 2 — Pipeline */}
