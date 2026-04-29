@@ -116,7 +116,7 @@ export function useTVStats() {
     const [mesRes, semanaRes, mrr12Res, mrrPotencial12Res, churnMesRes, churnAnteriorRes] = await Promise.all([
       supabase
         .from('vendas')
-        .select('id, status_ixc, mrr, valor_total, dias_em_aa, cliente_nome, data_venda, codigo_contrato_ixc, created_at, status_atualizado_em, vendedor:vendedores(id, nome), segmento:segmentos(id, nome)')
+        .select('id, status_ixc, mrr, valor_total, valor_unitario, dias_em_aa, cliente_nome, data_venda, codigo_contrato_ixc, created_at, status_atualizado_em, vendedor:vendedores(id, nome), segmento:segmentos(id, nome)')
         .eq('mes_referencia', mesAtual)
         .eq('ano_referencia', anoAtual),
       supabase
@@ -125,14 +125,14 @@ export function useTVStats() {
         .gte('data_venda', inicioSemanaStr),
       supabase
         .from('vendas')
-        .select('data_venda, valor_total')
+        .select('mes_referencia, ano_referencia, valor_total')
         .eq('mrr', true)
         .eq('status_ixc', 'A')
         .gte('data_venda', inicio12MesesStr),
       // MRR potencial: contratos MRR ainda aguardando ativação (AA/P) por mês
       supabase
         .from('vendas')
-        .select('data_venda, valor_total')
+        .select('mes_referencia, ano_referencia, valor_total')
         .eq('mrr', true)
         .in('status_ixc', ['AA', 'P'])
         .gte('data_venda', inicio12MesesStr),
@@ -169,7 +169,7 @@ export function useTVStats() {
 
     const mrrReal = vendasMes
       .filter((v) => v.mrr && v.status_ixc === 'A')
-      .reduce((s, v) => s + (v.valor_total ?? 0), 0)
+      .reduce((s, v) => s + (v.valor_unitario ?? 0), 0)
 
     const mrrProjetado = vendasMes
       .filter((v) => v.mrr)
@@ -286,7 +286,8 @@ export function useTVStats() {
       mrrMap.set(key, 0)
     }
     for (const v of vendasMrr12) {
-      const key = v.data_venda.slice(0, 7)
+      if (!v.mes_referencia || !v.ano_referencia) continue
+      const key = `${v.ano_referencia}-${String(v.mes_referencia).padStart(2, '0')}`
       if (mrrMap.has(key)) mrrMap.set(key, (mrrMap.get(key) ?? 0) + (v.valor_total ?? 0))
     }
     const mrr12Meses = Array.from(mrrMap.entries()).map(([key, valor]) => {
@@ -303,7 +304,8 @@ export function useTVStats() {
       mrrPotencialMap.set(key, 0)
     }
     for (const v of vendasMrrPotencial12) {
-      const key = v.data_venda.slice(0, 7)
+      if (!v.mes_referencia || !v.ano_referencia) continue
+      const key = `${v.ano_referencia}-${String(v.mes_referencia).padStart(2, '0')}`
       if (mrrPotencialMap.has(key)) mrrPotencialMap.set(key, (mrrPotencialMap.get(key) ?? 0) + (v.valor_total ?? 0))
     }
     const mrrPotencial12Meses = Array.from(mrrPotencialMap.entries()).map(([key, valor]) => {
