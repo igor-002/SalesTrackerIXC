@@ -570,10 +570,11 @@ function getMesesAnteriores(n: number): { mes: number; ano: number; inicio: stri
 
 /**
  * Sincroniza histórico de vendedores selecionados (incluir_historico = true).
- * Busca contratos dos últimos 3 meses e armazena em vendas_historico.
+ * Por padrão busca os últimos 3 meses; se opcoes for passado, usa o mês/ano específico.
  */
 export async function syncHistoricoVendedores(
-  onProgress?: SyncProgressCallback
+  onProgress?: SyncProgressCallback,
+  opcoes?: { mes: number; ano: number }
 ): Promise<SyncHistoricoResult> {
   const iniciadoEm = Date.now()
   const logId = await inserirLogSync('historico_vendedores').catch(() => null)
@@ -605,8 +606,16 @@ export async function syncHistoricoVendedores(
       return { vendedoresProcessados: 0, mesesProcessados: 0, contratosInseridos: 0, erros: 0 }
     }
 
-    // 2. Calcular os 3 meses anteriores
-    const meses = getMesesAnteriores(3)
+    // 2. Determinar quais meses processar
+    const meses = opcoes
+      ? (() => {
+          const { mes, ano } = opcoes
+          const inicio = `${ano}-${String(mes).padStart(2, '0')}-01`
+          const ultimoDia = new Date(ano, mes, 0).getDate()
+          const fim = `${ano}-${String(mes).padStart(2, '0')}-${String(ultimoDia).padStart(2, '0')}`
+          return [{ mes, ano, inicio, fim }]
+        })()
+      : getMesesAnteriores(3)
     const totalOperacoes = vendedoresHistorico.length * meses.length
     let operacaoAtual = 0
     let totalContratosInseridos = 0

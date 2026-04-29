@@ -1,12 +1,14 @@
 import { useState, useMemo } from 'react'
-import { Search, RefreshCw, Wrench, Eye, ChevronDown, ChevronUp, X, AlertTriangle } from 'lucide-react'
+import { Search, RefreshCw, Wrench, Eye, ChevronDown, ChevronUp, X, AlertTriangle, Calendar } from 'lucide-react'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Spinner } from '@/components/ui/Spinner'
 import { toast } from '@/components/ui/Toast'
 import { useDiagnosticoIXC, useVendedoresAutorizados, type ContratoComVendedor } from '@/hooks/useDiagnosticoIXC'
-import { syncContratosFromIXC } from '@/services/ixcSync'
+import { syncContratosFromIXC, syncHistoricoVendedores } from '@/services/ixcSync'
 import { ixcBuscarProdutosPorVdContrato, ixcBuscarStatusContrato, type IxcContratoProduto } from '@/lib/ixc'
 import { formatBRL, formatDate } from '@/lib/formatters'
+
+const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro']
 
 const STATUS_LABELS: Record<string, string> = {
   A: 'Ativo',
@@ -43,6 +45,18 @@ export default function DiagnosticoIXC() {
   const [syncing, setSyncing] = useState(false)
   const [syncProgress, setSyncProgress] = useState({ msg: '', pct: 0 })
   const [syncingContrato, setSyncingContrato] = useState<string | null>(null)
+
+  const agora = new Date()
+  const mesAtualNum = agora.getMonth() + 1
+  const anoAtualNum = agora.getFullYear()
+  const mesPadrao = mesAtualNum === 1 ? 12 : mesAtualNum - 1
+  const anoPadrao = mesAtualNum === 1 ? anoAtualNum - 1 : anoAtualNum
+  const [mesHistorico, setMesHistorico] = useState(mesPadrao)
+  const [anoHistorico, setAnoHistorico] = useState(anoPadrao)
+  const [syncingHistorico, setSyncingHistorico] = useState(false)
+  const [syncHistoricoProgress, setSyncHistoricoProgress] = useState({ msg: '', pct: 0 })
+  const ANOS = Array.from({ length: anoAtualNum - 2023 }, (_, i) => 2024 + i)
+  const isMesAtualOuFuturo = anoHistorico > anoAtualNum || (anoHistorico === anoAtualNum && mesHistorico >= mesAtualNum)
 
   const [modalProdutos, setModalProdutos] = useState<{
     open: boolean
@@ -128,6 +142,24 @@ export default function DiagnosticoIXC() {
 
   function fecharModalProdutos() {
     setModalProdutos({ open: false, contrato: null, produtos: [], loading: false })
+  }
+
+  async function handleSyncHistorico() {
+    setSyncingHistorico(true)
+    setSyncHistoricoProgress({ msg: 'Iniciando...', pct: 0 })
+    try {
+      const result = await syncHistoricoVendedores(
+        (msg, pct) => setSyncHistoricoProgress({ msg, pct: pct ?? 0 }),
+        { mes: mesHistorico, ano: anoHistorico }
+      )
+      toast('success', `Histórico sincronizado: ${result.contratosInseridos} contratos inseridos`)
+      await refetchLogs()
+    } catch (err) {
+      toast('error', err instanceof Error ? err.message : 'Erro no sync histórico')
+    } finally {
+      setSyncingHistorico(false)
+      setSyncHistoricoProgress({ msg: '', pct: 0 })
+    }
   }
 
   const temFiltroAtivo = busca || vendedorFiltro || statusFiltro
@@ -384,6 +416,73 @@ export default function DiagnosticoIXC() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+      </GlassCard>
+
+      {/* Seção: Sincronizar Mês Histórico */}
+      <GlassCard className="p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Calendar size={16} className="text-violet-400" />
+          <span className="text-sm font-bold text-white">Sincronizar Mês Histórico</span>
+        </div>
+        <p className="text-xs text-white/40 mb-4">
+          Busca contratos que ativaram neste mês diretamente do IXC e adiciona ao histórico.
+          Não afeta os contratos do mês atual.
+        </p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <select
+            value={mesHistorico}
+            onChange={(e) => setMesHistorico(Number(e.target.value))}
+            disabled={syncingHistorico}
+            style={selectStyle}
+          >
+            {MESES.map((nome, i) => (
+              <option key={i + 1} value={i + 1} style={{ background: '#0f2419' }}>
+                {nome}
+              </option>
+            ))}
+          </select>
+          <select
+            value={anoHistorico}
+            onChange={(e) => setAnoHistorico(Number(e.target.value))}
+            disabled={syncingHistorico}
+            style={selectStyle}
+          >
+            {ANOS.map((ano) => (
+              <option key={ano} value={ano} style={{ background: '#0f2419' }}>
+                {ano}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={handleSyncHistorico}
+            disabled={syncingHistorico || isMesAtualOuFuturo}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{ background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', border: '1px solid rgba(139,92,246,0.2)' }}
+          >
+            {syncingHistorico ? <Spinner size="sm" /> : <RefreshCw size={12} />}
+            {syncingHistorico ? 'Sincronizando...' : 'Buscar do IXC'}
+          </button>
+          {isMesAtualOuFuturo && (
+            <span className="text-xs" style={{ color: '#f59e0b99' }}>
+              Apenas meses anteriores ao mês atual
+            </span>
+          )}
+        </div>
+        {syncingHistorico && (
+          <div className="mt-4">
+            <div className="flex items-center gap-3 mb-2">
+              <Spinner size="sm" style={{ color: '#8b5cf6' }} />
+              <span className="text-sm text-white font-medium">Sincronizando histórico...</span>
+            </div>
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+              <div
+                className="h-full rounded-full transition-all duration-300"
+                style={{ width: `${syncHistoricoProgress.pct}%`, background: '#8b5cf6' }}
+              />
+            </div>
+            <p className="text-xs text-white/40 mt-2">{syncHistoricoProgress.msg}</p>
           </div>
         )}
       </GlassCard>
