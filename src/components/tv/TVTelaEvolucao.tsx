@@ -16,6 +16,27 @@ function formatCompact(v: number): string {
 }
 
 const AMBER = '#f59e0b'
+const AMBER_LABEL = '#fbbf24'
+
+// Estilo de label com outline escuro simulando sombra de texto (paintOrder não suportado
+// via prop style em SVG em todos os browsers, então usamos stroke como fallback)
+const LABEL_CONFIRMADO = {
+  fill: '#ffffff',
+  fontSize: 18,
+  fontWeight: 'bold',
+  stroke: 'rgba(0,0,0,0.65)',
+  strokeWidth: 4,
+  paintOrder: 'stroke',
+} as React.CSSProperties
+
+const LABEL_POTENCIAL = {
+  fill: AMBER_LABEL,
+  fontSize: 18,
+  fontWeight: 'bold',
+  stroke: 'rgba(0,0,0,0.55)',
+  strokeWidth: 4,
+  paintOrder: 'stroke',
+} as React.CSSProperties
 
 export function TVTelaEvolucao({ mrr6Meses, mrrPotencial6Meses, t }: TVTelaEvolucaoProps) {
   const mesAtualLabel = new Date().toLocaleString('pt-BR', { month: 'long', year: 'numeric' })
@@ -29,13 +50,18 @@ export function TVTelaEvolucao({ mrr6Meses, mrrPotencial6Meses, t }: TVTelaEvolu
   }
 
   // Merge confirmado + potencial por posição (mesmos meses, mesma ordem)
-  const chartData = mrr6Meses.map((d, i) => ({
+  const allData = mrr6Meses.map((d, i) => ({
     mes: d.mes,
     confirmado: d.valor,
     potencial: mrrPotencial6Meses[i]?.valor ?? 0,
   }))
 
+  // Remover meses iniciais sem dados em nenhuma das duas linhas
+  const firstWithData = allData.findIndex(d => d.confirmado > 0 || d.potencial > 0)
+  const chartData = firstWithData >= 0 ? allData.slice(firstWithData) : allData
+
   const ultimo = chartData[chartData.length - 1]
+  const nMeses = chartData.length
 
   return (
     <div className="min-w-full h-full flex flex-col gap-4">
@@ -48,7 +74,7 @@ export function TVTelaEvolucao({ mrr6Meses, mrrPotencial6Meses, t }: TVTelaEvolu
           className="text-xs font-bold px-3 py-1.5 rounded-full"
           style={{ background: `${t.primary}12`, color: `${t.primary}cc`, border: `1px solid ${t.primary}20` }}
         >
-          Últimos 6 meses
+          Últimos {nMeses} {nMeses === 1 ? 'mês' : 'meses'}
         </span>
       </div>
 
@@ -64,7 +90,7 @@ export function TVTelaEvolucao({ mrr6Meses, mrrPotencial6Meses, t }: TVTelaEvolu
         {/* Gráfico */}
         <div className="flex-1 min-h-0">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 56, right: 30, left: 10, bottom: 0 }}>
+            <AreaChart data={chartData} margin={{ top: 60, right: 30, left: 10, bottom: 0 }}>
               <defs>
                 <linearGradient id="mrrGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={t.primary} stopOpacity={0.35} />
@@ -101,7 +127,7 @@ export function TVTelaEvolucao({ mrr6Meses, mrrPotencial6Meses, t }: TVTelaEvolu
                   position="top"
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   formatter={(v: any) => formatCompact(Number(v))}
-                  style={{ fill: '#ffffff', fontSize: 16, fontWeight: 700 }}
+                  style={LABEL_CONFIRMADO}
                 />
               </Area>
 
@@ -121,7 +147,7 @@ export function TVTelaEvolucao({ mrr6Meses, mrrPotencial6Meses, t }: TVTelaEvolu
                   position="top"
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   formatter={(v: any) => formatCompact(Number(v))}
-                  style={{ fill: AMBER, fontSize: 15, fontWeight: 700 }}
+                  style={LABEL_POTENCIAL}
                 />
               </Area>
             </AreaChart>
@@ -168,10 +194,7 @@ export function TVTelaEvolucao({ mrr6Meses, mrrPotencial6Meses, t }: TVTelaEvolu
               <p className="text-xs text-white/35 uppercase tracking-widest font-bold mb-1">
                 Potencial
               </p>
-              <p
-                className="text-2xl font-black"
-                style={{ color: AMBER }}
-              >
+              <p className="text-2xl font-black" style={{ color: AMBER_LABEL }}>
                 {formatBRL(ultimo.potencial)}
               </p>
             </div>

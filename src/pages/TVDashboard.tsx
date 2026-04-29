@@ -169,6 +169,7 @@ export default function TVDashboard() {
         >
           <TVTelaVisaoGeral
             faturamentoReal={tvStats.faturamentoReal}
+            faturamentoPrometido={tvStats.faturamentoPrometido}
             mrrReal={tvStats.mrrReal}
             totalAtivos={tvStats.funilCounts.A}
             totalAguardando={tvStats.funilCounts.AA}

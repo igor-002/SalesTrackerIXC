@@ -4,6 +4,7 @@ import { formatBRL, formatPercent } from '@/lib/formatters'
 
 interface TVTelaVisaoGeralProps {
   faturamentoReal: number
+  faturamentoPrometido: number
   mrrReal: number
   totalAtivos: number
   totalAguardando: number
@@ -14,6 +15,7 @@ interface TVTelaVisaoGeralProps {
 
 export function TVTelaVisaoGeral({
   faturamentoReal,
+  faturamentoPrometido,
   mrrReal,
   totalAtivos,
   totalAguardando,
@@ -117,6 +119,11 @@ export function TVTelaVisaoGeral({
           <p className="text-sm mt-3" style={{ color: `${t.secondary}80` }}>
             Aguardando assinatura (AA)
           </p>
+          {faturamentoPrometido > 0 && (
+            <p className="text-base font-bold mt-2" style={{ color: '#f59e0b' }}>
+              {formatBRL(faturamentoPrometido)} em potencial
+            </p>
+          )}
         </div>
         <div
           className="absolute -right-10 -bottom-10 w-48 h-48 rounded-full blur-2xl pointer-events-none"
