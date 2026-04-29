@@ -168,7 +168,7 @@ export function useRelatorios(inicio: string, fim: string, vendedorId: string | 
     const byVendedor: VendedorStat[] = Array.from(vMap.entries()).map(([id, { nome, vv }]) => {
       const vA  = vv.filter(v => v.status_ixc === 'A')
       const vAA = vv.filter(v => v.status_ixc === 'AA')
-      const vCN = vv.filter(v => v.status_ixc === 'CN')
+      const vCN = vv.filter(v => v.status_ixc === 'CN' || v.status_ixc === 'C' || v.status_ixc === 'CA')
       const fat = vA.reduce((s, v) => s + (v.valor_total ?? 0), 0)
       const taxa = vA.length + vAA.length > 0 ? (vA.length / (vA.length + vAA.length)) * 100 : 0
       const ticket = vA.length > 0 ? fat / vA.length : 0

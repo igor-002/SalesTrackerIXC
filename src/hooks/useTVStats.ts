@@ -227,9 +227,9 @@ export function useTVStats() {
 
     // Churn: cancelados e bloqueados vs. mês anterior
     const churn: ChurnStats = {
-      canceladosMes: churnMes.filter((v) => v.status_ixc === 'C').length,
+      canceladosMes: churnMes.filter((v) => v.status_ixc === 'C' || v.status_ixc === 'CN' || v.status_ixc === 'CA').length,
       bloqueadosMes: churnMes.filter((v) => v.status_ixc === 'B').length,
-      canceladosMesAnterior: churnAnterior.filter((v) => v.status_ixc === 'C').length,
+      canceladosMesAnterior: churnAnterior.filter((v) => v.status_ixc === 'C' || v.status_ixc === 'CN' || v.status_ixc === 'CA').length,
       bloqueadosMesAnterior: churnAnterior.filter((v) => v.status_ixc === 'B').length,
     }
 

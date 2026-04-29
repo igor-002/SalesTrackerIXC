@@ -63,6 +63,7 @@ export function useComissaoPagamentos({
 
   const periodoRef = `${ano}-${mes.toString().padStart(2, '0')}`
 
+  // Bug 3: fetchComissoes resolve marcado_por_nome via batch-query em profiles
   const fetchComissoes = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -80,6 +81,22 @@ export function useComissaoPagamentos({
       if (err) throw err
 
       const rows = (data ?? []) as (typeof data extends (infer T)[] | null ? T : never)[]
+
+      // Resolver nomes de quem marcou o pagamento
+      const marcadoIds = [...new Set(
+        rows.filter(r => (r as Record<string, unknown>).marcado_por).map(r => (r as Record<string, unknown>).marcado_por as string)
+      )]
+      const profileMap = new Map<string, string>()
+      if (marcadoIds.length > 0) {
+        const { data: profs } = await supabase
+          .from('profiles')
+          .select('id, nome')
+          .in('id', marcadoIds)
+        for (const p of profs ?? []) {
+          if (p.nome) profileMap.set(p.id, p.nome)
+        }
+      }
+
       setComissoes(rows.map((r: Record<string, unknown>) => {
         const vendedor = r.vendedor as { nome: string } | null
         return {
@@ -98,7 +115,7 @@ export function useComissaoPagamentos({
           status: (r.status as 'pendente' | 'pago') ?? 'pendente',
           data_pagamento: (r.data_pagamento as string | null) ?? null,
           marcado_por: (r.marcado_por as string | null) ?? null,
-          marcado_por_nome: null,
+          marcado_por_nome: profileMap.get(r.marcado_por as string) ?? null,
           observacao: (r.observacao as string | null) ?? null,
           is_transferida: (r.periodo_referencia as string) !== (r.periodo_pagamento as string),
         }
@@ -112,28 +129,28 @@ export function useComissaoPagamentos({
 
   const syncContratos = useCallback(async () => {
     if (loadingConfig) return
-    const syncKey = `${periodoRef}-${loadingConfig}`
+    // Bug 4: syncKey estável — usar empresaId em vez de loadingConfig (boolean)
+    const syncKey = `${periodoRef}-${empresaId ?? ''}`
     if (syncedRef.current === syncKey) return
     syncedRef.current = syncKey
 
     setSyncing(true)
     try {
-      console.log('[CP-DEBUG] iniciando sync', { empresaId, mes, ano, vendedorId })
-
-      if (!empresaId) {
-        console.warn('[CP-DEBUG] empresaId nulo, abortando sync')
-        return
-      }
+      if (!empresaId) return
 
       const mesAnterior = mes === 1 ? 12 : mes - 1
       const anoAnterior = mes === 1 ? ano - 1 : ano
 
-      const SELECT = 'codigo_contrato_ixc, cliente_nome, plano, valor_unitario, quantidade, data_ativacao, status_ixc, vendedor_id, empresa_id, mes_referencia, ano_referencia'
+      // vendas_historico: tem plano, data_ativacao; vendas: não tem essas colunas
+      const SELECT_HIST = 'codigo_contrato_ixc, cliente_nome, plano, valor_unitario, quantidade, data_ativacao, status_ixc, vendedor_id, empresa_id, mes_referencia, ano_referencia'
+      // vendas: sem plano e sem data_ativacao — usamos null como fallback no mapeamento
+      const SELECT_VENDAS = 'codigo_contrato_ixc, cliente_nome, valor_unitario, quantidade, status_ixc, vendedor_id, empresa_id, mes_referencia, ano_referencia'
 
-      const [res1, res2] = await Promise.all([
+      // Bug 2: buscar também de `vendas` (mês corrente ainda não arquivado em historico)
+      const [res1, res2, res3] = await Promise.all([
         supabase
           .from('vendas_historico')
-          .select(SELECT)
+          .select(SELECT_HIST)
           .eq('empresa_id', empresaId)
           .eq('status_ixc', 'A')
           .eq('ano_referencia', ano)
@@ -141,28 +158,59 @@ export function useComissaoPagamentos({
           .not('data_ativacao', 'is', null),
         supabase
           .from('vendas_historico')
-          .select(SELECT)
+          .select(SELECT_HIST)
           .eq('empresa_id', empresaId)
           .eq('status_ixc', 'A')
           .eq('ano_referencia', anoAnterior)
           .eq('mes_referencia', mesAnterior)
           .not('data_ativacao', 'is', null),
+        supabase
+          .from('vendas')
+          .select(SELECT_VENDAS)
+          .eq('empresa_id', empresaId)
+          .eq('status_ixc', 'A')
+          .or(
+            `and(ano_referencia.eq.${ano},mes_referencia.eq.${mes}),` +
+            `and(ano_referencia.eq.${anoAnterior},mes_referencia.eq.${mesAnterior})`
+          ),
       ])
-
-      console.log('[CP-DEBUG] res1 data:', res1.data?.length, 'error:', res1.error?.message)
-      console.log('[CP-DEBUG] res2 data:', res2.data?.length, 'error:', res2.error?.message)
 
       if (res1.error) throw res1.error
       if (res2.error) throw res2.error
+      // res3 é best-effort — não falha o sync se der erro em vendas
 
-      const contratos = [...(res1.data ?? []), ...(res2.data ?? [])]
-      console.log('[CP-DEBUG] contratos raw:', contratos?.length, JSON.stringify(contratos?.[0]))
+      // Tipo normalizado que unifica as duas fontes
+      type ContratoSyncRow = {
+        codigo_contrato_ixc: string | null
+        cliente_nome: string
+        plano: string | null
+        valor_unitario: number | null
+        quantidade: number | null
+        data_ativacao: string | null
+        status_ixc: string | null
+        vendedor_id: string | null
+        empresa_id: string | null
+        mes_referencia: number | null
+        ano_referencia: number | null
+      }
 
-      const registros = contratos.map(h => {
+      // Deduplicar: vendas_historico tem precedência sobre vendas
+      const historico = [...(res1.data ?? []), ...(res2.data ?? [])] as ContratoSyncRow[]
+      const historicoKeys = new Set(historico.map(h => h.codigo_contrato_ixc).filter(Boolean))
+      const vendasAtivas = (res3.data ?? [])
+        .filter(v => v.codigo_contrato_ixc && !historicoKeys.has(v.codigo_contrato_ixc))
+        .map(v => ({ ...v, plano: null, data_ativacao: null })) as ContratoSyncRow[]
+      const contratos: ContratoSyncRow[] = [...historico, ...vendasAtivas]
+
+      const registros = contratos
+        .filter(h => h.mes_referencia !== null && h.ano_referencia !== null)
+        .map(h => {
+        const mesRef = h.mes_referencia!
+        const anoRef = h.ano_referencia!
         const pct = resolverPct(h.vendedor_id ?? '')
         const valorPlano = (h.valor_unitario ?? 0) * (h.quantidade ?? 1)
-        const periodoRefRow = `${h.ano_referencia}-${h.mes_referencia.toString().padStart(2, '0')}`
-        const periodoPag = calcularPeriodoPagamento(h.data_ativacao, h.mes_referencia, h.ano_referencia)
+        const periodoRefRow = `${anoRef}-${mesRef.toString().padStart(2, '0')}`
+        const periodoPag = calcularPeriodoPagamento(h.data_ativacao, mesRef, anoRef)
         return {
           empresa_id: empresaId ?? undefined,
           vendedor_id: h.vendedor_id ?? null,
@@ -176,9 +224,8 @@ export function useComissaoPagamentos({
           data_ativacao: h.data_ativacao ?? null,
         }
       }).filter(r => r.codigo_contrato_ixc)
-      console.log('[CP-DEBUG] registros para upsert:', registros.length, JSON.stringify(registros[0]))
 
-      // Passo 1: insert novos (em lotes de 100)
+      // Passo 1: insert novos (em lotes de 100), preserva status/pagamento existentes
       for (let i = 0; i < registros.length; i += 100) {
         const lote = registros.slice(i, i + 100)
         await supabase
@@ -194,6 +241,19 @@ export function useComissaoPagamentos({
           .eq('codigo_contrato_ixc', r.codigo_contrato_ixc as string)
           .eq('periodo_referencia', r.periodo_referencia)
           .neq('periodo_pagamento', r.periodo_pagamento)
+      }
+
+      // Bug 1 — Passo 3: atualiza comissao_pct e valor_plano para forçar regeneração
+      // da coluna GENERATED comissao_valor = valor_plano * comissao_pct / 100.
+      // Só toca linhas onde comissao_pct está configurado — não altera status/pagamento.
+      for (const r of registros) {
+        if (r.comissao_pct !== null) {
+          await supabase
+            .from('comissao_pagamentos')
+            .update({ comissao_pct: r.comissao_pct, valor_plano: r.valor_plano } as never)
+            .eq('codigo_contrato_ixc', r.codigo_contrato_ixc as string)
+            .eq('periodo_referencia', r.periodo_referencia)
+        }
       }
     } catch (e) {
       console.error('[useComissaoPagamentos] sync error:', e)

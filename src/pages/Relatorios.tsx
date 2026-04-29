@@ -27,6 +27,7 @@ import { useMetasVendedor } from '@/hooks/useMetasVendedor'
 import { useRelatoriosRedesign } from '@/hooks/useRelatoriosRedesign'
 import {
   useRelatoriosMes,
+  useRelatoriosRange,
   calcKpis,
   calcTempoAtivacao,
   agruparPorMes,
@@ -1706,7 +1707,7 @@ function TabRanking({ vendedores }: {
 function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
   vendedorIdFiltro: string | null
   isGestor: boolean
-  vendedores: { id: string; nome: string; ativo: boolean | null; meta_mensal?: number | null }[]
+  vendedores: { id: string; nome: string; ativo: boolean | null }[]
 }) {
   const now = new Date()
   const [mes, setMes] = useState(now.getMonth() + 1)
@@ -1724,7 +1725,7 @@ function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
   const { getMetaVendedor } = useMetasVendedor(mes, ano)
 
   const meses4 = useMemo(() => ultimosMeses(4, mes, ano), [mes, ano])
-  const { data: contratosRange = [] } = useRelatoriosMes(mes, ano, vendedorEfetivo)
+  const { data: contratosRange = [] } = useRelatoriosRange(meses4, vendedorEfetivo)
 
   const kpis = useMemo(() => calcKpis(contratos), [contratos])
   const meta = getMetaVendedor(vendedorEfetivo ?? '')
@@ -1736,13 +1737,9 @@ function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
     ? (vendedores.find(v => v.id === vendedorEfetivo)?.nome ?? 'Vendedor')
     : 'Todos'
 
-  const cancelamentos = contratos.filter(c => c.status_ixc === 'C').length
+  const cancelamentos = contratos.filter(c => c.status_ixc === 'C' || c.status_ixc === 'CN' || c.status_ixc === 'CA').length
   const taxaConversaoInd = contratos.length > 0 ? (kpis.ativos / contratos.length) * 100 : 0
   const tempoAtivInd = useMemo(() => calcTempoAtivacao(contratos), [contratos])
-  const metaIndividual = vendedores.find(v => v.id === vendedorEfetivo)?.meta_mensal ?? null
-  const pctMetaInd = metaIndividual && metaIndividual > 0
-    ? Math.min((kpis.ativos / metaIndividual) * 100, 200)
-    : null
 
   const badgeDestaque = useMemo(() => {
     if (!vendedorEfetivo || contratosTime.length === 0) return false
@@ -1769,7 +1766,7 @@ function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
     const cancelMap = new Map<string, number>()
     for (const c of contratosTime) {
       const vid = c.vendedor?.id
-      if (!vid || c.status_ixc !== 'C') continue
+      if (!vid || (c.status_ixc !== 'C' && c.status_ixc !== 'CN' && c.status_ixc !== 'CA')) continue
       cancelMap.set(vid, (cancelMap.get(vid) ?? 0) + 1)
     }
     if (cancelMap.size === 0) return false
@@ -1853,23 +1850,23 @@ function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
               </div>
               <div>
                 <p className="text-xs text-white/40 mb-1">Meta individual</p>
-                {metaIndividual && metaIndividual > 0 ? (
+                {meta > 0 ? (
                   <>
-                    <p className="text-xl font-bold text-white">{pctMetaInd?.toFixed(0)}%</p>
-                    <p className="text-xs text-white/30 mt-0.5">{kpis.ativos} de {metaIndividual} contratos</p>
+                    <p className="text-xl font-bold text-white">{pctMeta.toFixed(0)}%</p>
+                    <p className="text-xs text-white/30 mt-0.5">{kpis.ativos} de {meta} contratos</p>
                   </>
                 ) : (
                   <p className="text-sm text-white/30">Não definida</p>
                 )}
               </div>
             </div>
-            {metaIndividual && metaIndividual > 0 && pctMetaInd !== null && (
+            {meta > 0 && (
               <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs text-white/40">Progresso vs. meta individual</span>
-                  <span className="text-xs font-semibold" style={{ color: (pctMetaInd ?? 0) >= 100 ? '#00d68f' : '#f59e0b' }}>{kpis.ativos} / {metaIndividual}</span>
+                  <span className="text-xs font-semibold" style={{ color: pctMeta >= 100 ? '#00d68f' : '#f59e0b' }}>{kpis.ativos} / {meta}</span>
                 </div>
-                <ProgressBar value={Math.min(pctMetaInd, 100)} color={(pctMetaInd ?? 0) >= 100 ? 'success' : (pctMetaInd ?? 0) >= 60 ? 'primary' : 'warning'} size="md" emptyLabel="Mês iniciando" />
+                <ProgressBar value={Math.min(pctMeta, 100)} color={pctMeta >= 100 ? 'success' : pctMeta >= 60 ? 'primary' : 'warning'} size="md" emptyLabel="Mês iniciando" />
               </div>
             )}
           </GlassCard>
@@ -1917,7 +1914,7 @@ function TabPorVendedor({ vendedorIdFiltro, isGestor, vendedores }: {
 
 type StatusFiltroProjeto = 'todos' | 'pendente' | 'quitado' | 'em_atraso' | 'cancelado'
 
-function TabProjetos() {
+function TabProjetos({ vendedorIdFiltro }: { vendedorIdFiltro: string | null }) {
   const now = new Date()
   const [mes, setMes] = useState(now.getMonth() + 1)
   const [ano, setAno] = useState(now.getFullYear())
@@ -1929,8 +1926,11 @@ function TabProjetos() {
     const inicio = `${ano}-${String(mes).padStart(2, '0')}-01`
     const fimMes = new Date(ano, mes, 0)
     const fim = `${ano}-${String(mes).padStart(2, '0')}-${String(fimMes.getDate()).padStart(2, '0')}`
-    return vendas.filter(v => v.data_venda >= inicio && v.data_venda <= fim)
-  }, [vendas, mes, ano])
+    return vendas.filter(v =>
+      v.data_venda >= inicio && v.data_venda <= fim &&
+      (vendedorIdFiltro === null || v.vendedor?.id === vendedorIdFiltro)
+    )
+  }, [vendas, mes, ano, vendedorIdFiltro])
 
   const projetosFiltrados = useMemo(() => {
     if (statusFiltro === 'todos') return projetosMes
@@ -2143,7 +2143,7 @@ export default function Relatorios() {
         />
       )}
       {aba === 'projetos' && (
-        <TabProjetos />
+        <TabProjetos vendedorIdFiltro={vendedorDbId} />
       )}
       {aba === 'comissoes' && (
         <TabComissoesPagamento

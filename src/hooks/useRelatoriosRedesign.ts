@@ -266,7 +266,7 @@ export function useRelatoriosRedesign(
     const cadastrados = contratos.length
     const ativos = contratos.filter(c => c.status_ixc === 'A')
     const aguardando = contratos.filter(c => c.status_ixc === 'AA' || c.status_ixc === 'P')
-    const cancelados = contratos.filter(c => c.status_ixc === 'C' || c.status_ixc === 'CN')
+    const cancelados = contratos.filter(c => c.status_ixc === 'C' || c.status_ixc === 'CN' || c.status_ixc === 'CA')
 
     const taxaConversao = cadastrados > 0 ? (ativos.length / cadastrados) * 100 : 0
     const taxaPerda = cadastrados > 0 ? (cancelados.length / cadastrados) * 100 : 0
@@ -388,7 +388,7 @@ export function useRelatoriosRedesign(
         }
       }
       if (c.status_ixc === 'AA' || c.status_ixc === 'P') existing.aguardando++
-      if (c.status_ixc === 'C' || c.status_ixc === 'CN') existing.cancelados++
+      if (c.status_ixc === 'C' || c.status_ixc === 'CN' || c.status_ixc === 'CA') existing.cancelados++
 
       map.set(vid, existing)
     }
