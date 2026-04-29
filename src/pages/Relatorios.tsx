@@ -449,7 +449,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
       }
     }
 
-    return base6.map(({ mes, ano }) => {
+    const rows = base6.map(({ mes, ano }) => {
       const label = `${MESES_SHORT[mes - 1]}/${String(ano).slice(2)}`
       const found = mrrTendencia.find(m => m.mes === mes && m.ano === ano)
       const row: Record<string, number | string> = {
@@ -462,6 +462,10 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
       }
       return row
     })
+
+    // Remove meses zerados do início da série (não do meio)
+    const firstWithData = rows.findIndex(r => (r.mrrTotal as number) > 0)
+    return firstWithData >= 0 ? rows.slice(firstWithData) : rows
   }, [mrrTendencia])
 
   const vendedoresParaLinha = useMemo(() => {

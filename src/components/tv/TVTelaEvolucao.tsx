@@ -57,7 +57,11 @@ export function TVTelaEvolucao({ mrr6Meses, mrrPotencial6Meses, t }: TVTelaEvolu
     potencial: mrrPotencial6Meses[i]?.valor ?? 0,
   }))
 
-  const ultimo = chartData[chartData.length - 1]
+  // Remove meses zerados do início (não do meio) — evita área vazia à esquerda
+  const firstWithData = chartData.findIndex(d => d.confirmado > 0 || d.potencial > 0)
+  const dadosFiltrados = firstWithData >= 0 ? chartData.slice(firstWithData) : chartData
+
+  const ultimo = dadosFiltrados[dadosFiltrados.length - 1]
 
   return (
     <div className="min-w-full h-full flex flex-col gap-4">
@@ -86,7 +90,7 @@ export function TVTelaEvolucao({ mrr6Meses, mrrPotencial6Meses, t }: TVTelaEvolu
         {/* Gráfico */}
         <div className="flex-1 min-h-0">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 60, right: 30, left: 10, bottom: 0 }}>
+            <AreaChart data={dadosFiltrados} margin={{ top: 60, right: 30, left: 10, bottom: 0 }}>
               <defs>
                 <linearGradient id="mrrGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor={t.primary} stopOpacity={0.35} />
