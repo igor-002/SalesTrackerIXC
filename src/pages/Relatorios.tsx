@@ -1932,6 +1932,7 @@ function TabProjetos({ vendedorIdFiltro }: { vendedorIdFiltro: string | null }) 
     const fim = `${ano}-${String(mes).padStart(2, '0')}-${String(fimMes.getDate()).padStart(2, '0')}`
     return vendas.filter(v =>
       v.data_venda >= inicio && v.data_venda <= fim &&
+      v.vendedor_id !== null &&
       (vendedorIdFiltro === null || v.vendedor?.id === vendedorIdFiltro)
     )
   }, [vendas, mes, ano, vendedorIdFiltro])
