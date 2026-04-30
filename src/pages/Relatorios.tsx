@@ -2097,7 +2097,6 @@ export default function Relatorios() {
   const abas: { key: Aba; label: string; icon: React.ReactNode; somenteGestor?: boolean }[] = [
     { key: 'visao_geral',   label: 'Visão Geral',          icon: <TrendingUp size={15} /> },
     { key: 'ranking',       label: 'Ranking de Vendedores', icon: <Users size={15} />,      somenteGestor: true },
-    { key: 'por_vendedor',  label: 'Por Vendedor',          icon: <User size={15} /> },
     { key: 'projetos',      label: 'Projetos & Serviços',   icon: <FolderKanban size={15} /> },
     { key: 'comissoes',     label: 'Comissões',             icon: <DollarSign size={15} /> },
   ]
