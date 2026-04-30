@@ -14,7 +14,8 @@ const Clientes    = lazy(() => import('@/pages/Clientes'))
 const TVDashboard = lazy(() => import('@/pages/TVDashboard'))
 const Usuarios       = lazy(() => import('@/pages/Usuarios'))
 const Relatorios     = lazy(() => import('@/pages/Relatorios'))
-const DiagnosticoIXC = lazy(() => import('@/pages/DiagnosticoIXC'))
+const DiagnosticoIXC   = lazy(() => import('@/pages/DiagnosticoIXC'))
+const RelatorioDiario  = lazy(() => import('@/pages/RelatorioDiario'))
 
 function PageLoader() {
   return (
@@ -83,6 +84,12 @@ export function Router() {
           <Route path="/relatorios" element={
             <ProtectedRoute permissao="relatorios">
               <AppShell><Relatorios /></AppShell>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/relatorio-diario" element={
+            <ProtectedRoute permissao="relatorios">
+              <AppShell><RelatorioDiario /></AppShell>
             </ProtectedRoute>
           } />
 

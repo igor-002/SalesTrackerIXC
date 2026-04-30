@@ -791,6 +791,62 @@ export type Database = {
           },
         ]
       }
+      relatorio_diario: {
+        Row: {
+          id: string
+          empresa_id: string
+          vendedor_id: string
+          data_relatorio: string
+          leads: number
+          contatos: number
+          calls_reunioes: number
+          vendas: number
+          valor_total: number
+          observacoes: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          empresa_id?: string
+          vendedor_id: string
+          data_relatorio: string
+          leads?: number
+          contatos?: number
+          calls_reunioes?: number
+          vendas?: number
+          valor_total?: number
+          observacoes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          empresa_id?: string
+          vendedor_id?: string
+          data_relatorio?: string
+          leads?: number
+          contatos?: number
+          calls_reunioes?: number
+          vendas?: number
+          valor_total?: number
+          observacoes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "relatorio_diario_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "vendedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vendedores: {
         Row: {
           ativo: boolean | null
