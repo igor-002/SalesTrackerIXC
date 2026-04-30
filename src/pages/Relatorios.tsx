@@ -24,7 +24,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useVendedores } from '@/hooks/useVendedores'
 import { useMetas } from '@/hooks/useMetas'
 import { useMetasVendedor } from '@/hooks/useMetasVendedor'
-import { useRelatoriosRedesign } from '@/hooks/useRelatoriosRedesign'
+import { useRelatoriosRedesign, type FiltroRedesign } from '@/hooks/useRelatoriosRedesign'
 import {
   useRelatoriosMes,
   useRelatoriosRange,
@@ -205,27 +205,51 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
   const [vendedorLocal, setVendedorLocal] = useState<string | null>(null)
   const vendedorEfetivo = isGestor ? vendedorLocal : vendedorIdFiltro
 
-  // Período — modo e valores pendentes (antes do Aplicar) e aplicados
-  const [periodoMode, setPeriodoMode] = useState<'ultimos3' | 'custom'>('ultimos3')
-  const [pendingMes, setPendingMes] = useState(now.getMonth() + 1)
-  const [pendingAno, setPendingAno] = useState(now.getFullYear())
-  const [aplicado, setAplicado] = useState<{ mes: number; ano: number } | null>(null)
+  // Período — modo rápido ou range livre
+  type PeriodoMode = 'hoje' | 'semana' | 'mesMes' | 'mesAnterior' | 'ultimos3' | 'range'
+  const [periodoMode, setPeriodoMode] = useState<PeriodoMode>('ultimos3')
+  const [pendingInicio, setPendingInicio] = useState('')
+  const [pendingFim, setPendingFim] = useState('')
+  const [rangeInicio, setRangeInicio] = useState('')
+  const [rangeFim, setRangeFim] = useState('')
 
-  const periodoCustom = periodoMode === 'custom' ? aplicado : null
+  const fmtDate = (d: Date) => d.toISOString().split('T')[0]
 
-  const handleAplicar = () => {
-    setAplicado({ mes: pendingMes, ano: pendingAno })
-    setPeriodoMode('custom')
-  }
+  const filtro = useMemo((): FiltroRedesign | null => {
+    const today = new Date()
+    switch (periodoMode) {
+      case 'hoje':
+        return { tipo: 'range', inicio: fmtDate(today), fim: fmtDate(today) }
+      case 'semana': {
+        const dow = today.getDay()
+        const daysBack = dow === 0 ? 6 : dow - 1  // segunda-feira como início
+        const start = new Date(today)
+        start.setDate(today.getDate() - daysBack)
+        return { tipo: 'range', inicio: fmtDate(start), fim: fmtDate(today) }
+      }
+      case 'mesMes':
+        return { tipo: 'mes', mes: today.getMonth() + 1, ano: today.getFullYear() }
+      case 'mesAnterior': {
+        const m = today.getMonth() === 0 ? 12 : today.getMonth()
+        const a = today.getMonth() === 0 ? today.getFullYear() - 1 : today.getFullYear()
+        return { tipo: 'mes', mes: m, ano: a }
+      }
+      case 'ultimos3':
+        return null
+      case 'range':
+        return rangeInicio && rangeFim ? { tipo: 'range', inicio: rangeInicio, fim: rangeFim } : null
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodoMode, rangeInicio, rangeFim])
 
-  const handleUltimos3 = () => {
-    setPeriodoMode('ultimos3')
-    setAplicado(null)
+  const handleAplicarRange = () => {
+    if (!pendingInicio || !pendingFim || pendingInicio > pendingFim) return
+    setRangeInicio(pendingInicio)
+    setRangeFim(pendingFim)
   }
 
   const {
     loading,
-    meses3,
     mesesEfetivos,
     isCustom,
     isHistorico,
@@ -238,7 +262,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
     totaisTime,
     kpis,
     aguardandoAntigos,
-  } = useRelatoriosRedesign(vendedorEfetivo, periodoCustom)
+  } = useRelatoriosRedesign(vendedorEfetivo, filtro)
 
   const { getMetaAtual } = useMetas()
   const metaAtual = getMetaAtual()
@@ -529,81 +553,110 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
       <GlassCard className="p-4">
         <div className="flex flex-wrap items-end gap-4">
           {/* Seletor de Período */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 flex-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-white/40">Período</p>
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* Toggle Últimos 3 meses / Específico */}
-              <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.1)' }}>
+
+            {/* Botões rápidos */}
+            {(() => {
+              const btns: { key: PeriodoMode; label: string }[] = [
+                { key: 'hoje',        label: 'Hoje' },
+                { key: 'semana',      label: 'Esta semana' },
+                { key: 'mesMes',      label: 'Este mês' },
+                { key: 'mesAnterior', label: 'Mês anterior' },
+                { key: 'ultimos3',    label: 'Últimos 3 meses' },
+                { key: 'range',       label: 'Período livre' },
+              ]
+              return (
+                <div className="flex flex-wrap gap-1.5">
+                  {btns.map(({ key, label }) => {
+                    const ativo = periodoMode === key
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => setPeriodoMode(key)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+                        style={ativo
+                          ? { background: 'rgba(0,214,143,0.18)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.35)' }
+                          : { background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.08)' }
+                        }
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+              )
+            })()}
+
+            {/* Inputs de data — só aparece em modo range */}
+            {periodoMode === 'range' && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="date"
+                  value={pendingInicio}
+                  onChange={e => setPendingInicio(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg text-xs text-white outline-none cursor-pointer"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', colorScheme: 'dark' }}
+                />
+                <span className="text-xs text-white/30">até</span>
+                <input
+                  type="date"
+                  value={pendingFim}
+                  onChange={e => setPendingFim(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg text-xs text-white outline-none cursor-pointer"
+                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', colorScheme: 'dark' }}
+                />
                 <button
-                  onClick={handleUltimos3}
-                  className="px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer"
-                  style={periodoMode === 'ultimos3'
-                    ? { background: 'rgba(0,214,143,0.2)', color: '#00d68f' }
-                    : { background: 'transparent', color: 'rgba(255,255,255,0.4)' }
-                  }
+                  onClick={handleAplicarRange}
+                  disabled={!pendingInicio || !pendingFim || pendingInicio > pendingFim}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all disabled:opacity-40"
+                  style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}
                 >
-                  Últimos 3 meses
-                </button>
-                <button
-                  onClick={() => setPeriodoMode('custom')}
-                  className="px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer"
-                  style={periodoMode === 'custom'
-                    ? { background: 'rgba(139,92,246,0.2)', color: '#a78bfa' }
-                    : { background: 'transparent', color: 'rgba(255,255,255,0.4)' }
-                  }
-                >
-                  Período específico
+                  Aplicar
                 </button>
               </div>
-
-              {/* Dropdowns + Aplicar — só aparece em modo custom */}
-              {periodoMode === 'custom' && (
-                <div className="flex items-center gap-2">
-                  <select
-                    value={pendingMes}
-                    onChange={e => setPendingMes(Number(e.target.value))}
-                    className="px-2.5 py-1.5 rounded-lg text-xs text-white outline-none cursor-pointer"
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', colorScheme: 'dark' }}
-                  >
-                    {MESES_LABELS.map((l, i) => (
-                      <option key={i + 1} value={i + 1} style={{ background: '#0f2419', color: '#fff' }}>{l}</option>
-                    ))}
-                  </select>
-                  <select
-                    value={pendingAno}
-                    onChange={e => setPendingAno(Number(e.target.value))}
-                    className="px-2.5 py-1.5 rounded-lg text-xs text-white outline-none cursor-pointer"
-                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', colorScheme: 'dark' }}
-                  >
-                    {[2024, 2025, 2026, 2027].map(a => (
-                      <option key={a} value={a} style={{ background: '#0f2419', color: '#fff' }}>{a}</option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={handleAplicar}
-                    className="px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all"
-                    style={{ background: 'rgba(139,92,246,0.2)', color: '#a78bfa', border: '1px solid rgba(139,92,246,0.3)' }}
-                  >
-                    Aplicar
-                  </button>
-                </div>
-              )}
-            </div>
+            )}
 
             {/* Indicador do período ativo */}
-            <div className="flex items-center gap-2">
-              <p className="text-xs text-white/50">
-                {isCustom && aplicado
-                  ? <>Exibindo: <span className="text-white/80 font-medium">{MESES_LABELS[aplicado.mes - 1]} / {aplicado.ano}</span></>
-                  : <>Exibindo: <span className="text-white/80 font-medium">{mesesEfetivos.map(m => MESES_LABELS[m.mes - 1]).join(', ')} / {meses3[0].ano}</span></>
+            {(() => {
+              const fmtBR = (iso: string) => {
+                const [y, m, d] = iso.split('-')
+                return `${d}/${m}/${y}`
+              }
+              let label = ''
+              switch (periodoMode) {
+                case 'hoje': label = `Hoje — ${fmtBR(fmtDate(now))}`; break
+                case 'semana': {
+                  const dow = now.getDay(); const daysBack = dow === 0 ? 6 : dow - 1
+                  const start = new Date(now); start.setDate(now.getDate() - daysBack)
+                  label = `Esta semana — ${fmtBR(fmtDate(start))} a ${fmtBR(fmtDate(now))}`; break
                 }
-              </p>
-              {isHistorico && (
-                <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
-                  dados do histórico
-                </span>
-              )}
-            </div>
+                case 'mesMes': label = `Este mês — ${MESES_LABELS[now.getMonth()]} / ${now.getFullYear()}`; break
+                case 'mesAnterior': {
+                  const m = now.getMonth() === 0 ? 12 : now.getMonth()
+                  const a = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
+                  label = `Mês anterior — ${MESES_LABELS[m - 1]} / ${a}`; break
+                }
+                case 'ultimos3':
+                  label = `Últimos 3 meses — ${mesesEfetivos.map(m => MESES_LABELS[m.mes - 1]).join(', ')}`; break
+                case 'range':
+                  label = rangeInicio && rangeFim
+                    ? `${fmtBR(rangeInicio)} a ${fmtBR(rangeFim)}`
+                    : 'Selecione as datas e clique Aplicar'; break
+              }
+              return (
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-white/50">
+                    Exibindo: <span className="text-white/80 font-medium">{label}</span>
+                  </p>
+                  {isHistorico && (
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
+                      dados do histórico
+                    </span>
+                  )}
+                </div>
+              )
+            })()}
           </div>
 
           {isGestor && (
@@ -719,13 +772,15 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-sm font-semibold text-white">
-              {isCustom && aplicado
-                ? `Evolução — ${MESES_LABELS[aplicado.mes - 1]} / ${aplicado.ano}`
+              {isCustom && filtro?.tipo === 'mes'
+                ? `Evolução — ${MESES_LABELS[filtro.mes - 1]} / ${filtro.ano}`
+                : isCustom && filtro?.tipo === 'range'
+                ? `Evolução — período selecionado`
                 : 'Evolução e Projeção'}
             </h3>
             <p className="text-xs text-white/30 mt-0.5">
               {isCustom
-                ? 'Mês selecionado'
+                ? 'Período selecionado'
                 : '3 meses reais + 3 meses projetados (média ponderada + tendência)'}
             </p>
           </div>

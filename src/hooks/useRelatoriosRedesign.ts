@@ -156,38 +156,60 @@ function calcFatorTendencia(valores: number[]): number {
   return (ultimo - primeiro) / primeiro
 }
 
+// ── Tipo de filtro de período ────────────────────────────────────────────────
+
+export type FiltroRedesign =
+  | { tipo: 'mes'; mes: number; ano: number }
+  | { tipo: 'range'; inicio: string; fim: string }  // datas ISO 'YYYY-MM-DD'
+
 // ── Hook principal ───────────────────────────────────────────────────────────
 
 export function useRelatoriosRedesign(
   vendedorIdFiltro: string | null,
-  periodoCustom?: { mes: number; ano: number } | null
+  filtro?: FiltroRedesign | null
 ) {
   const meses3 = useMemo(() => getUltimos3Meses(), [])
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const mesesEfetivos = useMemo(() => {
-    if (periodoCustom) return [periodoCustom]
-    return meses3
-  }, [periodoCustom?.mes, periodoCustom?.ano, meses3])
+    if (!filtro) return meses3
+    if (filtro.tipo === 'mes') return [{ mes: filtro.mes, ano: filtro.ano }]
+    // range: meses cobertos pelo intervalo de datas
+    const start = new Date(filtro.inicio + 'T00:00:00')
+    const end = new Date(filtro.fim + 'T00:00:00')
+    const result: { mes: number; ano: number }[] = []
+    const cur = new Date(start.getFullYear(), start.getMonth(), 1)
+    while (cur <= end) {
+      result.push({ mes: cur.getMonth() + 1, ano: cur.getFullYear() })
+      cur.setMonth(cur.getMonth() + 1)
+    }
+    return result.length > 0 ? result : meses3
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtro?.tipo === 'mes' ? `${filtro?.mes}-${filtro?.ano}` : filtro?.tipo === 'range' ? `${filtro?.inicio}:${filtro?.fim}` : 'null', meses3])
 
-  const isCustom = Boolean(periodoCustom)
+  const isCustom = Boolean(filtro)
 
   // Stable string key to avoid object-reference issues in queryKey
-  const queryKeyPeriodo = mesesEfetivos.map(m => `${m.mes}-${m.ano}`).join(',')
+  const queryKeyPeriodo = filtro?.tipo === 'range'
+    ? `range:${filtro.inicio}:${filtro.fim}`
+    : mesesEfetivos.map(m => `${m.mes}-${m.ano}`).join(',')
 
   const { data: resultado = { contratos: [] as ContratoRedesign[], isHistorico: false }, isLoading } = useQuery({
     queryKey: ['relatorios-redesign', queryKeyPeriodo, vendedorIdFiltro],
     queryFn: async () => {
-      const orParts = mesesEfetivos
-        .map(m => `and(mes_referencia.eq.${m.mes},ano_referencia.eq.${m.ano})`)
-        .join(',')
-
       let q = supabase
         .from('vendas')
         .select('id, cliente_nome, valor_unitario, valor_total, mrr, status_ixc, vendedor_id, mes_referencia, ano_referencia, dias_aguardando, created_at, status_atualizado_em, data_venda, cliente_cpf_cnpj, vendedor:vendedores(id, nome)')
-        .or(orParts)
         .order('mes_referencia', { ascending: true })
         .order('ano_referencia', { ascending: true })
+
+      if (filtro?.tipo === 'range') {
+        q = q.gte('data_venda', filtro.inicio).lte('data_venda', filtro.fim)
+      } else {
+        const orParts = mesesEfetivos
+          .map(m => `and(mes_referencia.eq.${m.mes},ano_referencia.eq.${m.ano})`)
+          .join(',')
+        q = q.or(orParts)
+      }
 
       if (vendedorIdFiltro) q = q.eq('vendedor_id', vendedorIdFiltro)
 
@@ -197,9 +219,9 @@ export function useRelatoriosRedesign(
       let contratos = (data ?? []) as ContratoRedesign[]
       let isHistorico = false
 
-      // Fallback para vendas_historico se mês customizado não tiver dados em vendas
-      if (isCustom && contratos.length === 0 && periodoCustom) {
-        const { mes, ano } = periodoCustom
+      // Fallback para vendas_historico — apenas para filtro por mês específico
+      if (isCustom && filtro?.tipo === 'mes' && contratos.length === 0) {
+        const { mes, ano } = filtro
         let histQ = supabase
           .from('vendas_historico')
           .select('id, cliente_nome, valor_unitario, mrr, status_ixc, vendedor_id, mes_referencia, ano_referencia, cliente_cpf_cnpj, vendedor:vendedores(id, nome)')
