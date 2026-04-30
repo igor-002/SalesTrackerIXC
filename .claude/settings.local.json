@@ -54,7 +54,8 @@
       "Bash(grep -r \"ixc_id\" C:/www/salestrakerOPENITATT/src/hooks/useProdutos.ts C:/www/salestrakerOPENITATT/src/components/produtos/*.tsx)",
       "mcp__supabase__list_migrations",
       "Bash(git revert *)",
-      "Bash(file *)"
+      "Bash(file *)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); deps={**d.get\\('dependencies',{}\\), **d.get\\('devDependencies',{}\\)}; [print\\(k,v\\) for k,v in deps.items\\(\\) if any\\(x in k for x in ['jspdf','pdf','print']\\)]\")"
     ]
   }
 }
