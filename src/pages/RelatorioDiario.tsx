@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import { ClipboardList, CheckCircle2, Clock, ChevronDown, ChevronUp, FileText, Plus, X } from 'lucide-react'
+import { ClipboardList, CheckCircle2, Clock, ChevronDown, ChevronUp, FileText, Plus, X, Trash2 } from 'lucide-react'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button } from '@/components/ui/Button'
@@ -241,6 +241,8 @@ export default function RelatorioDiario() {
   const { user, permissoes, vendedorDbId } = useAuthStore()
   const isGestor = Boolean(permissoes?.relatorios) && !vendedorDbId
 
+  const qc = useQueryClient()
+
   const [dataSel, setDataSel] = useState(today())
   const [historicoAberto, setHistoricoAberto] = useState(false)
   const [forms, setForms] = useState<Record<string, FormData>>({})
@@ -319,6 +321,26 @@ export default function RelatorioDiario() {
       ...p,
       [vendedorId]: { ...(p[vendedorId] ?? { nome: '', valor: '' }), [field]: value },
     }))
+  }
+
+  async function handleLimpar(vendedorId: string, nomeVendedor: string) {
+    const ok = window.confirm(`Limpar dados de ${nomeVendedor} para ${fmtBR(dataSel)}? Isso não pode ser desfeito.`)
+    if (!ok) return
+    try {
+      const { error } = await supabase
+        .from('relatorio_diario')
+        .delete()
+        .eq('vendedor_id', vendedorId)
+        .eq('data_relatorio', dataSel)
+      if (error) throw error
+      setForms(f => ({ ...f, [vendedorId]: emptyForm() }))
+      setProdutosVendidos(p => ({ ...p, [vendedorId]: [] }))
+      await qc.invalidateQueries({ queryKey: ['relatorio-diario', dataSel] })
+      await qc.invalidateQueries({ queryKey: ['relatorio-diario-historico'] })
+      toast('success', 'Dados limpos com sucesso.')
+    } catch {
+      toast('error', 'Erro ao limpar dados.')
+    }
   }
 
   async function handleSalvar(vendedorId: string) {
@@ -429,14 +451,25 @@ export default function RelatorioDiario() {
                     <p className="text-xs text-white/35">{dataSel === today() ? 'Hoje' : fmtBR(dataSel)}</p>
                   </div>
                 </div>
-                {preenchido
-                  ? <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,214,143,0.12)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.25)' }}>
-                      <CheckCircle2 size={11} /> Preenchido
-                    </span>
-                  : <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.35)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                      <Clock size={11} /> Pendente
-                    </span>
-                }
+                <div className="flex items-center gap-2">
+                  {preenchido
+                    ? <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(0,214,143,0.12)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.25)' }}>
+                        <CheckCircle2 size={11} /> Preenchido
+                      </span>
+                    : <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.35)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <Clock size={11} /> Pendente
+                      </span>
+                  }
+                  {isGestor && preenchido && (
+                    <button
+                      onClick={() => handleLimpar(v.id, v.nome)}
+                      title={`Limpar dados de ${v.nome}`}
+                      className="flex items-center justify-center w-7 h-7 rounded-lg cursor-pointer transition-colors hover:bg-red-500/15 text-white/25 hover:text-red-400"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Campos numéricos — grid 2×2 */}
