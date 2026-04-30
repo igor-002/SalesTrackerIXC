@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, PieChart, Pie, Cell,
-  LineChart, Line, ComposedChart,
+  LineChart, Line, ComposedChart, LabelList,
 } from 'recharts'
 import {
   FileText, Users, TrendingUp, DollarSign, Percent,
@@ -1450,34 +1450,70 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
           </div>
         </div>
 
-        <ResponsiveContainer width="100%" height={260}>
-          <LineChart data={dadosMrrLinha}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-            <XAxis dataKey="mesLabel" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} axisLine={false} tickLine={false} width={70} tickFormatter={v => formatBRL(v)} />
-            <Tooltip content={<MrrTooltip />} />
-            <Legend
-              iconType="line"
-              wrapperStyle={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', paddingTop: 10 }}
-              formatter={(value) => <span style={{ color: 'rgba(255,255,255,0.6)' }}>{value}</span>}
-            />
-            <Line type="monotone" dataKey="mrrTotal" name="Total do Time" stroke="#00d68f" strokeWidth={3} dot={{ fill: '#00d68f', r: 4 }} activeDot={{ r: 6 }} connectNulls={true} />
-            {vendedoresParaLinha.map(v => (
-              <Line
-                key={v.id}
-                type="monotone"
-                dataKey={v.id}
-                name={v.nome}
-                stroke={v.cor}
-                strokeWidth={1.5}
-                strokeDasharray="4 2"
-                dot={{ fill: v.cor, r: 3 }}
-                activeDot={{ r: 5 }}
-                connectNulls={true}
-              />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
+        {(() => {
+          const isPontoUnico = dadosMrrLinha.length === 1
+          const dotTotal = isPontoUnico ? { fill: '#00d68f', r: 10, strokeWidth: 2, stroke: 'rgba(255,255,255,0.2)' } : { fill: '#00d68f', r: 4 }
+          const dotVendedor = (cor: string) => isPontoUnico
+            ? { fill: cor, r: 7, strokeWidth: 2, stroke: 'rgba(255,255,255,0.15)' }
+            : { fill: cor, r: 3 }
+          return (
+            <>
+              <ResponsiveContainer width="100%" height={260}>
+                <LineChart data={dadosMrrLinha} margin={{ top: isPontoUnico ? 28 : 5, right: 16, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+                  <XAxis dataKey="mesLabel" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} axisLine={false} tickLine={false} width={70} tickFormatter={v => formatBRL(v)} />
+                  <Tooltip content={<MrrTooltip />} />
+                  <Legend
+                    iconType="line"
+                    wrapperStyle={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', paddingTop: 10 }}
+                    formatter={(value) => <span style={{ color: 'rgba(255,255,255,0.6)' }}>{value}</span>}
+                  />
+                  <Line type="monotone" dataKey="mrrTotal" name="Total do Time" stroke="#00d68f" strokeWidth={3} dot={dotTotal} activeDot={{ r: 7 }} connectNulls={true}>
+                    {isPontoUnico && (
+                      <LabelList
+                        dataKey="mrrTotal"
+                        position="top"
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        formatter={(v: any) => formatBRL(Number(v))}
+                        style={{ fill: '#00d68f', fontSize: 13, fontWeight: 700 }}
+                      />
+                    )}
+                  </Line>
+                  {vendedoresParaLinha.map(v => (
+                    <Line
+                      key={v.id}
+                      type="monotone"
+                      dataKey={v.id}
+                      name={v.nome}
+                      stroke={v.cor}
+                      strokeWidth={1.5}
+                      strokeDasharray={isPontoUnico ? undefined : '4 2'}
+                      dot={dotVendedor(v.cor)}
+                      activeDot={{ r: isPontoUnico ? 9 : 5 }}
+                      connectNulls={true}
+                    >
+                      {isPontoUnico && (
+                        <LabelList
+                          dataKey={v.id}
+                          position="top"
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          formatter={(val: any) => Number(val) > 0 ? formatBRL(Number(val)) : ""}
+                          style={{ fill: v.cor, fontSize: 12, fontWeight: 600 }}
+                        />
+                      )}
+                    </Line>
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+              {isPontoUnico && (
+                <p className="text-center text-xs text-white/30 mt-1 pb-1">
+                  Selecione "Últimos 3 meses" para ver a evolução
+                </p>
+              )}
+            </>
+          )
+        })()}
       </GlassCard>
 
       {/* SEÇÃO 6 — Tabela de Performance por Vendedor */}
