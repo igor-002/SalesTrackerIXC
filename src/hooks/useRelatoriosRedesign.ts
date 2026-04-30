@@ -13,6 +13,7 @@ export interface ContratoRedesign {
   cliente_nome: string
   valor_unitario: number
   valor_total: number | null
+  mrr: boolean | null
   status_ixc: string | null
   vendedor_id: string | null
   vendedor: { id: string; nome: string } | null
@@ -183,7 +184,7 @@ export function useRelatoriosRedesign(
 
       let q = supabase
         .from('vendas')
-        .select('id, cliente_nome, valor_unitario, valor_total, status_ixc, vendedor_id, mes_referencia, ano_referencia, dias_aguardando, created_at, status_atualizado_em, data_venda, cliente_cpf_cnpj, vendedor:vendedores(id, nome)')
+        .select('id, cliente_nome, valor_unitario, valor_total, mrr, status_ixc, vendedor_id, mes_referencia, ano_referencia, dias_aguardando, created_at, status_atualizado_em, data_venda, cliente_cpf_cnpj, vendedor:vendedores(id, nome)')
         .or(orParts)
         .order('mes_referencia', { ascending: true })
         .order('ano_referencia', { ascending: true })
@@ -201,7 +202,7 @@ export function useRelatoriosRedesign(
         const { mes, ano } = periodoCustom
         let histQ = supabase
           .from('vendas_historico')
-          .select('id, cliente_nome, valor_unitario, status_ixc, vendedor_id, mes_referencia, ano_referencia, cliente_cpf_cnpj, vendedor:vendedores(id, nome)')
+          .select('id, cliente_nome, valor_unitario, mrr, status_ixc, vendedor_id, mes_referencia, ano_referencia, cliente_cpf_cnpj, vendedor:vendedores(id, nome)')
           .eq('mes_referencia', mes)
           .eq('ano_referencia', ano)
 
@@ -216,6 +217,7 @@ export function useRelatoriosRedesign(
             cliente_nome: String(h.cliente_nome),
             valor_unitario: Number(h.valor_unitario ?? 0),
             valor_total: Number(h.valor_unitario ?? 0),
+            mrr: (h.mrr as boolean | null) ?? true,
             status_ixc: (h.status_ixc as string | null) ?? 'A',
             vendedor_id: h.vendedor_id as string | null,
             vendedor: h.vendedor as { id: string; nome: string } | null,
@@ -331,7 +333,7 @@ export function useRelatoriosRedesign(
   // ── MRR Tendência por mês ────────────────────────────────────────────────────
   const mrrTendencia = useMemo((): MrrTendencia[] => {
     return mesesEfetivos.map(({ mes, ano }) => {
-      const doMes = contratos.filter(c => c.mes_referencia === mes && c.ano_referencia === ano && c.status_ixc === 'A')
+      const doMes = contratos.filter(c => c.mes_referencia === mes && c.ano_referencia === ano && c.status_ixc === 'A' && c.mrr === true)
       const mrrTotal = doMes.reduce((s, c) => s + (c.valor_unitario ?? 0), 0)
 
       const porVendedorMap = new Map<string, { nome: string; mrr: number }>()

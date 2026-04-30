@@ -476,7 +476,7 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
       }
     }
     return Array.from(set).map((vid, i) => {
-      const nome = mrrTendencia[0]?.porVendedor.find(v => v.vendedor_id === vid)?.nome ?? 'Vendedor'
+      const nome = mrrTendencia.flatMap(m => m.porVendedor).find(v => v.vendedor_id === vid)?.nome ?? 'Vendedor'
       return { id: vid, nome, cor: CORES_VENDEDORES[i % CORES_VENDEDORES.length] }
     })
   }, [mrrTendencia])
