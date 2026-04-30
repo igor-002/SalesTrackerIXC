@@ -803,6 +803,7 @@ export type Database = {
           vendas: number
           valor_total: number
           observacoes: string | null
+          produtos_vendidos: Json | null
           created_by: string | null
           created_at: string
           updated_at: string
@@ -818,6 +819,7 @@ export type Database = {
           vendas?: number
           valor_total?: number
           observacoes?: string | null
+          produtos_vendidos?: Json | null
           created_by?: string | null
           created_at?: string
           updated_at?: string
@@ -833,6 +835,7 @@ export type Database = {
           vendas?: number
           valor_total?: number
           observacoes?: string | null
+          produtos_vendidos?: Json | null
           created_by?: string | null
           created_at?: string
           updated_at?: string

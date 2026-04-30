@@ -2,6 +2,11 @@ import { useCallback } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 
+export interface ProdutoVendido {
+  nome: string
+  valor: number
+}
+
 export interface RelDiarioRow {
   id: string
   vendedor_id: string
@@ -12,6 +17,7 @@ export interface RelDiarioRow {
   vendas: number
   valor_total: number
   observacoes: string | null
+  produtos_vendidos: ProdutoVendido[] | null
 }
 
 export interface RelDiarioHistoricoItem {
@@ -29,10 +35,13 @@ export function useRelatorioDiario(data: string) {
     queryFn: async () => {
       const { data: rows, error } = await supabase
         .from('relatorio_diario')
-        .select('id, vendedor_id, data_relatorio, leads, contatos, calls_reunioes, vendas, valor_total, observacoes')
+        .select('id, vendedor_id, data_relatorio, leads, contatos, calls_reunioes, vendas, valor_total, observacoes, produtos_vendidos')
         .eq('data_relatorio', data)
       if (error) throw error
-      return (rows ?? []) as RelDiarioRow[]
+      return (rows ?? []).map(r => ({
+        ...r,
+        produtos_vendidos: Array.isArray(r.produtos_vendidos) ? r.produtos_vendidos as unknown as ProdutoVendido[] : [],
+      })) as RelDiarioRow[]
     },
     staleTime: 60 * 1000,
   })
@@ -53,6 +62,7 @@ export function useRelatorioDiario(data: string) {
       vendas: payload.vendas,
       valor_total: payload.valor_total,
       observacoes: payload.observacoes || null,
+      produtos_vendidos: payload.produtos_vendidos ?? [],
       created_by: createdBy,
     } as never, { onConflict: 'vendedor_id,data_relatorio' })
     if (error) throw error

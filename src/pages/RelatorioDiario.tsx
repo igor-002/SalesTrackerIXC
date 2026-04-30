@@ -1,14 +1,14 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import { ClipboardList, CheckCircle2, Clock, ChevronDown, ChevronUp, FileText } from 'lucide-react'
+import { ClipboardList, CheckCircle2, Clock, ChevronDown, ChevronUp, FileText, Plus, X } from 'lucide-react'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Spinner } from '@/components/ui/Spinner'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/components/ui/Toast'
 import { useAuthStore } from '@/store/authStore'
 import { useVendedores } from '@/hooks/useVendedores'
-import { useRelatorioDiario, useRelatorioDiarioHistorico } from '@/hooks/useRelatorioDiario'
+import { useRelatorioDiario, useRelatorioDiarioHistorico, type ProdutoVendido } from '@/hooks/useRelatorioDiario'
 import { formatBRL } from '@/lib/formatters'
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -35,6 +35,10 @@ const emptyForm = (): FormData => ({
 
 function numOf(s: string) { const n = parseFloat(s.replace(',', '.')); return isNaN(n) ? 0 : n }
 
+function somarProdutos(lista: ProdutoVendido[]) {
+  return lista.reduce((s, p) => s + p.valor, 0)
+}
+
 // ── Geração de PDF ────────────────────────────────────────────────────────────
 
 async function gerarPDF(
@@ -42,6 +46,7 @@ async function gerarPDF(
   vendedores: { id: string; nome: string }[],
   forms: Record<string, FormData>,
   empresaNome: string,
+  produtosVendidos: Record<string, ProdutoVendido[]>,
 ) {
   const { default: jsPDF } = await import('jspdf')
   const { default: autoTable } = await import('jspdf-autotable')
@@ -146,6 +151,45 @@ async function gerarPDF(
     ...tblLine,
   })
 
+  // ── Produtos vendidos no dia
+  const todasProdutos: { vendedor: string; nome: string; valor: number }[] = []
+  for (const v of vendedores) {
+    for (const p of produtosVendidos[v.id] ?? []) {
+      todasProdutos.push({ vendedor: v.nome, nome: p.nome, valor: p.valor })
+    }
+  }
+
+  if (todasProdutos.length > 0) {
+    const prodY = (doc as any).lastAutoTable.finalY + 8
+    const totalProd = todasProdutos.reduce((s, p) => s + p.valor, 0)
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.setTextColor(...headerGreen)
+    doc.text('PRODUTOS VENDIDOS NO DIA', marginL, prodY - 2)
+
+    autoTable(doc, {
+      startY: prodY + 1,
+      head: [['VENDEDOR', 'PRODUTO', 'VALOR']],
+      body: [
+        ...todasProdutos.map(p => [p.vendedor, p.nome, formatBRL(p.valor)]),
+        ['', 'TOTAL', formatBRL(totalProd)],
+      ],
+      headStyles,
+      alternateRowStyles: altRows,
+      styles: tblStyles,
+      margin: { left: marginL, right: marginR },
+      ...tblLine,
+      didParseCell: (data: any) => {
+        if (data.row.index === todasProdutos.length) {
+          data.cell.styles.fontStyle = 'bold'
+          data.cell.styles.fillColor = [240, 247, 244]
+          data.cell.styles.textColor = headerGreen
+        }
+      },
+    })
+  }
+
   // ── Contracts table
   if (contratos && contratos.length > 0) {
     const afterY = (doc as any).lastAutoTable.finalY + 8
@@ -200,6 +244,8 @@ export default function RelatorioDiario() {
   const [dataSel, setDataSel] = useState(today())
   const [historicoAberto, setHistoricoAberto] = useState(false)
   const [forms, setForms] = useState<Record<string, FormData>>({})
+  const [produtosVendidos, setProdutosVendidos] = useState<Record<string, ProdutoVendido[]>>({})
+  const [novoProduto, setNovoProduto] = useState<Record<string, { nome: string; valor: string }>>({})
   const [salvando, setSalvando] = useState<Record<string, boolean>>({})
   const [gerandoPDF, setGerandoPDF] = useState(false)
 
@@ -213,12 +259,7 @@ export default function RelatorioDiario() {
   })
 
   const { vendedores, loading: loadingVend } = useVendedores()
-  const vendedoresAtivos = useMemo(
-    () => vendedores.filter(v => v.ativo),
-    [vendedores],
-  )
-
-  // Gestor vê todos; vendedor vê só o próprio
+  const vendedoresAtivos = useMemo(() => vendedores.filter(v => v.ativo), [vendedores])
   const vendedoresVisiveis = useMemo(
     () => isGestor ? vendedoresAtivos : vendedoresAtivos.filter(v => v.id === vendedorDbId),
     [isGestor, vendedoresAtivos, vendedorDbId],
@@ -227,12 +268,13 @@ export default function RelatorioDiario() {
   const { relatorios, loading: loadingRel, upsert } = useRelatorioDiario(dataSel)
   const { historico, loading: loadingHist } = useRelatorioDiarioHistorico()
 
-  // Inicializar forms quando dados chegam
+  // Inicializar forms e produtos quando dados chegam
   useEffect(() => {
-    const next: Record<string, FormData> = {}
+    const nextForms: Record<string, FormData> = {}
+    const nextProds: Record<string, ProdutoVendido[]> = {}
     for (const v of vendedoresVisiveis) {
       const existing = relatorios.find(r => r.vendedor_id === v.id)
-      next[v.id] = existing
+      nextForms[v.id] = existing
         ? {
             leads: String(existing.leads),
             contatos: String(existing.contatos),
@@ -242,16 +284,41 @@ export default function RelatorioDiario() {
             observacoes: existing.observacoes ?? '',
           }
         : emptyForm()
+      nextProds[v.id] = existing?.produtos_vendidos ?? []
     }
-    setForms(next)
+    setForms(nextForms)
+    setProdutosVendidos(nextProds)
   }, [relatorios, vendedoresVisiveis])
 
-  const preenchidos = relatorios.filter(r =>
-    vendedoresAtivos.some(v => v.id === r.vendedor_id),
-  ).length
+  const preenchidos = relatorios.filter(r => vendedoresAtivos.some(v => v.id === r.vendedor_id)).length
 
   function setField(vendedorId: string, field: keyof FormData, value: string) {
     setForms(f => ({ ...f, [vendedorId]: { ...(f[vendedorId] ?? emptyForm()), [field]: value } }))
+  }
+
+  function adicionarProduto(vendedorId: string) {
+    const np = novoProduto[vendedorId]
+    if (!np?.nome.trim()) return
+    const newProd: ProdutoVendido = { nome: np.nome.trim(), valor: numOf(np.valor) }
+    const lista = [...(produtosVendidos[vendedorId] ?? []), newProd]
+    const total = somarProdutos(lista)
+    setProdutosVendidos(p => ({ ...p, [vendedorId]: lista }))
+    setForms(f => ({ ...f, [vendedorId]: { ...(f[vendedorId] ?? emptyForm()), valor_total: String(total) } }))
+    setNovoProduto(p => ({ ...p, [vendedorId]: { nome: '', valor: '' } }))
+  }
+
+  function removerProduto(vendedorId: string, idx: number) {
+    const lista = (produtosVendidos[vendedorId] ?? []).filter((_, i) => i !== idx)
+    const total = somarProdutos(lista)
+    setProdutosVendidos(p => ({ ...p, [vendedorId]: lista }))
+    setForms(f => ({ ...f, [vendedorId]: { ...(f[vendedorId] ?? emptyForm()), valor_total: lista.length > 0 ? String(total) : f[vendedorId]?.valor_total ?? '' } }))
+  }
+
+  function setNovoProdutoField(vendedorId: string, field: 'nome' | 'valor', value: string) {
+    setNovoProduto(p => ({
+      ...p,
+      [vendedorId]: { ...(p[vendedorId] ?? { nome: '', valor: '' }), [field]: value },
+    }))
   }
 
   async function handleSalvar(vendedorId: string) {
@@ -265,6 +332,7 @@ export default function RelatorioDiario() {
         vendas: numOf(f.vendas),
         valor_total: numOf(f.valor_total),
         observacoes: f.observacoes || null,
+        produtos_vendidos: produtosVendidos[vendedorId] ?? [],
       }, user?.id ?? null)
       toast('success', 'Relatório salvo!')
     } catch {
@@ -277,7 +345,7 @@ export default function RelatorioDiario() {
   async function handleGerarPDF() {
     setGerandoPDF(true)
     try {
-      await gerarPDF(dataSel, vendedoresVisiveis, forms, empresa ?? 'SalesTracker')
+      await gerarPDF(dataSel, vendedoresVisiveis, forms, empresa ?? 'SalesTracker', produtosVendidos)
     } finally {
       setGerandoPDF(false)
     }
@@ -337,11 +405,13 @@ export default function RelatorioDiario() {
       </div>
 
       {/* Grid de cards por vendedor */}
-      <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))' }}>
+      <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))' }}>
         {vendedoresVisiveis.map(v => {
           const f = forms[v.id] ?? emptyForm()
           const preenchido = relatorios.some(r => r.vendedor_id === v.id)
           const isSaving = salvando[v.id] ?? false
+          const prods = produtosVendidos[v.id] ?? []
+          const np = novoProduto[v.id] ?? { nome: '', valor: '' }
 
           return (
             <GlassCard key={v.id} className="p-5 flex flex-col gap-4">
@@ -369,7 +439,7 @@ export default function RelatorioDiario() {
                 }
               </div>
 
-              {/* Campos numéricos — grid 2×2 + campo de valor */}
+              {/* Campos numéricos — grid 2×2 */}
               <div className="grid grid-cols-2 gap-2.5">
                 {([
                   { label: 'Leads', field: 'leads' },
@@ -390,19 +460,82 @@ export default function RelatorioDiario() {
                     />
                   </div>
                 ))}
-                <div className="col-span-2 flex flex-col gap-1">
-                  <label className="text-xs text-white/40 font-medium">Valor total (R$)</label>
+              </div>
+
+              {/* Produtos Vendidos */}
+              <div className="flex flex-col gap-2">
+                <label className="text-xs text-white/40 font-medium">Produtos Vendidos</label>
+
+                {/* Tags dos produtos já adicionados */}
+                {prods.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {prods.map((p, idx) => (
+                      <span
+                        key={idx}
+                        className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full"
+                        style={{ background: 'rgba(0,214,143,0.1)', border: '1px solid rgba(0,214,143,0.2)', color: 'rgba(255,255,255,0.85)' }}
+                      >
+                        {p.nome} — {formatBRL(p.valor)}
+                        <button
+                          onClick={() => removerProduto(v.id, idx)}
+                          className="flex items-center justify-center rounded-full cursor-pointer transition-colors hover:text-red-400 text-white/40 ml-0.5"
+                        >
+                          <X size={10} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Linha de adição */}
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    value={np.nome}
+                    onChange={e => setNovoProdutoField(v.id, 'nome', e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') adicionarProduto(v.id) }}
+                    placeholder="Nome do produto"
+                    className="flex-1 px-2.5 py-1.5 rounded-lg text-sm text-white outline-none min-w-0"
+                    style={inputStyle}
+                  />
                   <input
                     type="number"
                     min="0"
                     step="0.01"
-                    value={f.valor_total}
-                    onChange={e => setField(v.id, 'valor_total', e.target.value)}
-                    placeholder="0,00"
-                    className={inputCls}
+                    value={np.valor}
+                    onChange={e => setNovoProdutoField(v.id, 'valor', e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') adicionarProduto(v.id) }}
+                    placeholder="R$"
+                    className="w-20 px-2.5 py-1.5 rounded-lg text-sm text-white outline-none tabular-nums"
                     style={inputStyle}
                   />
+                  <button
+                    onClick={() => adicionarProduto(v.id)}
+                    className="flex items-center justify-center w-9 h-9 rounded-lg font-bold cursor-pointer transition-all flex-shrink-0"
+                    style={{ background: 'rgba(0,214,143,0.15)', border: '1px solid rgba(0,214,143,0.25)', color: '#00d68f' }}
+                    title="Adicionar produto"
+                  >
+                    <Plus size={15} />
+                  </button>
                 </div>
+              </div>
+
+              {/* Valor total */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-white/40 font-medium">
+                  Valor total (R$)
+                  {prods.length > 0 && <span className="ml-1 text-white/25">· calculado dos produtos</span>}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={f.valor_total}
+                  onChange={e => setField(v.id, 'valor_total', e.target.value)}
+                  placeholder="0,00"
+                  className={inputCls}
+                  style={inputStyle}
+                />
               </div>
 
               {/* Observações */}
@@ -418,11 +551,7 @@ export default function RelatorioDiario() {
                 />
               </div>
 
-              <Button
-                onClick={() => handleSalvar(v.id)}
-                loading={isSaving}
-                className="w-full"
-              >
+              <Button onClick={() => handleSalvar(v.id)} loading={isSaving} className="w-full">
                 Salvar
               </Button>
             </GlassCard>
@@ -442,11 +571,7 @@ export default function RelatorioDiario() {
               <h3 className="text-sm font-semibold text-white">Consolidado do Dia</h3>
               <p className="text-xs text-white/30 mt-0.5">{fmtBR(dataSel)}</p>
             </div>
-            <Button
-              variant="secondary"
-              onClick={handleGerarPDF}
-              loading={gerandoPDF}
-            >
+            <Button variant="secondary" onClick={handleGerarPDF} loading={gerandoPDF}>
               <FileText size={14} className="mr-1.5" />
               Gerar PDF
             </Button>
@@ -490,6 +615,27 @@ export default function RelatorioDiario() {
                     </tr>
                   )
                 })}
+
+                {/* Produtos: linha resumo */}
+                {vendedoresVisiveis.some(v => (produtosVendidos[v.id] ?? []).length > 0) && (
+                  <tr style={{ borderTop: '1px solid rgba(0,214,143,0.12)', background: 'rgba(0,214,143,0.03)' }}>
+                    <td className="px-4 py-2.5 text-xs font-bold text-white/60 uppercase tracking-wide">Produtos</td>
+                    {vendedoresVisiveis.map(v => {
+                      const prods = produtosVendidos[v.id] ?? []
+                      return (
+                        <td key={v.id} className="px-3 py-2.5 text-center text-white/50 text-xs">
+                          {prods.length > 0
+                            ? <span title={prods.map(p => `${p.nome}: ${formatBRL(p.valor)}`).join('\n')}>{prods.length} item{prods.length > 1 ? 's' : ''}</span>
+                            : <span className="text-white/20">—</span>
+                          }
+                        </td>
+                      )
+                    })}
+                    <td className="px-3 py-2.5 text-center tabular-nums font-bold text-xs" style={{ color: '#00d68f' }}>
+                      {vendedoresVisiveis.reduce((s, v) => s + (produtosVendidos[v.id] ?? []).length, 0)} itens
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -520,7 +666,7 @@ export default function RelatorioDiario() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                      {['Data', 'Preencheram', 'Total Vendas', 'Valor Total', 'Status', 'PDF'].map(h => (
+                      {['Data', 'Preencheram', 'Total Vendas', 'Valor Total', 'Status', 'Ver'].map(h => (
                         <th key={h} className="px-4 py-3 text-left text-xs font-bold uppercase tracking-widest text-white/30">{h}</th>
                       ))}
                     </tr>
