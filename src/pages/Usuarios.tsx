@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input'
 import { useUsuarios, type UsuarioRow } from '@/hooks/useUsuarios'
 import { useVendedores } from '@/hooks/useVendedores'
 import { toast } from '@/components/ui/Toast'
-import { type Permissoes, PERMISSOES_DEFAULT, PERMISSAO_LABELS } from '@/types/permissoes'
+import { type Permissoes, PERMISSOES_DEFAULT, PERMISSOES_ADMIN, PERMISSOES_VENDEDOR, PERMISSAO_LABELS } from '@/types/permissoes'
 
 // ── Modal ──────────────────────────────────────────────────────────────────
 
@@ -138,6 +138,36 @@ function UsuarioModal({ usuario, onClose, onSave, onUpdate, onUpdateSenha, vende
               )}
             </div>
 
+            {/* Perfil rápido */}
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                Perfil de acesso
+              </p>
+              <div className="flex gap-2">
+                {([
+                  { label: 'Vendedor', preset: PERMISSOES_VENDEDOR, color: '#06b6d4' },
+                  { label: 'Administrador', preset: PERMISSOES_ADMIN, color: '#00d68f' },
+                ] as const).map(({ label, preset, color }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setPerms({ ...preset })}
+                    className="flex-1 px-3 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                    style={{
+                      background: 'rgba(255,255,255,0.05)',
+                      border: `1px solid rgba(255,255,255,0.1)`,
+                      color: 'rgba(255,255,255,0.5)',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = `${color}18`; e.currentTarget.style.borderColor = `${color}40`; e.currentTarget.style.color = color }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)' }}
+                  >
+                    Aplicar perfil {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-white/25">Atalho para preencher as permissões abaixo. Você pode ajustar depois.</p>
+            </div>
+
             {/* Vendedor IXC */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'rgba(255,255,255,0.5)' }}>
@@ -160,7 +190,11 @@ function UsuarioModal({ usuario, onClose, onSave, onUpdate, onUpdateSenha, vende
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-white/30">Restringe Clientes apenas às vendas deste vendedor.</p>
+              <p className="text-xs text-white/30">
+                {idVendedorIxc
+                  ? 'Vendedor vinculado — usuário verá apenas seus próprios dados nos Relatórios.'
+                  : 'Restringe Relatórios e Clientes apenas às vendas deste vendedor.'}
+              </p>
             </div>
 
             {/* Permissões */}
@@ -272,7 +306,7 @@ export default function Usuarios() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                {['Nome', 'Email', 'Vendedor IXC', 'Admin', 'Status', 'Ações'].map((col) => (
+                {['Nome', 'Email', 'Vendedor IXC', 'Perfil', 'Status', 'Ações'].map((col) => (
                   <th key={col} className="px-5 py-3 text-left text-xs font-bold uppercase tracking-widest text-white/30">
                     {col}
                   </th>
@@ -296,9 +330,20 @@ export default function Usuarios() {
                   </td>
                   <td className="px-5 py-3.5">
                     {u.permissoes?.admin ? (
-                      <ShieldCheck size={16} className="text-emerald-400" />
+                      <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                        <ShieldCheck size={14} />
+                        Admin
+                      </span>
+                    ) : u.id_vendedor_ixc ? (
+                      <span className="flex items-center gap-1.5 text-xs font-bold text-cyan-400">
+                        <Shield size={14} />
+                        Vendedor
+                      </span>
                     ) : (
-                      <Shield size={16} className="text-white/20" />
+                      <span className="flex items-center gap-1.5 text-xs font-bold text-white/20">
+                        <Shield size={14} />
+                        Padrão
+                      </span>
                     )}
                   </td>
                   <td className="px-5 py-3.5">

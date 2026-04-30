@@ -34,6 +34,18 @@ export const PERMISSOES_ADMIN: Permissoes = {
   admin: true,
 }
 
+export const PERMISSOES_VENDEDOR: Permissoes = {
+  dashboard: false,
+  nova_venda: false,
+  clientes: false,
+  vendedores: false,
+  metas: false,
+  produtos: false,
+  tv_dashboard: false,
+  relatorios: true,
+  admin: false,
+}
+
 export const PERMISSAO_LABELS: Record<keyof Permissoes, string> = {
   dashboard:    'Dashboard',
   nova_venda:   'Nova Venda',

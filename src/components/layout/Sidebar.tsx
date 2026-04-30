@@ -28,7 +28,7 @@ const navItems = [
 ]
 
 export function Sidebar() {
-  const { user, signOut, permissoes } = useAuthStore()
+  const { user, signOut, permissoes, vendedorDbId } = useAuthStore()
   const userName = user?.email?.split('@')[0] ?? 'Usuário'
 
   const navVisiveis = navItems.filter(({ permissao }) =>
@@ -92,7 +92,7 @@ export function Sidebar() {
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-white truncate">{userName}</p>
             <p className="text-xs text-white/40">
-              {permissoes?.admin ? 'Administrador' : 'Vendedor'}
+              {permissoes?.admin ? 'Administrador' : vendedorDbId ? 'Vendedor' : 'Usuário'}
             </p>
           </div>
         </div>
