@@ -9,7 +9,7 @@ import { supabase } from '@/lib/supabase'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, PieChart, Pie, Cell,
-  LineChart, Line, ComposedChart, LabelList,
+  LineChart, Line, ComposedChart,
 } from 'recharts'
 import {
   FileText, Users, TrendingUp, DollarSign, Percent,
@@ -24,7 +24,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useVendedores } from '@/hooks/useVendedores'
 import { useMetas } from '@/hooks/useMetas'
 import { useMetasVendedor } from '@/hooks/useMetasVendedor'
-import { useRelatoriosRedesign, type FiltroRedesign } from '@/hooks/useRelatoriosRedesign'
+import { useRelatoriosRedesign, type FiltroRedesign, type ContratoRedesign } from '@/hooks/useRelatoriosRedesign'
 import {
   useRelatoriosMes,
   useRelatoriosRange,
@@ -1505,70 +1505,92 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
           </div>
         </div>
 
-        {(() => {
-          const isPontoUnico = dadosMrrLinha.length === 1
-          const dotTotal = isPontoUnico ? { fill: '#00d68f', r: 10, strokeWidth: 2, stroke: 'rgba(255,255,255,0.2)' } : { fill: '#00d68f', r: 4 }
-          const dotVendedor = (cor: string) => isPontoUnico
-            ? { fill: cor, r: 7, strokeWidth: 2, stroke: 'rgba(255,255,255,0.15)' }
-            : { fill: cor, r: 3 }
+        {dadosMrrLinha.length === 1 ? (() => {
+          const ponto = dadosMrrLinha[0]
+          const totalMrr = (ponto?.mrrTotal as number) ?? 0
+          const linhas = vendedoresParaLinha
+            .map(v => ({ ...v, mrr: (ponto?.[v.id] as number) ?? 0 }))
+            .filter(v => v.mrr > 0)
+            .sort((a, b) => b.mrr - a.mrr)
           return (
-            <>
-              <ResponsiveContainer width="100%" height={260}>
-                <LineChart data={dadosMrrLinha} margin={{ top: isPontoUnico ? 28 : 5, right: 16, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                  <XAxis dataKey="mesLabel" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} axisLine={false} tickLine={false} width={70} tickFormatter={v => formatBRL(v)} />
-                  <Tooltip content={<MrrTooltip />} />
-                  <Legend
-                    iconType="line"
-                    wrapperStyle={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', paddingTop: 10 }}
-                    formatter={(value) => <span style={{ color: 'rgba(255,255,255,0.6)' }}>{value}</span>}
-                  />
-                  <Line type="monotone" dataKey="mrrTotal" name="Total do Time" stroke="#00d68f" strokeWidth={3} dot={dotTotal} activeDot={{ r: 7 }} connectNulls={true}>
-                    {isPontoUnico && (
-                      <LabelList
-                        dataKey="mrrTotal"
-                        position="top"
-                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        formatter={(v: any) => formatBRL(Number(v))}
-                        style={{ fill: '#00d68f', fontSize: 13, fontWeight: 700 }}
-                      />
-                    )}
-                  </Line>
-                  {vendedoresParaLinha.map(v => (
-                    <Line
-                      key={v.id}
-                      type="monotone"
-                      dataKey={v.id}
-                      name={v.nome}
-                      stroke={v.cor}
-                      strokeWidth={1.5}
-                      strokeDasharray={isPontoUnico ? undefined : '4 2'}
-                      dot={dotVendedor(v.cor)}
-                      activeDot={{ r: isPontoUnico ? 9 : 5 }}
-                      connectNulls={true}
-                    >
-                      {isPontoUnico && (
-                        <LabelList
-                          dataKey={v.id}
-                          position="top"
-                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                          formatter={(val: any) => Number(val) > 0 ? formatBRL(Number(val)) : ""}
-                          style={{ fill: v.cor, fontSize: 12, fontWeight: 600 }}
-                        />
-                      )}
-                    </Line>
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
-              {isPontoUnico && (
-                <p className="text-center text-xs text-white/30 mt-1 pb-1">
-                  Selecione "Últimos 3 meses" para ver a evolução
-                </p>
-              )}
-            </>
+            <div className="flex flex-col gap-3">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    {['Vendedor', 'MRR do Período', '% do Total'].map(h => (
+                      <th key={h} className="px-3 py-2 text-left text-xs font-bold uppercase tracking-widest text-white/30">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {linhas.length === 0 ? (
+                    <tr><td colSpan={3} className="px-3 py-4 text-center text-sm text-white/30">Sem dados de MRR no período</td></tr>
+                  ) : linhas.map(v => {
+                    const pct = totalMrr > 0 ? (v.mrr / totalMrr) * 100 : 0
+                    return (
+                      <tr key={v.id} className="hover:bg-white/3 transition-colors" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                        <td className="px-3 py-3">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: v.cor }} />
+                            <span className="font-semibold text-white">{v.nome}</span>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 tabular-nums font-bold" style={{ color: v.cor }}>{formatBRL(v.mrr)}</td>
+                        <td className="px-3 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)', minWidth: 80 }}>
+                              <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: v.cor }} />
+                            </div>
+                            <span className="text-xs tabular-nums text-white/50 w-10 text-right">{pct.toFixed(0)}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {linhas.length > 0 && (
+                    <tr style={{ borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,214,143,0.03)' }}>
+                      <td className="px-3 py-2 text-xs font-bold text-white/40 uppercase tracking-wide">Total</td>
+                      <td className="px-3 py-2 tabular-nums font-bold text-white">{formatBRL(totalMrr)}</td>
+                      <td />
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+              <p className="text-center text-xs text-white/25 pb-1">
+                Selecione "Últimos 3 meses" para ver a evolução
+              </p>
+            </div>
           )
-        })()}
+        })() : (
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={dadosMrrLinha} margin={{ top: 5, right: 16, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
+              <XAxis dataKey="mesLabel" tick={{ fill: 'rgba(255,255,255,0.5)', fontSize: 12 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} axisLine={false} tickLine={false} width={70} tickFormatter={v => formatBRL(v)} />
+              <Tooltip content={<MrrTooltip />} />
+              <Legend
+                iconType="line"
+                wrapperStyle={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', paddingTop: 10 }}
+                formatter={(value) => <span style={{ color: 'rgba(255,255,255,0.6)' }}>{value}</span>}
+              />
+              <Line type="monotone" dataKey="mrrTotal" name="Total do Time" stroke="#00d68f" strokeWidth={3} dot={{ fill: '#00d68f', r: 4 }} activeDot={{ r: 6 }} connectNulls={true} />
+              {vendedoresParaLinha.map(v => (
+                <Line
+                  key={v.id}
+                  type="monotone"
+                  dataKey={v.id}
+                  name={v.nome}
+                  stroke={v.cor}
+                  strokeWidth={1.5}
+                  strokeDasharray="4 2"
+                  dot={{ fill: v.cor, r: 3 }}
+                  activeDot={{ r: 5 }}
+                  connectNulls={true}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </GlassCard>
 
       {/* SEÇÃO 6 — Tabela de Performance por Vendedor */}
@@ -1651,6 +1673,91 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
           </table>
         </div>
       </GlassCard>
+
+      {/* SEÇÃO 7 — Contratos do Período */}
+      {(() => {
+        const contratosOrdenados = [...contratos].sort((a, b) => {
+          const da = a.data_venda ?? a.created_at ?? ''
+          const db = b.data_venda ?? b.created_at ?? ''
+          return db.localeCompare(da)
+        })
+
+        const fmtDateBR = (iso: string | null) => {
+          if (!iso) return '—'
+          const [y, m, d] = iso.split('T')[0].split('-')
+          return `${d}/${m}/${y}`
+        }
+
+        const StatusBadge = ({ c }: { c: ContratoRedesign }) => {
+          if (c.status_ixc === 'A') {
+            return (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                style={{ background: 'rgba(0,214,143,0.12)', color: '#00d68f', border: '1px solid rgba(0,214,143,0.25)' }}>
+                Ativo
+              </span>
+            )
+          }
+          if (c.status_ixc === 'AA' || c.status_ixc === 'P') {
+            const dias = c.dias_aguardando ?? 0
+            return (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
+                Aguardando {dias > 0 ? `${dias}d` : ''}
+              </span>
+            )
+          }
+          if (c.status_ixc === 'CA' || c.status_ixc === 'C' || c.status_ixc === 'CN') {
+            return (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full whitespace-nowrap"
+                style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}>
+                Cancelado
+              </span>
+            )
+          }
+          return <span className="text-xs text-white/25">{c.status_ixc ?? '—'}</span>
+        }
+
+        return (
+          <GlassCard className="overflow-hidden">
+            <div className="px-5 py-4 flex items-center justify-between flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+              <div>
+                <h3 className="text-sm font-semibold text-white">
+                  Contratos do Período ({contratosOrdenados.length})
+                </h3>
+                <p className="text-xs text-white/30 mt-0.5">Ordenados por data de cadastro (mais recentes primeiro)</p>
+              </div>
+            </div>
+            <div className="overflow-y-auto" style={{ maxHeight: contratosOrdenados.length > 15 ? '28rem' : undefined }}>
+              <table className="w-full text-sm">
+                <thead className="sticky top-0" style={{ background: '#0c1e14', zIndex: 1 }}>
+                  <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    {['Cliente', 'Vendedor', 'Cadastro', 'Status', 'Valor'].map(h => (
+                      <th key={h} className="px-4 py-3 text-left text-xs font-bold uppercase tracking-widest text-white/30 whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {contratosOrdenados.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-sm text-white/30">
+                        Nenhum contrato no período selecionado
+                      </td>
+                    </tr>
+                  ) : contratosOrdenados.map(c => (
+                    <tr key={c.id} className="hover:bg-white/3 transition-colors" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                      <td className="px-4 py-3 font-semibold text-white max-w-[200px] truncate">{c.cliente_nome}</td>
+                      <td className="px-4 py-3 text-white/50 whitespace-nowrap">{c.vendedor?.nome ?? '—'}</td>
+                      <td className="px-4 py-3 text-white/40 tabular-nums whitespace-nowrap">{fmtDateBR(c.data_venda ?? c.created_at)}</td>
+                      <td className="px-4 py-3"><StatusBadge c={c} /></td>
+                      <td className="px-4 py-3 tabular-nums font-medium text-white/80 whitespace-nowrap">{formatBRL(c.valor_unitario)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </GlassCard>
+        )
+      })()}
     </div>
   )
 }
