@@ -280,7 +280,7 @@ export default function RelatorioDiario() {
             contatos: String(existing.contatos),
             calls_reunioes: String(existing.calls_reunioes),
             vendas: String(existing.vendas),
-            valor_total: String(existing.valor_total),
+            valor_total: String(somarProdutos(existing.produtos_vendidos ?? [])),
             observacoes: existing.observacoes ?? '',
           }
         : emptyForm()
@@ -311,7 +311,7 @@ export default function RelatorioDiario() {
     const lista = (produtosVendidos[vendedorId] ?? []).filter((_, i) => i !== idx)
     const total = somarProdutos(lista)
     setProdutosVendidos(p => ({ ...p, [vendedorId]: lista }))
-    setForms(f => ({ ...f, [vendedorId]: { ...(f[vendedorId] ?? emptyForm()), valor_total: lista.length > 0 ? String(total) : f[vendedorId]?.valor_total ?? '' } }))
+    setForms(f => ({ ...f, [vendedorId]: { ...(f[vendedorId] ?? emptyForm()), valor_total: String(total) } }))
   }
 
   function setNovoProdutoField(vendedorId: string, field: 'nome' | 'valor', value: string) {
@@ -520,22 +520,12 @@ export default function RelatorioDiario() {
                 </div>
               </div>
 
-              {/* Valor total */}
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-white/40 font-medium">
-                  Valor total (R$)
-                  {prods.length > 0 && <span className="ml-1 text-white/25">· calculado dos produtos</span>}
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={f.valor_total}
-                  onChange={e => setField(v.id, 'valor_total', e.target.value)}
-                  placeholder="0,00"
-                  className={inputCls}
-                  style={inputStyle}
-                />
+              {/* Total calculado dos produtos */}
+              <div className="flex items-center justify-between px-3 py-2 rounded-xl" style={{ background: 'rgba(0,214,143,0.07)', border: '1px solid rgba(0,214,143,0.18)' }}>
+                <span className="text-xs font-medium text-white/50">Total</span>
+                <span className="text-base font-bold tabular-nums" style={{ color: '#00d68f' }}>
+                  {formatBRL(somarProdutos(prods))}
+                </span>
               </div>
 
               {/* Observações */}
