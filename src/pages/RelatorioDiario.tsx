@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase'
 import { ClipboardList, CheckCircle2, Clock, ChevronDown, ChevronUp, FileText } from 'lucide-react'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Spinner } from '@/components/ui/Spinner'
@@ -39,89 +41,152 @@ async function gerarPDF(
   data: string,
   vendedores: { id: string; nome: string }[],
   forms: Record<string, FormData>,
+  empresaNome: string,
 ) {
   const { default: jsPDF } = await import('jspdf')
+  const { default: autoTable } = await import('jspdf-autotable')
 
-  const cols = vendedores
+  const { data: contratos } = await supabase
+    .from('vendas')
+    .select('cliente_nome, valor_unitario, status_ixc, vendedor:vendedores(nome)')
+    .eq('data_venda', data)
+
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
-
-  const verde = [15, 64, 25] as [number, number, number]
   const pageW = 297
+  const pageH = 210
   const marginL = 14
-  const colW = Math.min(38, (pageW - marginL - 14 - 44) / Math.max(cols.length, 1))
-  const metricaW = 44
-  const totalW = 30
+  const marginR = 14
+  const contentW = pageW - marginL - marginR
+  const headerGreen: [number, number, number] = [26, 58, 42]
 
-  // Header
-  doc.setFillColor(...verde)
-  doc.rect(0, 0, pageW, 26, 'F')
+  // ── Header
+  doc.setFillColor(...headerGreen)
+  doc.rect(0, 0, pageW, 28, 'F')
   doc.setTextColor(255, 255, 255)
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(14)
-  doc.text('RELATÓRIO DE DESEMPENHO DIÁRIO', pageW / 2, 11, { align: 'center' })
-  doc.setFontSize(10)
-  doc.text(`DATA: ${fmtBR(data)}`, pageW / 2, 20, { align: 'center' })
+  doc.setFontSize(15)
+  doc.text('RELATÓRIO DE DESEMPENHO DIÁRIO', pageW / 2, 12, { align: 'center' })
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(9)
+  doc.text(empresaNome, marginL, 22)
+  const [yr, mo, dy] = data.split('-')
+  const dateObj = new Date(Number(yr), Number(mo) - 1, Number(dy))
+  const dateStr = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  doc.text(dateStr.charAt(0).toUpperCase() + dateStr.slice(1), pageW - marginR, 22, { align: 'right' })
 
-  // Tabela
-  const startY = 32
-  const rowH = 10
-  const headers = ['MÉTRICA', ...cols.map(v => v.nome.toUpperCase()), 'TOTAL']
-  const widths = [metricaW, ...cols.map(() => colW), totalW]
+  // ── KPI block
+  const kpiY = 33
+  const kpiH = 20
+  const gap = 4
+  const kpiW = (contentW - gap * 2) / 3
 
-  // Header da tabela
-  doc.setFillColor(30, 80, 40)
-  let xPos = marginL
-  for (let i = 0; i < headers.length; i++) {
-    doc.setFillColor(30, 80, 40)
-    doc.rect(xPos, startY, widths[i], rowH, 'F')
-    doc.setDrawColor(100, 150, 100)
-    doc.rect(xPos, startY, widths[i], rowH, 'S')
-    doc.setTextColor(255, 255, 255)
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(8)
-    doc.text(headers[i], xPos + widths[i] / 2, startY + 6.5, { align: 'center' })
-    xPos += widths[i]
-  }
+  const totalVendas = vendedores.reduce((s, v) => s + numOf(forms[v.id]?.vendas ?? '0'), 0)
+  const totalValor = vendedores.reduce((s, v) => s + numOf(forms[v.id]?.valor_total ?? '0'), 0)
+  const totalContatos = vendedores.reduce((s, v) => s + numOf(forms[v.id]?.contatos ?? '0'), 0)
+  const totalLeads = vendedores.reduce((s, v) => s + numOf(forms[v.id]?.leads ?? '0'), 0)
 
-  const metricas = [
-    { label: 'LEADS', key: 'leads' as keyof FormData, fmt: (v: number) => String(v) },
-    { label: 'CONTATOS', key: 'contatos' as keyof FormData, fmt: (v: number) => String(v) },
-    { label: 'CALLS / REUNIÕES', key: 'calls_reunioes' as keyof FormData, fmt: (v: number) => String(v) },
-    { label: 'VENDAS FECHADAS', key: 'vendas' as keyof FormData, fmt: (v: number) => String(v) },
-    { label: 'VALOR (R$)', key: 'valor_total' as keyof FormData, fmt: (v: number) => formatBRL(v) },
+  const kpis = [
+    { title: 'VENDAS FECHADAS', value: String(totalVendas), sub: `Valor: ${formatBRL(totalValor)}` },
+    { title: 'TOTAL DE CONTATOS', value: String(totalContatos), sub: 'contatos realizados' },
+    { title: 'TOTAL DE LEADS', value: String(totalLeads), sub: 'leads trabalhados' },
   ]
 
-  for (let row = 0; row < metricas.length; row++) {
-    const { label, key, fmt } = metricas[row]
-    const y = startY + (row + 1) * rowH
-    const isEven = row % 2 === 0
-    xPos = marginL
-    let total = 0
+  kpis.forEach((kpi, i) => {
+    const x = marginL + i * (kpiW + gap)
+    doc.setFillColor(240, 247, 244)
+    doc.roundedRect(x, kpiY, kpiW, kpiH, 2, 2, 'F')
+    doc.setDrawColor(180, 220, 200)
+    doc.roundedRect(x, kpiY, kpiW, kpiH, 2, 2, 'S')
+    doc.setTextColor(26, 58, 42)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7)
+    doc.text(kpi.title, x + kpiW / 2, kpiY + 6, { align: 'center' })
+    doc.setFontSize(16)
+    doc.text(kpi.value, x + kpiW / 2, kpiY + 14, { align: 'center' })
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7)
+    doc.setTextColor(80, 110, 95)
+    doc.text(kpi.sub, x + kpiW / 2, kpiY + 19, { align: 'center' })
+  })
 
-    const vals = cols.map(v => numOf(forms[v.id]?.[key] ?? '0'))
-    total = vals.reduce((s, x) => s + x, 0)
-    const allVals = [...vals, total]
-    const allHeaders = [label, ...allVals.map(fmt)]
+  // ── Shared table styles
+  const headStyles = {
+    fillColor: headerGreen,
+    textColor: [255, 255, 255] as [number, number, number],
+    fontStyle: 'bold' as const,
+    fontSize: 8,
+  }
+  const altRows = { fillColor: [240, 247, 244] as [number, number, number] }
+  const tblStyles = { fontSize: 8, cellPadding: 3 }
+  const tblLine = { tableLineColor: [200, 220, 210] as [number, number, number], tableLineWidth: 0.1 }
 
-    for (let c = 0; c < allHeaders.length; c++) {
-      doc.setFillColor(isEven ? 245 : 255, isEven ? 250 : 255, isEven ? 245 : 255)
-      doc.rect(xPos, y, widths[c], rowH, 'F')
-      doc.setDrawColor(180, 210, 180)
-      doc.rect(xPos, y, widths[c], rowH, 'S')
-      doc.setTextColor(30, 30, 30)
-      doc.setFont('helvetica', c === 0 ? 'bold' : 'normal')
-      doc.setFontSize(8)
-      doc.text(allHeaders[c], xPos + (c === 0 ? 3 : widths[c] / 2), y + 6.5, { align: c === 0 ? 'left' : 'center' })
-      xPos += widths[c]
-    }
+  const mkRow = (label: string, key: keyof FormData, isValor = false) => {
+    const vals = vendedores.map(v => numOf(forms[v.id]?.[key] ?? '0'))
+    const total = vals.reduce((s, x) => s + x, 0)
+    const fmt = isValor ? formatBRL : (n: number) => String(n)
+    return [label, ...vals.map(fmt), fmt(total)]
   }
 
-  // Footer
-  const footerY = startY + (metricas.length + 1) * rowH + 8
-  doc.setTextColor(120, 120, 120)
+  // ── Activity table
+  autoTable(doc, {
+    startY: kpiY + kpiH + 5,
+    head: [['MÉTRICA', ...vendedores.map(v => v.nome.toUpperCase()), 'TOTAL']],
+    body: [
+      mkRow('LEADS', 'leads'),
+      mkRow('CONTATOS', 'contatos'),
+      mkRow('CALLS / REUNIÕES', 'calls_reunioes'),
+      mkRow('VENDAS FECHADAS', 'vendas'),
+      mkRow('VALOR (R$)', 'valor_total', true),
+    ],
+    headStyles,
+    alternateRowStyles: altRows,
+    columnStyles: { 0: { fontStyle: 'bold' as const, textColor: headerGreen } },
+    styles: tblStyles,
+    margin: { left: marginL, right: marginR },
+    ...tblLine,
+  })
+
+  // ── Contracts table
+  if (contratos && contratos.length > 0) {
+    const afterY = (doc as any).lastAutoTable.finalY + 8
+    const statusLabel = (s: string | null) => {
+      const map: Record<string, string> = { A: 'Ativo', AA: 'Aguardando Assinatura', CA: 'Cancelado', B: 'Bloqueado' }
+      return (s && map[s]) ? map[s] : (s ?? '—')
+    }
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.setTextColor(...headerGreen)
+    doc.text('CONTRATOS FECHADOS HOJE', marginL, afterY - 2)
+
+    autoTable(doc, {
+      startY: afterY + 1,
+      head: [['CLIENTE', 'VENDEDOR', 'VALOR', 'STATUS']],
+      body: (contratos as any[]).map(c => [
+        c.cliente_nome ?? '—',
+        c.vendedor?.nome ?? '—',
+        formatBRL(c.valor_unitario ?? 0),
+        statusLabel(c.status_ixc),
+      ]),
+      headStyles,
+      alternateRowStyles: altRows,
+      styles: tblStyles,
+      margin: { left: marginL, right: marginR },
+      ...tblLine,
+    })
+  }
+
+  // ── Footer
+  const finalY = (doc as any).lastAutoTable?.finalY ?? 180
+  doc.setTextColor(150, 150, 150)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(7)
-  doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}`, marginL, footerY)
+  doc.text(
+    `${empresaNome} · Gerado em ${new Date().toLocaleString('pt-BR')}`,
+    pageW / 2,
+    Math.min(finalY + 8, pageH - 5),
+    { align: 'center' },
+  )
 
   doc.save(`relatorio-diario-${data}.pdf`)
 }
@@ -137,6 +202,15 @@ export default function RelatorioDiario() {
   const [forms, setForms] = useState<Record<string, FormData>>({})
   const [salvando, setSalvando] = useState<Record<string, boolean>>({})
   const [gerandoPDF, setGerandoPDF] = useState(false)
+
+  const { data: empresa } = useQuery({
+    queryKey: ['empresa-nome'],
+    queryFn: async () => {
+      const { data } = await supabase.from('empresas').select('nome').limit(1).single()
+      return data?.nome ?? 'SalesTracker'
+    },
+    staleTime: Infinity,
+  })
 
   const { vendedores, loading: loadingVend } = useVendedores()
   const vendedoresAtivos = useMemo(
@@ -203,7 +277,7 @@ export default function RelatorioDiario() {
   async function handleGerarPDF() {
     setGerandoPDF(true)
     try {
-      await gerarPDF(dataSel, vendedoresVisiveis, forms)
+      await gerarPDF(dataSel, vendedoresVisiveis, forms, empresa ?? 'SalesTracker')
     } finally {
       setGerandoPDF(false)
     }
