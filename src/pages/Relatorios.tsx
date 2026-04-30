@@ -1717,6 +1717,10 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
           return <span className="text-xs text-white/25">{c.status_ixc ?? '—'}</span>
         }
 
+        const somaAtivos    = contratos.filter(c => c.status_ixc === 'A').reduce((s, c) => s + (c.valor_unitario ?? 0), 0)
+        const somaAguardando = contratos.filter(c => c.status_ixc === 'AA' || c.status_ixc === 'P').reduce((s, c) => s + (c.valor_unitario ?? 0), 0)
+        const somaTotal      = contratos.reduce((s, c) => s + (c.valor_unitario ?? 0), 0)
+
         return (
           <GlassCard className="overflow-hidden">
             <div className="px-5 py-4 flex items-center justify-between flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -1726,6 +1730,25 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
                 </h3>
                 <p className="text-xs text-white/30 mt-0.5">Ordenados por data de cadastro (mais recentes primeiro)</p>
               </div>
+            </div>
+
+            {/* Resumo de totais */}
+            <div className="px-5 py-3 flex items-center gap-3 flex-wrap" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.015)' }}>
+              {[
+                { icon: '✓', label: 'Ativo', valor: somaAtivos,     cor: '#00d68f', bg: 'rgba(0,214,143,0.10)',  border: 'rgba(0,214,143,0.22)' },
+                { icon: '⏳', label: 'Aguardando', valor: somaAguardando, cor: '#f59e0b', bg: 'rgba(245,158,11,0.10)', border: 'rgba(245,158,11,0.22)' },
+                { icon: 'Σ', label: 'Total Geral', valor: somaTotal,    cor: 'rgba(255,255,255,0.75)', bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.12)' },
+              ].map(({ icon, label, valor, cor, bg, border }) => (
+                <div
+                  key={label}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                  style={{ background: bg, border: `1px solid ${border}` }}
+                >
+                  <span className="text-xs" style={{ color: cor }}>{icon}</span>
+                  <span className="text-xs text-white/40">{label}:</span>
+                  <span className="text-sm font-bold tabular-nums" style={{ color: cor }}>{formatBRL(valor)}</span>
+                </div>
+              ))}
             </div>
             <div className="overflow-y-auto" style={{ maxHeight: contratosOrdenados.length > 15 ? '28rem' : undefined }}>
               <table className="w-full text-sm">
