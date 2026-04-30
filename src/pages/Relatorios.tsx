@@ -12,7 +12,7 @@ import {
   LineChart, Line, ComposedChart,
 } from 'recharts'
 import {
-  FileText, Users, User, TrendingUp, DollarSign, Percent,
+  FileText, Users, TrendingUp, DollarSign, Percent,
   Target, ChevronDown, ChevronUp, Check, Edit2, X, Clock, FolderKanban,
   CheckCircle2, AlertCircle, Award, RotateCcw,
 } from 'lucide-react'
