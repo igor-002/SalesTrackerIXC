@@ -750,7 +750,7 @@ export async function ixcBuscarProdutosContrato(
         const registros = normalizeRegistros(data)
         for (const r of registros) {
           const id = String(r.id ?? '')
-          const valorUnit = parseFloat(String(r.valor_unit ?? '0'))
+          const valorUnit = parseFloat(String(r.valor_liquido ?? r.valor_unit ?? '0'))
           const qtde = parseInt(String(r.qtde ?? '1'), 10) || 1
           if (id && valorUnit > 0 && !produtosMap.has(id)) {
             produtosMap.set(id, { valorUnit, qtde })
@@ -784,7 +784,7 @@ export async function ixcBuscarProdutosContrato(
         const registros = normalizeRegistros(data)
         for (const r of registros) {
           const id = String(r.id ?? '')
-          const valorUnit = parseFloat(String(r.valor_unit ?? '0'))
+          const valorUnit = parseFloat(String(r.valor_liquido ?? r.valor_unit ?? '0'))
           const qtde = parseInt(String(r.qtde ?? '1'), 10) || 1
           if (id && valorUnit > 0 && !produtosMap.has(id)) {
             produtosMap.set(id, { valorUnit, qtde })
