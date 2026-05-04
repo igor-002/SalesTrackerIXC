@@ -207,7 +207,10 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
 
   // Período — modo rápido ou range livre
   type PeriodoMode = 'hoje' | 'semana' | 'mesMes' | 'mesAnterior' | 'ultimos3' | 'range'
-  const [periodoMode, setPeriodoMode] = useState<PeriodoMode>('ultimos3')
+  const hoje = new Date()
+  const [periodoMode, setPeriodoMode] = useState<PeriodoMode>(
+    hoje.getDate() <= 5 ? 'mesAnterior' : 'mesMes'
+  )
   const [pendingInicio, setPendingInicio] = useState('')
   const [pendingFim, setPendingFim] = useState('')
   const [rangeInicio, setRangeInicio] = useState('')
@@ -698,6 +701,18 @@ function TabVisaoGeral({ vendedorIdFiltro, isGestor, vendedores }: {
           />
         </div>
       </div>
+
+      {periodoMode === 'mesMes' && !loading && kpis.total === 0 && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white/60 text-sm">
+          <span className="text-xl">📅</span>
+          <span>
+            <strong className="text-white/80">
+              {hoje.toLocaleString('pt-BR', { month: 'long' }).replace(/^\w/, c => c.toUpperCase())}/{hoje.getFullYear()}
+            </strong>{' '}
+            está começando — nenhum contrato registrado ainda. Os dados aparecerão conforme o time registrar vendas.
+          </span>
+        </div>
+      )}
 
       {/* SEÇÃO METAS DO TIME */}
       <GlassCard className="p-5">
