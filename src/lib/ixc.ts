@@ -796,10 +796,44 @@ export async function ixcBuscarProdutosContrato(
     }
   }
 
-  // Somar valor_unit * qtde
+  // Query 3: Buscar descontos do contrato
+  const descontosMap = new Map<string, number>()
+  if (idContrato && idContrato !== '0' && idContrato.trim() !== '') {
+    try {
+      const resp = await fetch(ixcUrl('cliente_contrato_descontos'), {
+        method: 'POST',
+        headers: { ...ixcHeaders(), ixcsoft: 'listar' },
+        body: JSON.stringify({
+          qtype: 'cliente_contrato_descontos.id_contrato',
+          query: idContrato,
+          oper: '=',
+          page: '1',
+          rp: '50',
+          sortname: 'id',
+          sortorder: 'asc',
+        }),
+      })
+      if (resp.ok) {
+        const data = (await resp.json()) as { registros?: Record<string, unknown>[] | Record<string, unknown> }
+        const registros = normalizeRegistros(data)
+        for (const r of registros) {
+          const idProd = String(r.id_vd_contrato_produtos ?? '')
+          const desconto = parseFloat(String(r.valor_desconto ?? '0'))
+          if (idProd && desconto > 0) {
+            descontosMap.set(idProd, (descontosMap.get(idProd) ?? 0) + desconto)
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[ixcBuscarProdutosContrato] Erro query descontos:', err)
+    }
+  }
+
+  // Somar valor_unit * qtde, subtraindo descontos por produto
   let total = 0
-  for (const { valorUnit, qtde } of produtosMap.values()) {
-    total += valorUnit * qtde
+  for (const [id, { valorUnit, qtde }] of produtosMap.entries()) {
+    const desconto = descontosMap.get(id) ?? 0
+    total += Math.max(0, valorUnit * qtde - desconto)
   }
 
   return total
