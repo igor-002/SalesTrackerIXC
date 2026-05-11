@@ -818,7 +818,7 @@ export async function ixcBuscarProdutosContrato(
         const registros = normalizeRegistros(data)
         for (const r of registros) {
           const idProd = String(r.id_vd_contrato_produtos ?? '')
-          const desconto = parseFloat(String(r.valor_desconto ?? '0'))
+          const desconto = parseFloat(String(r.valor ?? '0'))
           if (idProd && desconto > 0) {
             descontosMap.set(idProd, (descontosMap.get(idProd) ?? 0) + desconto)
           }
