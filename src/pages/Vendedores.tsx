@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { RefreshCw, Users, Search, History } from 'lucide-react'
+import { RefreshCw, Users, Search, History, Download } from 'lucide-react'
 import { GlassCard } from '@/components/ui/GlassCard'
 import { Button } from '@/components/ui/Button'
 import { Spinner } from '@/components/ui/Spinner'
@@ -8,12 +8,13 @@ import { useVendedores } from '@/hooks/useVendedores'
 import { syncHistoricoVendedores } from '@/services/ixcSync'
 
 export default function Vendedores() {
-  const { vendedores, loading, updateVendedor, toggleIncluirHistorico, refetch } = useVendedores()
+  const { vendedores, loading, updateVendedor, toggleIncluirHistorico, syncVendedoresFromIXC, refetch } = useVendedores()
   const [syncing, setSyncing] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
   const [syncingHistorico, setSyncingHistorico] = useState(false)
   const [progressHistorico, setProgressHistorico] = useState({ message: '', percent: 0 })
   const [togglingHistorico, setTogglingHistorico] = useState<string | null>(null)
+  const [syncingVendedores, setSyncingVendedores] = useState(false)
 
   const vendedoresFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase()
@@ -47,6 +48,18 @@ export default function Vendedores() {
     }
   }
 
+  async function handleSyncVendedores() {
+    setSyncingVendedores(true)
+    try {
+      const r = await syncVendedoresFromIXC()
+      toast('success', `Vendedores sincronizados — ${r.inseridos} novos, ${r.atualizados} atualizados (${r.total} no IXC)`)
+    } catch (err) {
+      toast('error', err instanceof Error ? err.message : 'Erro ao sincronizar vendedores')
+    } finally {
+      setSyncingVendedores(false)
+    }
+  }
+
   async function handleSyncHistorico() {
     setSyncingHistorico(true)
     setProgressHistorico({ message: 'Iniciando...', percent: 0 })
@@ -72,6 +85,15 @@ export default function Vendedores() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={handleSyncVendedores}
+            disabled={syncingVendedores}
+            style={{ background: 'rgba(0,214,143,0.15)', borderColor: 'rgba(0,214,143,0.3)', color: '#00d68f' }}
+          >
+            <Download size={15} className={syncingVendedores ? 'animate-spin' : ''} />
+            Sincronizar Vendedores
+          </Button>
           <Button
             variant="secondary"
             onClick={handleSyncHistorico}
