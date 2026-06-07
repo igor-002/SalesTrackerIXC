@@ -225,6 +225,26 @@
 | PUT | `/cliente_contrato_acrescimos/{id}` |
 | DELETE | `/cliente_contrato_acrescimos/{id}` |
 
+**Campos do registro (GET, validado ao vivo):**
+```json
+{
+  "id": "7216",
+  "descricao": "acordo comercial",
+  "valor": "300.00",
+  "percentual": "187.500000",
+  "data": "2026-06-02",
+  "data_validade": "0000-00-00",
+  "id_contrato": "25524",
+  "id_vd_contrato_produtos": "6263",
+  "id_reajuste": "0"
+}
+```
+
+- Campo do valor = **`valor`** (string, R$). **Não** existe `valor_acrescimo`. Mesmo padrão dos descontos.
+- Vincula ao produto do contrato por `id_vd_contrato_produtos` → `vd_contratos_produtos.id`.
+- Filtrar por contrato: `qtype=cliente_contrato_acrescimos.id_contrato`, `oper="="`.
+- No cálculo do MRR (`ixcBuscarProdutosContrato`), acréscimo **soma** ao valor do produto: `max(0, valor_unit*qtde - desconto) + acrescimo`.
+
 ---
 
 ### Serviços e Descontos Adicionais `/cliente_contrato_servicos`

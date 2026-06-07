@@ -829,11 +829,47 @@ export async function ixcBuscarProdutosContrato(
     }
   }
 
-  // Somar valor_liquido * qtde, subtraindo descontos por produto
+  // Query 4: Buscar acréscimos do contrato
+  // Mesma estrutura dos descontos; o campo do valor é "valor" (não "valor_acrescimo").
+  // Acréscimo soma ao valor do produto (ex.: acordo comercial acima do plano).
+  const acrescimosMap = new Map<string, number>()
+  if (idContrato && idContrato !== '0' && idContrato.trim() !== '') {
+    try {
+      const resp = await fetch(ixcUrl('cliente_contrato_acrescimos'), {
+        method: 'POST',
+        headers: { ...ixcHeaders(), ixcsoft: 'listar' },
+        body: JSON.stringify({
+          qtype: 'cliente_contrato_acrescimos.id_contrato',
+          query: idContrato,
+          oper: '=',
+          page: '1',
+          rp: '50',
+          sortname: 'id',
+          sortorder: 'asc',
+        }),
+      })
+      if (resp.ok) {
+        const data = (await resp.json()) as { registros?: Record<string, unknown>[] | Record<string, unknown> }
+        const registros = normalizeRegistros(data)
+        for (const r of registros) {
+          const idProd = String(r.id_vd_contrato_produtos ?? '')
+          const acrescimo = parseFloat(String(r.valor ?? '0'))
+          if (idProd && acrescimo > 0) {
+            acrescimosMap.set(idProd, (acrescimosMap.get(idProd) ?? 0) + acrescimo)
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[ixcBuscarProdutosContrato] Erro query acréscimos:', err)
+    }
+  }
+
+  // Somar valor_liquido * qtde, subtraindo descontos e somando acréscimos por produto
   let total = 0
   for (const [id, { valorUnit, qtde }] of produtosMap.entries()) {
     const desconto = descontosMap.get(id) ?? 0
-    total += Math.max(0, valorUnit * qtde - desconto)
+    const acrescimo = acrescimosMap.get(id) ?? 0
+    total += Math.max(0, valorUnit * qtde - desconto) + acrescimo
   }
 
   return total
