@@ -113,16 +113,22 @@ export async function sincronizarStatusIxc(): Promise<SyncResultado> {
     if (!vendas.length) {
       resultado = { atualizadas: 0, erros: 0, total: 0 }
     } else {
-      const results = await Promise.allSettled(vendas.map(sincronizarVenda))
-
+      // Concorrência limitada: o browser só abre ~6 conexões por host ao proxy IXC.
+      // Disparar 276 promises de uma vez inunda a fila e trava o indicador "Sincronizando".
+      // Processar em lotes mantém throughput controlado.
+      const BATCH_SIZE = 10
       let atualizadas = 0
       let erros = 0
-      for (const r of results) {
-        if (r.status === 'fulfilled') {
-          if (r.value.atualizado) atualizadas++
-          if (r.value.erro) erros++
-        } else {
-          erros++
+      for (let i = 0; i < vendas.length; i += BATCH_SIZE) {
+        const batch = vendas.slice(i, i + BATCH_SIZE)
+        const results = await Promise.allSettled(batch.map(sincronizarVenda))
+        for (const r of results) {
+          if (r.status === 'fulfilled') {
+            if (r.value.atualizado) atualizadas++
+            if (r.value.erro) erros++
+          } else {
+            erros++
+          }
         }
       }
       resultado = { atualizadas, erros, total: vendas.length }

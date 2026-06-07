@@ -52,7 +52,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       .from('usuarios')
       .select('permissoes, id_vendedor_ixc, ativo')
       .eq('user_id', userId)
-      .single()
+      .maybeSingle()
 
     if (usuarioData) {
       // Usuário desativado → permissões mínimas (o ProtectedRoute bloqueará o acesso)
@@ -69,7 +69,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           .from('vendedores')
           .select('id')
           .eq('ixc_id', idVendedorIxc)
-          .single()
+          .maybeSingle()
         vendedorDbId = vendedorData?.id ?? null
       }
 

@@ -17,7 +17,9 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
 // Defina VITE_SUPABASE_SERVICE_ROLE_KEY nas variáveis de ambiente do projeto.
 const serviceRoleKey = (import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY as string | undefined)?.trim()
 export const supabaseAdmin = serviceRoleKey
-  ? createClient<Database>(supabaseUrl, serviceRoleKey, { auth: { autoRefreshToken: false, persistSession: false } })
+  ? createClient<Database>(supabaseUrl, serviceRoleKey, {
+      auth: { autoRefreshToken: false, persistSession: false, storageKey: 'sb-salestracker-admin' },
+    })
   : null
 
 export type SupabaseClient = typeof supabase
