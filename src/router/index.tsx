@@ -16,6 +16,7 @@ const Usuarios       = lazy(() => import('@/pages/Usuarios'))
 const Relatorios     = lazy(() => import('@/pages/Relatorios'))
 const DiagnosticoIXC   = lazy(() => import('@/pages/DiagnosticoIXC'))
 const RelatorioDiario  = lazy(() => import('@/pages/RelatorioDiario'))
+const RelatorioEquipe  = lazy(() => import('@/pages/RelatorioEquipe'))
 
 function PageLoader() {
   return (
@@ -90,6 +91,12 @@ export function Router() {
           <Route path="/relatorio-diario" element={
             <ProtectedRoute permissao="relatorios">
               <AppShell><RelatorioDiario /></AppShell>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/relatorio-equipe" element={
+            <ProtectedRoute permissao="relatorios">
+              <AppShell><RelatorioEquipe /></AppShell>
             </ProtectedRoute>
           } />
 
